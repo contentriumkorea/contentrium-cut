@@ -1,0 +1,12 @@
+{
+  "productId": "com.contentrium.cut",
+  "displayName": "Contentrium CUT",
+  "appVersion": "0.1.0",
+  "panelVersion": "0.1.0",
+  "companionVersion": "0.1.0",
+  "bundleId": "contentrium-cut-0.1.0",
+  "dataSchemaVersion": 1,
+  "protocolVersion": 1,
+  "publicKey": "RLvAgufz68t/+T6gY6bDLt6rHexzFrCZsdjvc3MvjI0=",
+  "signingKeyId": "contentrium-cut-2026-01"
+}

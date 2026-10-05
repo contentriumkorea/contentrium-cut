@@ -1,0 +1,19 @@
+{
+  "name": "contentrium-cut",
+  "version": "0.1.0",
+  "description": "Contentrium CUT Premiere Pro UXP panel and local Companion",
+  "scripts": {
+    "test": "node --test tests/host-guard.test.js tests/test-sync.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "devDependencies": {
+    "@adobe/premierepro": "^26.5.0",
+    "@electron/asar": "^4.3.1",
+    "js-sha256": "^1.0.0",
+    "tar": "^7.5.22",
+    "ws": "^8.22.0"
+  }
+}

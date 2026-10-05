@@ -1,0 +1,26 @@
+{
+  "appVersion": "0.1.0",
+  "frozenRuntimeImports": {
+    "appVersion": "0.1.0",
+    "bundleId": "contentrium-cut-0.1.0",
+    "runtimeReady": true,
+    "torchVersion": "2.14.1+cpu",
+    "onnxVersion": "1.30.0"
+  },
+  "frozenAnalysisJob": {
+    "frozenService": true,
+    "appVersion": "0.1.0",
+    "jobStatus": "completed"
+  },
+  "pythonTests": {
+    "passed": 263,
+    "skipped": 0,
+    "actualSilero": true
+  },
+  "nodeTests": {
+    "passed": 33,
+    "skipped": 0
+  },
+  "nativeHostVersion": "26.5.2",
+  "mixedModelInference": "not_verified_provider_access_required"
+}

@@ -1,0 +1,10 @@
+const test=require('node:test');const assert=require('node:assert/strict');
+const guard=require('../plugin/guard');
+const sha=require('../plugin/vendor/sha256');
+function hash(value){const stable=v=>Array.isArray(v)?'['+v.map(stable).join(',')+']':v&&typeof v==='object'?'{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stable(v[k])).join(',')+'}':JSON.stringify(v);return sha(stable(value));}
+function fixture(){const snapshot={snapshotHash:'owned',fps:{num:30,den:1},range:{startFrame:0,endFrame:720},tracks:[{trackRef:'video:0',mediaType:'video',muted:false,protected:false}],clips:[{instanceKey:'A',trackRef:'video:0',mediaType:'video',startTicks:'0',endTicks:'6096384000000',inTicks:'0',outTicks:'6096384000000',speed:1,disabled:false,supportFlags:{timeMappingSupported:true,effectPreservationSupported:true}}],supportFlags:{timeMappingSupported:true,audioPreservationSupported:true,effectPreservationSupported:true}};const plan={snapshotHash:'owned',segments:[{startFrame:0,endFrame:720,sourceClipInstanceKey:'A',sourceIn:'0',sourceOut:'6096384000000',cameraId:'CA',reason:'speaker'}]};plan.planHash=hash(plan);return {snapshot,plan};}
+test('modified source ticks cannot enter a host transaction',()=>{const f=fixture();f.plan.segments[0].sourceIn='1';const p={...f.plan};delete p.planHash;f.plan.planHash=hash(p);assert.throws(()=>guard.validateApply(f.snapshot,f.plan,['video:0'],hash),/SOURCE_TIME_MISMATCH/);});
+test('protected camera track cannot be removed',()=>{const f=fixture();f.snapshot.tracks[0].protected=true;assert.throws(()=>guard.validateApply(f.snapshot,f.plan,['video:0'],hash));});
+test('snapshot mismatch blocks before clone',()=>{const f=fixture();f.plan.snapshotHash='different';assert.throws(()=>guard.validateApply(f.snapshot,f.plan,['video:0'],hash));});
+test('no gap or overlap is admitted',()=>{const f=fixture();f.plan.segments[0].startFrame=1;const p={...f.plan};delete p.planHash;f.plan.planHash=hash(p);assert.throws(()=>guard.validateApply(f.snapshot,f.plan,['video:0'],hash));});
+test('valid exact frame plan is admitted',()=>{const f=fixture();assert.equal(guard.validateApply(f.snapshot,f.plan,['video:0'],hash),true);});

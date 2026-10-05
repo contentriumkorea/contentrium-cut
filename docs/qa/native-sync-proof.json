@@ -1,0 +1,23 @@
+{
+  "hostVersion": "26.5.2",
+  "fixture": "linked camera audio",
+  "originalUnchanged": true,
+  "sourceTimingAndEffectsPreserved": true,
+  "unselectedClipsUnchanged": true,
+  "moves": [
+    {
+      "mediaType": "video",
+      "trackRef": "video:1",
+      "offsetFrames": 60,
+      "durationFrames": 720
+    },
+    {
+      "mediaType": "audio",
+      "trackRef": "audio:1",
+      "offsetFrames": 60,
+      "durationFrames": 720
+    }
+  ],
+  "resultSequenceRef": "d5f124f8-800e-41ed-9f22-3d596740b8d6",
+  "evidenceTime": "2026-10-05T12:14:41.681Z"
+}

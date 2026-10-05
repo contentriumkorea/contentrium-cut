@@ -25,6 +25,24 @@ def digest(path):
             value.update(chunk)
     return value.hexdigest()
 
+def selected_release(tag):
+    # Drafts are listed for the authenticated publisher; GitHub's tag endpoint
+    # does not resolve a tag that has not yet been created by publication.
+    matches=[r for r in json.loads(gh('api',f'repos/{REPO}/releases',capture=True)) if r['tag_name']==tag]
+    if len(matches)>1:raise RuntimeError('Ambiguous release identity')
+    return matches[0] if matches else None
+
+def upload_missing(tag,paths):
+    release=selected_release(tag)
+    missing=[]
+    for path in paths:
+        matches=[a for a in release['assets'] if a['name']==path.name]
+        if not matches:missing.append(str(path));continue
+        actual=matches[0]
+        if len(matches)!=1 or actual['size']!=path.stat().st_size or actual.get('digest')!='sha256:'+digest(path):
+            raise RuntimeError('Existing draft asset differs; refuse replacement: '+path.name)
+    if missing:gh('release','upload',tag,'--repo',REPO,*missing)
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--notes', required=True)
@@ -38,10 +56,15 @@ def main():
     for _, name in files:
         if not (output / name).is_file():
             raise RuntimeError('Build is missing: ' + name)
-    gh('release', 'create', tag, '--repo', REPO, '--draft', '--title', 'Contentrium CUT',
-       '--target', args.target, '--notes-file', str(Path(args.notes).resolve()))
-    gh('release', 'upload', tag, '--repo', REPO, *[str(output / name) for _, name in files])
-    release = json.loads(gh('api', f'repos/{REPO}/releases/tags/{tag}', capture=True))
+    release=selected_release(tag)
+    if release:
+        if not release['draft'] or release['name']!='Contentrium CUT' or release['target_commitish']!=args.target:
+            raise RuntimeError('Existing release is not this unpublished reviewed target')
+    else:
+        gh('release','create',tag,'--repo',REPO,'--draft','--title','Contentrium CUT',
+           '--target',args.target,'--notes-file',str(Path(args.notes).resolve()))
+    upload_missing(tag,[output/name for _,name in files])
+    release=selected_release(tag)
     assets = []
     for role, name in files:
         actual = next(a for a in release['assets'] if a['name'] == name)
@@ -66,10 +89,9 @@ def main():
                      signature=base64.b64encode(key.sign(raw)).decode('ascii'))
     (output / 'update-manifest.json').write_bytes(raw)
     (output / 'update-manifest.sig').write_text(json.dumps(signature), encoding='utf-8')
-    gh('release', 'upload', tag, '--repo', REPO, str(output / 'update-manifest.json'),
-       str(output / 'update-manifest.sig'))
+    upload_missing(tag,[output/'update-manifest.json',output/'update-manifest.sig'])
     gh('release', 'edit', tag, '--repo', REPO, '--draft=false', '--latest')
-    print('Published ' + release['html_url'])
+    print('Published ' + selected_release(tag)['html_url'])
 
 if __name__ == '__main__':
     main()

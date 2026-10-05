@@ -1,0 +1,130 @@
+{
+  "checkedAt": "2026-10-05T19:05:14.828807+09:00",
+  "kind": "design_document_validation",
+  "status": "passed",
+  "documentCount": 6,
+  "totalCharacters": 84010,
+  "totalLines": 1500,
+  "localLinksChecked": 20,
+  "uniqueExternalLinksReferenced": 32,
+  "jsonExamplesParsed": 1,
+  "checks": [
+    "6 UTF-8 documents with Contentrium CUT titles",
+    "balanced fences and valid JSON examples",
+    "local links and reference definitions exist",
+    "21 main sections and R01-R12 present",
+    "G1-G7 acceptance gates present",
+    "15 update sections and U01-U23 scenarios present",
+    "update API paths aligned between main and annex",
+    "GitHub path and exact product/release names aligned",
+    "UI selection retains Mono Studio and unverified implementation flags",
+    "policy example remains 8 contiguous intervals totaling 600 frames",
+    "all five pre-update documents match archived SHA-256 values",
+    "original prior-design archive unchanged"
+  ],
+  "reviewDomains": [
+    "Premiere integration and preservation",
+    "audio sync and speaker segmentation",
+    "edit policy and evaluation",
+    "Mono Studio UI and cross-document integration",
+    "Contentrium CUT naming, GitHub distribution and update lifecycle"
+  ],
+  "policyExample": {
+    "fps": 30,
+    "durationFrames": 600,
+    "durationSeconds": 20,
+    "cuts": [
+      150,
+      240,
+      300,
+      360,
+      420,
+      495,
+      555
+    ]
+  },
+  "updates": {
+    "productName": "Contentrium CUT",
+    "repository": "contentriumkorea/contentrium-cut",
+    "repositoryStatus": "planned_not_published",
+    "requirements": [
+      "R09",
+      "R10",
+      "R11",
+      "R12"
+    ],
+    "acceptanceGate": "G7",
+    "documentedScenarios": 23,
+    "executedUpdateTests": 0,
+    "apiPathsAligned": true
+  },
+  "limits": [
+    "Document structure, requirements coverage and example arithmetic only",
+    "No product code or model execution tested",
+    "No Premiere host editing or real audio/video playback tested",
+    "No speed or recognition quality measured",
+    "No repository created or Release published",
+    "No installer, shutdown, update or rollback execution tested"
+  ],
+  "files": [
+    {
+      "file": "2026-10-05-premiere-speaker-cut-design.md",
+      "characters": 22887,
+      "lines": 476,
+      "sha256": "11955a8d56a32b607a539ae49ae484f9961ad4f4c8e2f717d125a010d9b58a02"
+    },
+    {
+      "file": "details\\audio-sync-and-speakers.md",
+      "characters": 9336,
+      "lines": 139,
+      "sha256": "fd50d70b903c719cfca950d4d4b5ea8939e46083f5b9065552fd5ec71bd7d8cd"
+    },
+    {
+      "file": "details\\distribution-and-updates.md",
+      "characters": 18070,
+      "lines": 286,
+      "sha256": "4153cacdfa9ed2ba6026f6c8db76d4904205390fecc57e050945967e7a8f38a4"
+    },
+    {
+      "file": "details\\editing-policy-and-qa.md",
+      "characters": 9019,
+      "lines": 157,
+      "sha256": "4ee27e32d3e28b9bddda1d0740950cf69e02b291c8da9a4abed742bdab7f5e6e"
+    },
+    {
+      "file": "details\\mono-studio-ui.md",
+      "characters": 12435,
+      "lines": 295,
+      "sha256": "bf180578c563b36920c8770d6cb9bd37c186d992640fdecfc378ccb69a554d47"
+    },
+    {
+      "file": "details\\premiere-integration.md",
+      "characters": 12263,
+      "lines": 147,
+      "sha256": "30521b1c309a51815abba2342de354f0042bf8ba39bc95458c7a1c0a89efea96"
+    }
+  ],
+  "preUpdateArchiveVerified": [
+    {
+      "file": "2026-10-05-premiere-speaker-cut-design.md",
+      "sha256": "580ea240e88c5a14be5bbc2de5340481f5c7f96410dafcc7fe15d1d9f1acfe68"
+    },
+    {
+      "file": "details\\audio-sync-and-speakers.md",
+      "sha256": "8aff760cc7dc4d01cca35bc38c0d1b939b1ecdabddfb573735c936c7f7ae98ca"
+    },
+    {
+      "file": "details\\editing-policy-and-qa.md",
+      "sha256": "d0810fcbf2af8e0a9a0c28b633242dd92b0acfb638d7788db0fbcb36817d62a4"
+    },
+    {
+      "file": "details\\mono-studio-ui.md",
+      "sha256": "026e4d0bd910654f865d46979f3da7070e4588a5e59d51ec8ef543f784d7e318"
+    },
+    {
+      "file": "details\\premiere-integration.md",
+      "sha256": "a913124f2b221676b00cd3785921d6f3dc82c003d4a13034bb5719ffaacda52d"
+    }
+  ],
+  "archivedDesignSha256": "913dd9150044d7d760a47809efb9a60bc11d8d7bb3dc65f24f5902c2f967387c"
+}

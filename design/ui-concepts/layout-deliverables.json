@@ -1,0 +1,57 @@
+[
+  {
+    "Id": "01",
+    "Name": "프리미어 통합형",
+    "Path": "D:\\AI\\0. Chat GPT CODEX\\2026-08-17 skill & software\\premiere-speaker-cut\\output\\ui-concepts\\2026-10-05 15'08 UI 01 프리미어 통합형.png",
+    "Width": 1672,
+    "Height": 941,
+    "Bytes": 1619403,
+    "SHA256": "810971947902B9826ABC71BF32A6BC3DB8CFB4AB877350B19CCCB73A0F62A251",
+    "Mode": "built-in image_gen",
+    "Kind": "UI design concept, not an implemented product screenshot"
+  },
+  {
+    "Id": "02",
+    "Name": "단계별 안내형",
+    "Path": "D:\\AI\\0. Chat GPT CODEX\\2026-08-17 skill & software\\premiere-speaker-cut\\output\\ui-concepts\\2026-10-05 15'08 UI 02 단계별 안내형.png",
+    "Width": 1672,
+    "Height": 941,
+    "Bytes": 1385483,
+    "SHA256": "E33A6FF09C3C0CF1836A57A020FE6B5D195E0D4ECE18A9046C158EC3B4529D84",
+    "Mode": "built-in image_gen",
+    "Kind": "UI design concept, not an implemented product screenshot"
+  },
+  {
+    "Id": "03",
+    "Name": "타임라인 검토형",
+    "Path": "D:\\AI\\0. Chat GPT CODEX\\2026-08-17 skill & software\\premiere-speaker-cut\\output\\ui-concepts\\2026-10-05 15'08 UI 03 타임라인 검토형.png",
+    "Width": 1672,
+    "Height": 941,
+    "Bytes": 1669348,
+    "SHA256": "96C3756226B9D506085A3120BDAAAC257AC83074A2A99E05F9AE801864635A9F",
+    "Mode": "built-in image_gen",
+    "Kind": "UI design concept, not an implemented product screenshot"
+  },
+  {
+    "Id": "04",
+    "Name": "화자 카드형",
+    "Path": "D:\\AI\\0. Chat GPT CODEX\\2026-08-17 skill & software\\premiere-speaker-cut\\output\\ui-concepts\\2026-10-05 15'08 UI 04 화자 카드형.png",
+    "Width": 1672,
+    "Height": 941,
+    "Bytes": 1508614,
+    "SHA256": "BB4DF222BB6F08E0474AD123D2383DD0A596231CBF4DA0C154BF6032793136B9",
+    "Mode": "built-in image_gen",
+    "Kind": "UI design concept, not an implemented product screenshot"
+  },
+  {
+    "Id": "05",
+    "Name": "최소 설정형",
+    "Path": "D:\\AI\\0. Chat GPT CODEX\\2026-08-17 skill & software\\premiere-speaker-cut\\output\\ui-concepts\\2026-10-05 15'08 UI 05 최소 설정형.png",
+    "Width": 1672,
+    "Height": 941,
+    "Bytes": 1559394,
+    "SHA256": "37C5707587316B3287562EC7C8F44FD996FB08984E773B2C7621E7D6C7E8B951",
+    "Mode": "built-in image_gen",
+    "Kind": "UI design concept, not an implemented product screenshot"
+  }
+]

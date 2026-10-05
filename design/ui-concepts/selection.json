@@ -1,0 +1,34 @@
+{
+  "productName": "Contentrium CUT",
+  "selectedConcept": "05",
+  "style": "Mono Studio",
+  "referenceImage": "../../output/ui-concepts/2026-10-05 17'15 UI 05 최소 설정형.png",
+  "state": "visual_direction_selected",
+  "userRequirement": "모노 스튜디오 느낌으로 가는데, 프리미어 프로랑 확실히 연계되어서 작동해야함 가능?",
+  "productSurface": "Premiere Pro UXP panel",
+  "palette": "Charcoal, black and white; white primary button; restrained status colors only",
+  "realHostIntegrationRequired": true,
+  "hostIntegrationVerified": false,
+  "distribution": {
+    "owner": "contentriumkorea",
+    "repository": "contentrium-cut",
+    "repositoryStatus": "planned_not_published",
+    "releaseTitle": "Contentrium CUT",
+    "nameSuffix": null,
+    "channel": "GitHub Releases stable",
+    "spec": "../../docs/superpowers/specs/details/distribution-and-updates.md"
+  },
+  "updates": {
+    "checkOnPanelOpen": true,
+    "silentWhenCurrent": true,
+    "notifyWhenAvailable": true,
+    "installAfterUserClick": true,
+    "stopAllCutWorkOnClick": true,
+    "hostStopBoundary": "Current short transaction returns; no next batch",
+    "forceQuitPremiere": false,
+    "preserveUserData": true,
+    "implementationVerified": false
+  },
+  "acceptanceMilestone": "Load panel inside Premiere, read the active project and sequence, create three planned cuts on a duplicate sequence, re-read the result and play it in Premiere.",
+  "notes": "Reference is a generated design board. Use Contentrium CUT as the product name and Mono Studio only as the visual style. The right-hand component specimen column is not part of the product UI. This records design decisions, not completed implementation or GitHub publication."
+}

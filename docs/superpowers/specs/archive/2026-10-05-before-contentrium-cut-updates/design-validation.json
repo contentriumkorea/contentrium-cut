@@ -1,0 +1,79 @@
+{
+  "checkedAt": "2026-10-05T18:28:33.414214+09:00",
+  "kind": "design_document_validation",
+  "status": "passed",
+  "documentCount": 5,
+  "totalCharacters": 58286,
+  "localLinksChecked": 12,
+  "checks": [
+    "UTF-8 readable",
+    "titles and fences valid",
+    "no TODO/TBD/FIXME",
+    "local links and reference definitions exist",
+    "JSON examples parse",
+    "20 main sections and 8 requirements present",
+    "shared contract names aligned",
+    "missing mapping versus local unknown separated",
+    "policy example 8 intervals covers 600 frames with valid camera coverage",
+    "prior design preserved"
+  ],
+  "reviewDomains": [
+    "Premiere integration and preservation",
+    "audio sync and speaker segmentation",
+    "edit policy and evaluation",
+    "Mono Studio UI and cross-document integration"
+  ],
+  "policyExample": {
+    "fps": 30,
+    "durationFrames": 600,
+    "durationSeconds": 20,
+    "cuts": [
+      150,
+      240,
+      300,
+      360,
+      420,
+      495,
+      555
+    ]
+  },
+  "limits": [
+    "Document structure and example arithmetic only",
+    "No product code or model execution tested",
+    "No Premiere host editing or real audio/video playback tested",
+    "No speed or recognition quality measured"
+  ],
+  "files": [
+    {
+      "file": "2026-10-05-premiere-speaker-cut-design.md",
+      "characters": 19187,
+      "lines": 435,
+      "sha256": "580ea240e88c5a14be5bbc2de5340481f5c7f96410dafcc7fe15d1d9f1acfe68"
+    },
+    {
+      "file": "details\\audio-sync-and-speakers.md",
+      "characters": 8994,
+      "lines": 137,
+      "sha256": "8aff760cc7dc4d01cca35bc38c0d1b939b1ecdabddfb573735c936c7f7ae98ca"
+    },
+    {
+      "file": "details\\editing-policy-and-qa.md",
+      "characters": 9001,
+      "lines": 157,
+      "sha256": "d0810fcbf2af8e0a9a0c28b633242dd92b0acfb638d7788db0fbcb36817d62a4"
+    },
+    {
+      "file": "details\\mono-studio-ui.md",
+      "characters": 10163,
+      "lines": 249,
+      "sha256": "026e4d0bd910654f865d46979f3da7070e4588a5e59d51ec8ef543f784d7e318"
+    },
+    {
+      "file": "details\\premiere-integration.md",
+      "characters": 10941,
+      "lines": 133,
+      "sha256": "a913124f2b221676b00cd3785921d6f3dc82c003d4a13034bb5719ffaacda52d"
+    }
+  ],
+  "archivedDesignSha256": "913dd9150044d7d760a47809efb9a60bc11d8d7bb3dc65f24f5902c2f967387c"
+}

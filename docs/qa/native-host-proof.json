@@ -1,0 +1,145 @@
+{
+  "hostVersion": "26.5.2",
+  "panelVersion": "0.1.0",
+  "kind": "actual Adobe UXP native transaction and rendered frames",
+  "apply": [
+    {
+      "at": "2026-10-05T11:25:45.682Z",
+      "linkedAudio": false,
+      "segmentFrames": [
+        [
+          0,
+          180
+        ],
+        [
+          180,
+          360
+        ],
+        [
+          360,
+          540
+        ],
+        [
+          540,
+          720
+        ]
+      ],
+      "originalUnchanged": true,
+      "audioUnchanged": true,
+      "audioClipCount": 1,
+      "resultSequenceRef": "70f0c2bc-9051-4908-8abd-9e7c39aedb9a"
+    },
+    {
+      "at": "2026-10-05T11:33:25.364Z",
+      "linkedAudio": true,
+      "segmentFrames": [
+        [
+          0,
+          180
+        ],
+        [
+          180,
+          360
+        ],
+        [
+          360,
+          540
+        ],
+        [
+          540,
+          720
+        ]
+      ],
+      "originalUnchanged": true,
+      "audioUnchanged": true,
+      "audioClipCount": 3,
+      "resultSequenceRef": "e998f9a6-b2ef-4171-a8ed-cf2bc4c3ef7b"
+    }
+  ],
+  "renderBoundarySamples": [
+    {
+      "frame": 0,
+      "pixel": [
+        255,
+        24,
+        0,
+        255
+      ],
+      "sha256": "70d419a1b442a4c06a292b94f1bf7d6525b620e0f3c86430dea231bfde9f5140"
+    },
+    {
+      "frame": 179,
+      "pixel": [
+        255,
+        24,
+        0,
+        255
+      ],
+      "sha256": "70d419a1b442a4c06a292b94f1bf7d6525b620e0f3c86430dea231bfde9f5140"
+    },
+    {
+      "frame": 180,
+      "pixel": [
+        0,
+        109,
+        0,
+        255
+      ],
+      "sha256": "6eb2711cdc66cb762805608b7661b2d36d0df637dfdd20b9f9ae01a15f384835"
+    },
+    {
+      "frame": 359,
+      "pixel": [
+        0,
+        109,
+        0,
+        255
+      ],
+      "sha256": "6eb2711cdc66cb762805608b7661b2d36d0df637dfdd20b9f9ae01a15f384835"
+    },
+    {
+      "frame": 360,
+      "pixel": [
+        0,
+        15,
+        255,
+        255
+      ],
+      "sha256": "14fa74834df10120919a342ae904a80a95e9f54961e54a31becb129ed5cf71fe"
+    },
+    {
+      "frame": 539,
+      "pixel": [
+        0,
+        15,
+        255,
+        255
+      ],
+      "sha256": "14fa74834df10120919a342ae904a80a95e9f54961e54a31becb129ed5cf71fe"
+    },
+    {
+      "frame": 540,
+      "pixel": [
+        255,
+        24,
+        0,
+        255
+      ],
+      "sha256": "70d419a1b442a4c06a292b94f1bf7d6525b620e0f3c86430dea231bfde9f5140"
+    },
+    {
+      "frame": 719,
+      "pixel": [
+        255,
+        24,
+        0,
+        255
+      ],
+      "sha256": "70d419a1b442a4c06a292b94f1bf7d6525b620e0f3c86430dea231bfde9f5140"
+    }
+  ],
+  "limits": [
+    "Native Motion/Opacity defaults only; additional keyed effects still pending",
+    "Community-1 human overlap quality not established by this test"
+  ]
+}

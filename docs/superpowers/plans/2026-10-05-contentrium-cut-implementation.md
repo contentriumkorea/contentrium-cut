@@ -1,6 +1,6 @@
 # Contentrium CUT Implementation Plan
 
-> **For agentic workers:** Use superpowers:executing-plans. Execute continuously in this session. User explicitly authorizes implementation, local installation and three public deployments; do not ask again for a plan handoff or publication approval.
+> **For agentic workers:** Use superpowers:executing-plans for root-owned host/install/publish work and superpowers:subagent-driven-development for tasks 2, 3 and updater task 6. Read docs/qa/execution-ledger.md and docs/implementation-contract.md for the execution ruling and pinned boundaries. Execute continuously in this session. User explicitly authorizes implementation, local installation and three public deployments; do not ask again for a plan handoff or publication approval.
 
 **Goal:** Implement the approved Premiere plugin, install and publish a first version, audit and improve it twice, reinstall only after the second audit, and leave the third release available for the user's update test.
 

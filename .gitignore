@@ -1,4 +1,5 @@
 .venv/
+.build-venv/
 node_modules/
 __pycache__/
 *.pyc
@@ -17,3 +18,5 @@ output/
 .env
 docs/qa/private/
 tools/vendor/
+*.spec
+tools/production-panel/

@@ -1,0 +1,51 @@
+{
+  "manifestVersion": 5,
+  "id": "com.contentrium.cut",
+  "name": "Contentrium CUT",
+  "version": "0.1.0",
+  "main": "index.html",
+  "host": {
+    "app": "premierepro",
+    "minVersion": "26.3.0"
+  },
+  "requiredPermissions": {
+    "network": {
+      "domains": [
+        "http://localhost:41737",
+        "http://localhost",
+        "127.0.0.1"
+      ]
+    },
+    "localFileSystem": "request",
+    "launchProcess": {
+      "schemes": [
+        "contentrium-cut"
+      ]
+    }
+  },
+  "entrypoints": [
+    {
+      "type": "panel",
+      "id": "contentrium-cut",
+      "label": {
+        "default": "Contentrium CUT"
+      },
+      "minimumSize": {
+        "width": 360,
+        "height": 500
+      },
+      "maximumSize": {
+        "width": 2000,
+        "height": 2400
+      },
+      "preferredDockedSize": {
+        "width": 440,
+        "height": 800
+      },
+      "preferredFloatingSize": {
+        "width": 520,
+        "height": 900
+      }
+    }
+  ]
+}

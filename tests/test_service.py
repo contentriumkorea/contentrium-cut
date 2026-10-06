@@ -29,17 +29,41 @@ class ServiceTests(unittest.TestCase):
         self.token = self.pair('panel-one')
 
     def make_service(self, installation=None, config=None):
-        service = self.module.CutService(self.tmp.name, config or self.config, installation=installation,
+        from test_s2_workers import ThreadContext,Scope
+        service = self.module.CutService(self.tmp.name, dict(config or self.config,sourceReader=lambda p:open(p,'rb'),validationContext=ThreadContext(),validationScope=Scope), installation=installation,
                                         process_probe=lambda instance, claim: dict(self.host) if self.host['alive'] else None)
         self.addCleanup(service.close)
         return service
 
     def request(self, path, body=None, token=None, method='POST', headers=None):
+        body=dict(body or {})
+        if path=='/heartbeat':
+            body.setdefault('protocolVersion',1);body.setdefault('appVersion',self.service.config['appVersion']);body.setdefault('bundleId',self.service.config['bundleId'])
+        if path=='/project':body.setdefault('epoch',self.service.epoch)
+        if path=='/apply/begin':
+            import uuid
+            body.setdefault('requestId',uuid.uuid4().hex)
+        if path=='/apply/end':
+            body.setdefault('epoch',0)
+            if body.get('status') in ['failed','canceled']:body.setdefault('receipt',{'resultSequenceRef':None})
+        if path=='/plan':
+            body.setdefault('analysisId','0'*64);body.setdefault('analysisRevision',0)
+            job=self.service.jobs.jobs.get(body.get('jobId'),{})
+            if job.get('kind')=='analysis' and job.get('status')=='completed' and token:
+                owner=self.service.auth.owner_id(token)
+                record=self.service.owners.get(job['jobId'],{})
+                if record.get('owner')==owner:
+                    try:
+                        state=self.service.coordinator.register_analysis(owner,job['jobId'],job['result'])
+                        body.update(analysisId=state['analysisId'],analysisRevision=state['revision'])
+                    except self.module.CutError:pass
         values = {'Host': '127.0.0.1:41737', 'Content-Type': 'application/json'}
         if token is not None:
             values['Authorization'] = 'Bearer ' + token
         values.update(headers or {})
-        return self.service.dispatch(method, path, values, json.dumps(body or {}).encode())
+        from test_source_validation import finish_validation
+        call=lambda m,p,b:self.service.dispatch(m,p,values,json.dumps(b or {}).encode())
+        return finish_validation(call,call(method,path,body))
 
     def pair(self, instance):
         code = self.service.auth.issue_code()
@@ -50,8 +74,15 @@ class ServiceTests(unittest.TestCase):
     def bind(self, token=None):
         args = fixture()
         snapshot = args[0]
+        source=Path(self.tmp.name)/'analysis.wav'
+        if not source.exists():source.write_bytes(b'original analysis media')
+        snapshot['sources'][0]['canonicalPath']=str(source)
+        for asset in snapshot['sources'][1:]:
+            media=Path(self.tmp.name)/(asset['assetId']+'.mov');media.write_bytes(b'original camera media');asset['canonicalPath']=str(media)
+        args[1]['sourceInputs']=[dict(assetId='CA-0',instanceKey='CA-0',path=str(source),sha256=hashlib.sha256(source.read_bytes()).hexdigest(),sessionOriginSeconds=0,sourceStartSeconds=0,sourceSampleRate=48000)]
         snapshot['supportFlags']['hostApplyVerified'] = True
         snapshot['snapshotHash'] = canonical_hash({k: v for k, v in snapshot.items() if k != 'snapshotHash'})
+        self.request('/heartbeat',{'hostIdentity':self.host,'epoch':self.service.epoch,'batchRunning':False,'quiescent':True},token or self.token)
         status, body = self.request('/project', {'snapshot': snapshot, 'hostIdentity': self.host}, token or self.token)
         self.assertEqual(status, 200, body)
         return args
@@ -61,6 +92,9 @@ class ServiceTests(unittest.TestCase):
         # Worker execution/process cancellation is independently tested in test_jobs.
         token = token or self.token
         owner = hashlib.sha256(token.encode()).hexdigest()
+        args[1].setdefault('evidence',{})
+        args[1].update(mediaSnapshotHash=args[0]['snapshotHash'],mediaInputs=[dict(assetId=s['assetId'],path=s['canonicalPath'],sha256=hashlib.sha256(Path(s['canonicalPath']).read_bytes()).hexdigest()) for s in args[0]['sources']])
+        for valid in args[1].get('validAudioRanges',[]):valid.update(assetId='CA-0',startSample=0,endSample=320000,sampleRate=48000)
         self.service.jobs.jobs[job_id] = {'jobId': job_id, 'kind': 'analysis', 'status': 'completed', 'epoch': 0, 'result': args[1]}
         self.service.record_job(job_id, owner, args[0]['projectRef'], args[0]['snapshotHash'])
         return job_id
@@ -84,6 +118,8 @@ class ServiceTests(unittest.TestCase):
                                    'quiescent': True, 'appVersion': '0.1.0', 'bundleId': 'old'}, self.token)
         status, state = self.request('/updates/check', {}, self.token)
         self.assertEqual(status, 200)
+        self.service.update_check.join(3)
+        state=self.service.update_state()
         self.assertEqual(state['checkState'], 'AVAILABLE')
         return external, state['candidate']
 
@@ -173,10 +209,10 @@ class ServiceTests(unittest.TestCase):
     def test_apply_other_panel_cannot_reuse_lease_or_plan(self):
         args = self.bind()
         plan = self.plan(args)
-        status, lease = self.request('/apply/begin', {'planHash': plan['planHash'], 'snapshotHash': args[0]['snapshotHash'], 'epoch': 0}, self.token)
-        self.assertEqual(status, 200)
         other = self.pair('panel-two')
         self.bind(other)
+        status, lease = self.request('/apply/begin', {'planHash': plan['planHash'], 'snapshotHash': args[0]['snapshotHash'], 'epoch': 0}, self.token)
+        self.assertEqual(status, 200)
         self.assertEqual(self.request('/apply/check', {'applyId': lease['applyId'], 'epoch': 0}, other)[0], 403)
         self.assertEqual(self.request('/apply/begin', {'planHash': plan['planHash'], 'snapshotHash': args[0]['snapshotHash'], 'epoch': 0}, other)[0], 409)
 
@@ -286,7 +322,7 @@ class ServiceTests(unittest.TestCase):
         plan = self.plan(args)
         status, lease = self.request('/apply/begin', {'planHash': plan['planHash'], 'snapshotHash': args[0]['snapshotHash'], 'epoch': 0}, self.token)
         self.assertEqual(status, 200)
-        self.request('/apply/check', {'applyId': lease['applyId'], 'epoch': 0}, self.token)
+        self.request('/apply/check', {'applyId': lease['applyId'], 'epoch': 0,'batchId':1,'operationDigest':'c'*64,'resultSequenceRef':None}, self.token)
         self.request('/heartbeat', {'hostIdentity': self.host, 'epoch': 0, 'batchRunning': False, 'quiescent': True}, self.token)
         self.assertTrue(self.request('/state', token=self.token)[1]['batchRunning'])
 
@@ -384,6 +420,10 @@ class ServiceTests(unittest.TestCase):
         body = {'applyId': lease['applyId'], 'status': 'completed', 'receipt': {'planHash': plan['planHash'], 'sourceUnchanged': True, 'readback': {'verified': False}}}
         self.assertEqual(self.request('/apply/end', body, self.token)[0], 409)
         self.assertTrue(self.service.applies[lease['applyId']]['active'])
+        self.request('/apply/check',{'applyId':lease['applyId'],'epoch':0,'batchId':1,'operationDigest':'c'*64,'resultSequenceRef':None},self.token)
+        self.request('/apply/result',{'applyId':lease['applyId'],'epoch':0,'resultSequenceRef':'result'},self.token)
+        self.request('/apply/batch-end',{'applyId':lease['applyId'],'epoch':0,'batchId':1,'receipt':{'transactionReturned':True}},self.token)
+        body['receipt'].update(sourceSnapshotHash=args[0]['snapshotHash'],resultSnapshotHash='d'*64,resultSequenceRef='result',saved=True)
         body['receipt']['readback']['verified'] = True
         self.assertEqual(self.request('/apply/end', body, self.token)[0], 200)
 
@@ -411,21 +451,21 @@ class ServiceTests(unittest.TestCase):
         self.assertNotEqual(self.service.finalize_activation()['updateState'], 'COMPLETE')
         self.assertEqual(len(external.installer.rollbacks), 1)
 
-    def test_update_during_apply_completion_rejects_success_but_allows_failed_close(self):
+    def test_update_during_apply_completion_rejects_success_and_failed_retains_uncertainty(self):
         external, candidate = self.signed_update()
         external.installer.host_closed = False
         args = self.bind()
         plan = self.plan(args)
         _, lease = self.request('/apply/begin', {'planHash': plan['planHash'], 'snapshotHash': args[0]['snapshotHash'], 'epoch': 0}, self.token)
-        self.request('/apply/check', {'applyId': lease['applyId'], 'epoch': 0}, self.token)
+        self.request('/apply/check', {'applyId': lease['applyId'], 'epoch': 0,'batchId':1,'operationDigest':'c'*64,'resultSequenceRef':None}, self.token)
         inspected, resume = threading.Event(), threading.Event()
-        real_snapshot = self.service._snapshot
+        real_snapshot = self.service._host
         def paused_snapshot(*values):
             result = real_snapshot(*values)
             inspected.set()
             resume.wait(2)
             return result
-        self.service._snapshot = paused_snapshot
+        self.service._host = paused_snapshot
         responses = []
         body = {'applyId': lease['applyId'], 'status': 'completed', 'receipt': {'planHash': plan['planHash'], 'sourceUnchanged': True, 'readback': {'verified': True}}}
         request = threading.Thread(target=lambda: responses.append(self.request('/apply/end', body, self.token)))
@@ -439,7 +479,8 @@ class ServiceTests(unittest.TestCase):
         self.assertTrue(self.service.applies[lease['applyId']]['active'])
         self.assertTrue(self.service.panels[self.service._owner(self.token)]['batchRunning'])
         self.assertEqual(self.request('/apply/end', {'applyId': lease['applyId'], 'status': 'failed'}, self.token)[0], 200)
-        self.assertFalse(self.service.panels[self.service._owner(self.token)]['batchRunning'])
+        self.assertTrue(self.service.panels[self.service._owner(self.token)]['batchRunning'])
+        self.assertTrue(self.service.journal.status(self.service._owner(self.token))['blocked'])
 
     def test_old_apply_cannot_complete_after_update_canceled_and_new_epoch_reopened(self):
         external, candidate = self.signed_update()
@@ -449,6 +490,9 @@ class ServiceTests(unittest.TestCase):
         _, lease = self.request('/apply/begin', {'planHash': plan['planHash'], 'snapshotHash': args[0]['snapshotHash'], 'epoch': 0}, self.token)
         self.request('/updates/start', dict(candidateId=candidate['candidateId'], manifestDigest=candidate['manifestDigest'], requestId='closed-epoch'), self.token)
         self.request('/updates/cancel', {}, self.token)
+        deadline=time.monotonic()+2
+        while not self.service.gate_open and time.monotonic()<deadline:
+            self.service.advance_once();threading.Event().wait(.01)
         self.assertTrue(self.service.gate_open)
         self.assertEqual(self.service.epoch, 1)
         body = {'applyId': lease['applyId'], 'status': 'completed', 'receipt': {'planHash': plan['planHash'], 'sourceUnchanged': True, 'readback': {'verified': True}}}
@@ -497,7 +541,8 @@ class ServiceTests(unittest.TestCase):
         job=self.completed_analysis(args,job_id='sync-fixture')
         assets=[source['assetId'] for source in args[0]['sources'][:2]]
         self.service.jobs.jobs[job].update(kind='sync',result={'schemaVersion':1,'referenceAssetId':assets[0],
-            'offsets':{assets[0]:0.0,assets[1]:2.0},'sources':{asset:{'status':'accepted'} for asset in assets},'reviews':[]})
+            'offsets':{assets[0]:0.0,assets[1]:2.0},'sources':{asset:{'status':'accepted'} for asset in assets},'reviews':[],
+            'mediaInputs':args[1]['mediaInputs'],'mediaSnapshotHash':args[0]['snapshotHash']})
         return job,[clip['instanceKey'] for clip in args[0]['clips'][:2]]
 
     def test_owned_completed_sync_plan_reuses_reviewed_apply_lease(self):

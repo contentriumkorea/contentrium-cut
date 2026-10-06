@@ -14,7 +14,9 @@ from contentrium_cut.updater import UpdateManager, API_ROOT, BINARY_HEADERS, Sem
 from contentrium_cut.windows_install import WindowsInstallation, WindowsNamedMutex, _atomic_json, _guard_path, _hash
 from contentrium_cut.contract import CutError
 from contentrium_cut.dependencies import install_ffmpeg
-from contentrium_cut.integration import install_integration, open_active
+from contentrium_cut.integration import install_integration, open_active, resolve_setup_root
+from contentrium_cut.bootstrap import known_folder, canonical_root
+from contentrium_cut.installer_preparation import prepare_installation
 
 def release_url(tag=None):
     if tag is None: return API_ROOT + '/releases/latest'
@@ -66,9 +68,38 @@ def setup_action(root):
 
 def install(config, root, tag=None, *, installation=None, transport=None, launcher_source=None,
             resource_root=None, dependency_installer=None, integration_installer=None,
-            mutex=WindowsNamedMutex, progress=None):
-    root = Path(root).resolve(); _guard_path(root)
+            mutex=WindowsNamedMutex, progress=None, mapping_evidence=None, preparation=None, cancel=None, wait=None):
+    root = canonical_root(root)
+    def integrate(manifest):
+        nonlocal journal
+        target = _integration_config(config,manifest)
+        read_grace = 0
+        while True:
+            try:
+                prepared = (preparation or prepare_installation)(root,target,installation=installation,mapping_evidence=mapping_evidence)
+            except CutError as error:
+                if error.code!='INSTALL_RECEIPT_INCOMPLETE':raise
+                if wait is None or read_grace >= 3:
+                    raise CutError('INSTALL_RECEIPT_INVALID','패널의 설치 확인 기록이 불완전합니다. 같은 Setup으로 설치 복구가 필요합니다.') from None
+                read_grace += 1
+                if wait(0.1):return dict(status='PENDING_PROVISIONING',appVersion=manifest['appVersion'],bundleId=manifest['bundleId'],canceled=True)
+                continue
+            if prepared.get('status') == 'PREPARED': break
+            if prepared.get('status') != 'PENDING_PROVISIONING':
+                raise CutError('INSTALL_PREPARATION','Installation preparation did not return a verified result.')
+            notify('Premiere Pro에서 Contentrium CUT 패널을 열어 주세요. 설치 연결을 준비하고 있습니다.')
+            if wait is None or (cancel and cancel()): return prepared
+            if wait(0.75): return dict(prepared,canceled=True)
+        check_cancel()
+        journal=dict(journal,state='INTEGRATION_PENDING',preparationResult=prepared)
+        _atomic_json(journal_path,journal)
+        options = dict(launcher_source=launcher_source,resource_root=resource_root,
+                       mapping_evidence=prepared.get('mappingEvidence',mapping_evidence))
+        result = (integration_installer or install_integration)(root,target,**options)
+        return result
     notify = progress or (lambda message: None)
+    def check_cancel():
+        if cancel and cancel(): raise CutError('CANCELED','설치 진행을 중단했습니다. 같은 Setup으로 이어서 준비할 수 있습니다.')
     source = Path(launcher_source) if launcher_source else (Path(sys.executable) if getattr(sys, 'frozen', False) else None)
     if source is None or source.suffix.lower() != '.exe' or not source.is_file():
         raise CutError('LAUNCHER_SOURCE', 'A built Contentrium CUT Setup executable is required for the stable launcher.')
@@ -87,7 +118,7 @@ def install(config, root, tag=None, *, installation=None, transport=None, launch
                 try:
                     journal=_json(journal_path.read_bytes())
                     if (type(journal.get('schemaVersion')) is not int or journal.get('schemaVersion')!=1 or journal.get('productId')!='com.contentrium.cut'
-                            or journal.get('state') not in {'SELECTED','PREPARED','BOOTSTRAP_PENDING','INTEGRATION_PENDING','READY_TO_OPEN'}
+                            or journal.get('state') not in {'SELECTED','PREPARED','BOOTSTRAP_PENDING','PROVISIONING_PENDING','INTEGRATION_PENDING','READY_TO_OPEN'}
                             or not re.fullmatch('first-install-[0-9a-f]{32}',journal.get('payloadDirectory',''))):
                         raise ValueError('Invalid installation journal')
                     documents=[base64.b64decode(journal[key],validate=True) for key in ('manifest','signature')]
@@ -98,7 +129,7 @@ def install(config, root, tag=None, *, installation=None, transport=None, launch
                     if (journal.get('appVersion')!=manifest['appVersion'] or journal.get('bundleId')!=manifest['bundleId']
                             or (tag is not None and tag!=manifest['tag'])):
                         raise ValueError('Different recovery selection')
-                    if journal['state'] in {'INTEGRATION_PENDING','READY_TO_OPEN'}:
+                    if journal['state'] in {'PROVISIONING_PENDING','INTEGRATION_PENDING','READY_TO_OPEN'}:
                         receipt=journal.get('bootstrapResult',{})
                         if (receipt.get('status')!='PENDING_ACTIVATION' or receipt.get('appVersion')!=manifest['appVersion']
                                 or receipt.get('bundleId')!=manifest['bundleId']):
@@ -134,14 +165,15 @@ def install(config, root, tag=None, *, installation=None, transport=None, launch
                     raise CutError('INSTALL_EXISTS','Active installation differs from first-install recovery; use its update action.')
                 result={'status':'PENDING_ACTIVATION','appVersion':manifest['appVersion'],'bundleId':manifest['bundleId'],
                         'versionDirectory':str(root/'app'/'versions'/manifest['appVersion']),'adobeRegistered':True}
-                journal=dict(journal,state='INTEGRATION_PENDING',bootstrapResult=result)
+                journal=dict(journal,state='PROVISIONING_PENDING',bootstrapResult=result)
                 _atomic_json(journal_path,journal)
-                integration=(integration_installer or install_integration)(root,_integration_config(config,manifest),
-                    launcher_source=launcher_source,resource_root=resource_root)
+                integration=integrate(manifest)
+                if integration.get('status')=='PENDING_PROVISIONING': return integration
                 if not _integration_receipt(integration): raise CutError('INSTALL_INTEGRATION','Native launcher integration did not return a receipt.')
                 _atomic_json(journal_path,dict(journal,state='READY_TO_OPEN',integrationResult=integration))
                 return result
             installation._require_host_exit()
+            check_cancel()
             # Recovery automatically uses its pinned release ID, never a later latest release.
             _confirm_selection(manager,release,documents)
             notify('검증된 프로그램 파일을 내려받고 있습니다.')
@@ -154,7 +186,7 @@ def install(config, root, tag=None, *, installation=None, transport=None, launch
                 _guard_path(path); _guard_path(partial)
                 if not path.exists():
                     partial.unlink(missing_ok=True)  # Only this journal's named incomplete payload, never user data.
-                    manager.transport.download(actual['browser_download_url'],partial,dict(BINARY_HEADERS),lambda:None,asset['size'])
+                    manager.transport.download(actual['browser_download_url'],partial,dict(BINARY_HEADERS),check_cancel,asset['size'])
                     if partial.stat().st_size!=asset['size'] or _hash(partial)!=asset['sha256']:
                         raise CutError('UPDATE_HASH','Download hash differs from signed manifest.')
                     os.replace(partial,path)
@@ -164,10 +196,12 @@ def install(config, root, tag=None, *, installation=None, transport=None, launch
                 prepared[asset['role']] = {'path': str(path), 'sha256': asset['sha256'], 'assetId': asset['assetId']}
             journal=dict(journal,state='PREPARED',preparedAssets=prepared)
             _atomic_json(journal_path,journal)
+            check_cancel()
             notify('제공자의 고정 FFmpeg 패키지를 설치하고 있습니다.')
             (dependency_installer or install_ffmpeg)(root)
             _confirm_selection(manager,release,documents)
             installation._require_host_exit()
+            check_cancel()
             notify('Adobe 패널과 로컬 프로그램을 설치하고 있습니다.')
             journal=dict(journal,state='BOOTSTRAP_PENDING')
             _atomic_json(journal_path,journal)  # Durable before any Adobe command / app pointer mutation.
@@ -175,16 +209,25 @@ def install(config, root, tag=None, *, installation=None, transport=None, launch
             if (not isinstance(result,dict) or result.get('status')!='PENDING_ACTIVATION'
                     or result.get('appVersion')!=manifest['appVersion'] or result.get('bundleId')!=manifest['bundleId']):
                 raise CutError('INSTALL_RESULT', 'Installation did not produce a pending activation receipt.')
-            journal=dict(journal,state='INTEGRATION_PENDING',bootstrapResult=result)
+            journal=dict(journal,state='PROVISIONING_PENDING',bootstrapResult=result)
             _atomic_json(journal_path,journal)
-            integration=(integration_installer or install_integration)(root,_integration_config(config,manifest),
-                launcher_source=launcher_source,resource_root=resource_root)
+            integration=integrate(manifest)
+            if integration.get('status')=='PENDING_PROVISIONING': return integration
             if not _integration_receipt(integration): raise CutError('INSTALL_INTEGRATION','Native launcher integration did not return a receipt.')
             _atomic_json(journal_path,dict(journal,state='READY_TO_OPEN',integrationResult=integration))
             return result
 
 def _integration_receipt(value):
     return isinstance(value,dict) and all(isinstance(value.get(key),str) and value[key] for key in ('launcher','shortcut'))
+
+def run_setup_worker(config, root, events, cancel_event, **options):
+    """Tk-free worker boundary; waiting/cancel never blocks the Setup event loop."""
+    try:
+        result = install(config,root,progress=lambda message:events.put(('progress',message)),
+                         cancel=cancel_event.is_set,wait=cancel_event.wait,**options)
+        events.put(('pending' if result.get('status')=='PENDING_PROVISIONING' else 'success',result))
+    except Exception as error:
+        events.put(('error',getattr(error,'message','설치 중 오류가 발생했습니다.')))
 
 def show_gui(config, root, *, tag=None, launcher_source=None, resource_root=None):
     import tkinter as tk
@@ -194,22 +237,21 @@ def show_gui(config, root, *, tag=None, launcher_source=None, resource_root=None
     window.configure(bg='#151515')
     tk.Label(window, text='CONTENTRIUM  CUT', bg='#151515', fg='#eeeeea', font=('Segoe UI',20)).pack(pady=(25,12))
     action=setup_action(root)
-    status = tk.StringVar(value='진행 중이던 정확한 버전의 설치를 복구합니다.\n프로젝트를 저장하고 Premiere Pro 창을 닫아 주세요.' if action=='repair' else
+    try: pending_setup=_json((Path(root)/'updates/first-install.json').read_bytes()).get('state') in {'PROVISIONING_PENDING','INTEGRATION_PENDING'}
+    except (OSError,ValueError):pending_setup=False
+    status = tk.StringVar(value='설치 연결 준비를 이어서 진행합니다.\nPremiere Pro에서 Contentrium CUT 패널을 열어 주세요.' if pending_setup else
+                         '진행 중이던 정확한 버전의 설치를 복구합니다.\n프로젝트를 저장하고 Premiere Pro 창을 닫아 주세요.' if action=='repair' else
                          '프로젝트를 저장하고 모든 Premiere Pro 창을 닫은 뒤 설치하세요.\n프로그램과 패널은 서명된 배포에서 설치됩니다.')
     tk.Label(window, textvariable=status, bg='#151515', fg='#bbbbbb', wraplength=440, justify='left').pack(padx=30,pady=15)
-    running = [False]
+    running = [False]; cancel_event = threading.Event()
     def launch():
         try: open_active(root); window.destroy()
         except Exception as error: messagebox.showerror('Contentrium CUT', getattr(error,'message','프로그램을 열 수 없습니다.'))
     def begin():
-        running[0] = True; button.configure(state='disabled')
-        def work():
-            try:
-                result = install(config,root,tag,launcher_source=launcher_source,resource_root=resource_root,
-                                 progress=lambda message:events.put(('progress',message)))
-                events.put(('success',result))
-            except Exception as error: events.put(('error',getattr(error,'message','설치 중 오류가 발생했습니다.')))
-        threading.Thread(target=work, name='Contentrium-CUT-Setup', daemon=False).start()
+        running[0] = True; cancel_event.clear(); button.configure(state='disabled')
+        threading.Thread(target=run_setup_worker,args=(config,root,events,cancel_event),
+            kwargs=dict(tag=tag,launcher_source=launcher_source,resource_root=resource_root),
+            name='Contentrium-CUT-Setup',daemon=False).start()
     button = tk.Button(window,text='Contentrium CUT 열기' if action=='open' else '설치 복구' if action=='repair' else '설치',
                        command=launch if action=='open' else begin,bg='#ddddda',fg='#151515',padx=25,pady=8)
     button.pack(pady=18)
@@ -219,31 +261,41 @@ def show_gui(config, root, *, tag=None, launcher_source=None, resource_root=None
                 kind,value = events.get_nowait()
                 if kind == 'progress': status.set(value)
                 elif kind == 'success':
-                    running[0]=False;status.set('설치 준비가 완료됐습니다. Contentrium CUT을 열고\nPremiere Pro 패널에서 연결을 확인하세요.')
+                    running[0]=False;status.set('설치 연결 준비가 완료됐습니다.\nPremiere Pro의 Contentrium CUT 패널에서 계속하세요.')
                     button.configure(text='Contentrium CUT 열기',state='normal',command=launch)
+                elif kind == 'pending':
+                    running[0]=False;status.set('설치 연결 준비를 보존했습니다. 같은 Setup으로 이어서 진행할 수 있습니다.');button.configure(state='normal')
                 else:
                     running[0]=False;status.set(value);button.configure(state='normal')
         except queue.Empty: pass
         window.after(150,poll)
-    window.protocol('WM_DELETE_WINDOW',lambda:status.set('진행 중인 설치가 끝날 때까지 기다려 주세요.') if running[0] else window.destroy())
+    def close():
+        cancel_event.set();window.destroy()
+    window.protocol('WM_DELETE_WINDOW',close)
     poll(); window.mainloop()
 
 def main(argv=None):
     parser=argparse.ArgumentParser()
-    mode=parser.add_mutually_exclusive_group();mode.add_argument('--install',action='store_true');mode.add_argument('--open',action='store_true')
-    parser.add_argument('--tag');parser.add_argument('--config');parser.add_argument('--result');parser.add_argument('--root');parser.add_argument('--launcher-source')
+    mode=parser.add_mutually_exclusive_group();mode.add_argument('--install',action='store_true');mode.add_argument('--open',action='store_true');mode.add_argument('--supervise',action='store_true')
+    parser.add_argument('--tag');parser.add_argument('--config');parser.add_argument('--result');parser.add_argument('--root');parser.add_argument('--launcher-source');parser.add_argument('--mapping-evidence')
     args, unknown=parser.parse_known_args(argv)
     if unknown and not args.open: parser.error('Unrecognized arguments')
-    root=Path(args.root).resolve() if args.root else Path(os.environ['LOCALAPPDATA'])/'Contentrium CUT'
     resources=Path(getattr(sys,'_MEIPASS',Path(__file__).resolve().parents[1]))
     try:
-        if args.open:
+        if args.open or args.supervise:
+            root=canonical_root(args.root or Path(sys.executable).parent)
             open_active(root); return 0
         config_path=Path(args.config) if args.config else resources/'config.json'
         config=json.loads(config_path.read_text(encoding='utf-8-sig'))
+        root=resolve_setup_root(config,explicit=args.root)
         if not args.install:
             show_gui(config,root,tag=args.tag,launcher_source=args.launcher_source,resource_root=resources); return 0
-        result=install(config,root,args.tag,launcher_source=args.launcher_source,resource_root=resources)
+        evidence=None
+        if args.mapping_evidence:
+            source=Path(args.mapping_evidence);_guard_path(source)
+            if source.stat().st_size>4096:raise CutError('BOOTSTRAP_MAPPING','Mapping receipt exceeds limits.')
+            evidence=_json(source.read_bytes())
+        result=install(config,root,args.tag,launcher_source=args.launcher_source,resource_root=resources,mapping_evidence=evidence)
         if args.result: _atomic_json(Path(args.result).resolve(),result)
         if sys.stdout: print(json.dumps(result))
         return 0
@@ -252,9 +304,12 @@ def main(argv=None):
         if args.result: _atomic_json(Path(args.result).resolve(),failure)
         if args.install:
             if sys.stderr: print(failure['error']['code']+' '+failure['error']['message'],file=sys.stderr)
-        else:
+        elif not (args.open or args.supervise):
             import tkinter.messagebox as messagebox
             messagebox.showerror('Contentrium CUT',failure['error']['message'])
         return 1
 
-if __name__ == '__main__': raise SystemExit(main())
+if __name__ == '__main__':
+    import multiprocessing
+    multiprocessing.freeze_support()
+    raise SystemExit(main())

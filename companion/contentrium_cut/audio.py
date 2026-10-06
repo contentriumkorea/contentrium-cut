@@ -7,13 +7,18 @@ import shutil
 import subprocess
 import tempfile
 import time
+from bisect import bisect_right
 from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
 from scipy.signal import correlate, resample_poly
-from .contract import CutError
+from .contract import CutError,frame_ticks
 from .models import ModelManager, SileroVAD, CommunityDiarizer, check_cancel
+from .analysis_inputs import source_key, check_assignments, channel_index
+from .resource import preflight_pcm, positive_number
+from .mixed_chunks import diarize_chunks
+from .audio_evidence import media_digest
 
 SR = 16000
 
@@ -26,13 +31,16 @@ def _seconds(frame, fps):
     return float(Fraction(int(frame)*int(fps['den']),int(fps['num'])))
 
 
-def _run(argv, cancel=None, stdout=None):
+def _run(argv, cancel=None, stdout=None,max_output_bytes=None):
     check_cancel(cancel)
     with tempfile.TemporaryFile() as errors, tempfile.TemporaryFile() as captured:
-        child=subprocess.Popen(argv,stdout=stdout if stdout is not None else captured,stderr=errors,shell=False)
+        child=subprocess.Popen(argv,stdout=stdout if stdout is not None else captured,stderr=errors,shell=False,
+                               creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         try:
             while child.poll() is None:
                 check_cancel(cancel)
+                if max_output_bytes is not None and stdout is not None and os.fstat(stdout.fileno()).st_size>max_output_bytes:
+                    raise CutError('AUDIO_RESOURCE_LIMIT','Decoder output exceeded its admitted PCM bound.')
                 time.sleep(.02)
             captured.seek(0)
             output=captured.read() if stdout is None else None
@@ -49,27 +57,37 @@ def _run(argv, cancel=None, stdout=None):
             raise
 
 
-def _probe(source, settings=None, cancel=None):
+def _media_metadata(source,cancel=None,settings=None):
     path=Path(source.get('path',''))
     if not path.is_file(): raise CutError('MISSING_AUDIO','Selected source is missing.',{'assetId':source.get('assetId')})
     executable=(settings or {}).get('ffmpeg') or source.get('ffmpeg') or os.environ.get('CONTENTRIUM_FFMPEG') or shutil.which('ffmpeg')
     if not executable or not Path(executable).is_file(): raise CutError('FFMPEG_NOT_READY','Configure a local FFmpeg executable.')
     probe=str(Path(executable).with_name('ffprobe.exe' if os.name=='nt' else 'ffprobe'))
     data=json.loads(_run([probe,'-v','error','-show_streams','-show_format','-of','json',str(path.resolve())],cancel))
+    return {'path':str(path.resolve()),'ffmpeg':str(executable),'metadata':data,'size':path.stat().st_size,'mtimeNs':path.stat().st_mtime_ns}
+
+def _probe(source, settings=None, cancel=None):
+    base=_media_metadata(source,cancel,settings);data=base['metadata']
     streams=[s for s in data.get('streams',[]) if s.get('codec_type')=='audio']
-    index=int(source.get('streamIndex',0)); channel=int(source.get('channelIndex',0))
+    index=channel_index(source.get('streamIndex',0)); channel=channel_index(source.get('channelIndex',0))
     if index<0 or index>=len(streams): raise CutError('MISSING_AUDIO','Selected stream has no audio.')
     stream=streams[index]
     if channel<0 or channel>=int(stream['channels']): raise CutError('MISSING_AUDIO','Selected channel does not exist.')
-    return {'path':str(path.resolve()),'ffmpeg':str(executable),'stream':index,'channel':channel,'channels':int(stream['channels']),
-            'origin':float(stream.get('start_time',0) or 0),'size':path.stat().st_size,'mtimeNs':path.stat().st_mtime_ns}
+    duration=stream.get('duration') or data.get('format',{}).get('duration')
+    duration=float(duration) if duration is not None else None
+    format_origin=float(data.get('format',{}).get('start_time',0) or 0);pts_origin=float(stream.get('start_time',0) or 0)
+    if stream.get('duration') is not None:duration=float(stream['duration'])+pts_origin-format_origin
+    return dict(base,stream=index,channel=channel,channels=int(stream['channels']),durationSeconds=duration,
+                origin=pts_origin-format_origin,audioStreamOriginSeconds=pts_origin-format_origin,formatPtsOriginSeconds=format_origin,sampleRate=int(stream.get('sample_rate',SR)))
 
 
-def _verify_mixed_channels(argv, info, target, source, cancel):
+def _verify_mixed_channels(argv, info, target, source, cancel,max_output_bytes=None):
     """Inspect disk-backed channels before averaging an unselected stereo mix."""
     audit = target.with_name('channels-' + target.name)
     with audit.open('wb') as output:
-        _run(argv + ['-ar', str(SR), '-ac', str(info['channels']), '-f', 'f32le', 'pipe:1'], cancel, stdout=output)
+        _run(argv + ['-ar', str(SR), '-ac', str(info['channels']), '-f', 'f32le', 'pipe:1'], cancel, stdout=output,max_output_bytes=max_output_bytes)
+    if max_output_bytes is not None and audit.stat().st_size>max_output_bytes:
+        raise CutError('AUDIO_RESOURCE_LIMIT','Multichannel audit exceeded its admitted PCM bound.')
     if not audit.stat().st_size or audit.stat().st_size % (4 * info['channels']):
         raise CutError('MISSING_AUDIO', 'No complete multichannel samples were decoded.')
     pcm = np.memmap(audit, dtype='<f4', mode='r')
@@ -100,12 +118,18 @@ def _verify_mixed_channels(argv, info, target, source, cancel):
                                 'reason': reason, 'windowStartSample': start})
     finally:
         pcm._mmap.close()
+        audit.unlink(missing_ok=True)
 
 
 def _decode(source,directory,number,settings=None,cancel=None,start=None,duration=None,mixed=False):
+    if settings is None:settings=source.get('resourceSettings')
     if start is None:start=source.get('sourceStartSeconds')
     if duration is None:duration=source.get('durationSeconds')
     info=_probe(source,settings,cancel); target=Path(directory)/('pcm-%s.f32'%number)
+    if start is not None and (isinstance(start,bool) or not isinstance(start,(int,float)) or not math.isfinite(start) or start<0):
+        raise CutError('INVALID_AUDIO_INPUT','Source start must be finite and nonnegative.')
+    estimated=duration if duration is not None else (info['durationSeconds']-(start or 0) if info['durationSeconds'] is not None else None)
+    budget=preflight_pcm(estimated,settings,directory,channels=info['channels']+1 if mixed and 'channelIndex' not in source else 1,mixed=mixed)
     argv=[info['ffmpeg'],'-v','error','-nostdin','-i',info['path']]
     if start is not None: argv+=['-ss',str(max(0.,start))]
     if duration is not None: argv+=['-t',str(max(0.,duration))]
@@ -115,7 +139,7 @@ def _decode(source,directory,number,settings=None,cancel=None,start=None,duratio
             argv+=['-af','pan=mono|c0=c%d'%info['channel']]
             info['channelSelection'] = {'mode': 'explicit', 'channelIndex': info['channel']}
         elif info['channels']>1:
-            _verify_mixed_channels(argv, info, target, source, cancel)
+            _verify_mixed_channels(argv, info, target, source, cancel,budget['maxOutputBytes']*info['channels'])
             expr='+'.join('%s*c%d'%(1/info['channels'],c) for c in range(info['channels']))
             argv+=['-af','pan=mono|c0='+expr]
             info['channelSelection'] = {'mode': 'verified-average', 'channelCount': info['channels']}
@@ -123,9 +147,11 @@ def _decode(source,directory,number,settings=None,cancel=None,start=None,duratio
             info['channelSelection'] = {'mode': 'mono', 'channelIndex': 0}
     else: argv+=['-af','pan=mono|c0=c%d'%info['channel']]
     argv+=['-ar',str(SR),'-ac','1','-f','f32le','pipe:1']
-    with target.open('wb') as f: _run(argv,cancel,stdout=f)
+    with target.open('wb') as f: _run(argv,cancel,stdout=f,max_output_bytes=budget['maxOutputBytes'])
+    if target.stat().st_size>budget['maxOutputBytes']:raise CutError('AUDIO_RESOURCE_LIMIT','Decoder output exceeded its admitted PCM bound.')
     if not target.stat().st_size: raise CutError('MISSING_AUDIO','No audio samples were decoded.')
-    info.update(samples=np.memmap(target,dtype='<f4',mode='r'),origin=info['origin']+(start or 0),pcmPath=str(target))
+    media_origin=max(start or 0,info['audioStreamOriginSeconds'])
+    info.update(samples=np.memmap(target,dtype='<f4',mode='r'),origin=media_origin,sourcePtsOriginSeconds=info['formatPtsOriginSeconds']+media_origin,pcmPath=str(target))
     return info
 
 
@@ -174,6 +200,28 @@ def _pair(a,b,fps,cancel):
 def sync_sources(sources,reference,fps,cancel=None):
     if not sources or len({s['assetId'] for s in sources})!=len(sources) or reference not in {s['assetId'] for s in sources}:
         raise CutError('INVALID_AUDIO_INPUT','Sync requires unique sources and a reference.')
+    methods={s.get('syncMethod','audio') for s in sources}
+    if len(methods)!=1 or not methods<={'audio','manual','timecode'}:raise CutError('INVALID_AUDIO_INPUT','Choose one synchronization method for all selected sources.')
+    if methods!={'audio'}:
+        from .sync_methods import explicit_sync
+        result=explicit_sync(sources,reference,fps,_media_metadata,cancel)
+        if methods=={'timecode'}:
+            eligible=[dict(s,syncMethod='audio') for s in sources if s['assetId'] in result['offsets'] and result['sources'][s['assetId']]['hasAudio'] and Path(s['path']).is_file()]
+            if len(eligible)>=2:
+                audio_reference=reference if any(s['assetId']==reference for s in eligible) else eligible[0]['assetId']
+                waveform=sync_sources(eligible,audio_reference,fps,cancel)
+                unsafe={asset for review in waveform['reviews'] if review['code'] in {'SYNC_DRIFT','SYNC_GRAPH_CONFLICT'} for asset in review.get('assetIds',[])}
+                anchor=result['offsets'][audio_reference]
+                for source in eligible:
+                    asset=source['assetId']
+                    if asset==reference:continue
+                    verified=waveform['offsets'].get(asset);expected=result['offsets'][asset]-anchor
+                    if asset in unsafe or (verified is not None and abs(verified-expected)>fps['den']/fps['num']):
+                        result['sources'][asset]['status']='review';result['offsets'].pop(asset,None)
+                        result['reviews'].append({'code':'TIMECODE_AUDIO_CONFLICT','assetId':asset,'fallback':'manual'})
+                    else:result['sources'][asset]['audioVerification']='accepted' if verified is not None else 'unresolved'
+                result['audioVerificationEdges']=waveform['edges']
+        return result
     plan={'schemaVersion':1,'referenceAssetId':reference,'offsets':{reference:0.},'sources':{},'edges':[],'reviews':[]}
     with tempfile.TemporaryDirectory(prefix='contentrium-sync-') as directory:
         decoded={}
@@ -240,34 +288,42 @@ def _intervals(turns,valid,fps,frame_range,unknown=()):
 
 
 def _separate(decoded,channels,settings,fps,frame_range,cancel):
-    model=SileroVAD(ModelManager(settings.get('modelRoot'))); steps={}; reviews=[]; unknown=[]; valid=[]; evidence=[]
+    model=SileroVAD(ModelManager(settings.get('modelRoot'),cancel=cancel)); steps={}; reviews=[]; unknown=[]; valid=[]; evidence=[]
     for channel,info in zip(channels,decoded):
         sid=channel['speakerId']; offset=info['sessionOrigin']; samples=info['samples']; active=False; rows=[]; sample_ranges=[]; run_start=None
         for a,b,p in model.probabilities(samples,cancel):
             if p>=float(settings.get('vadThreshold',.5)): active=True
             elif p<float(settings.get('vadEndThreshold',.35)): active=False
             rms=float(np.sqrt(np.mean(np.square(samples[a:b],dtype=np.float64))))
-            rows.append((offset+a/SR,offset+b/SR,active,rms,p))
+            rows.append((offset+a/SR,offset+b/SR,active,rms,p,source_key(channel)))
             if active and run_start is None: run_start=a
             if not active and run_start is not None:
                 sample_ranges.append({'startSample':run_start,'endSample':a}); run_start=None
         if run_start is not None: sample_ranges.append({'startSample':run_start,'endSample':len(samples)})
-        steps[sid]=rows
+        steps.setdefault(sid,[]).extend(rows)
         valid.append({'assetId':channel['assetId'],'speakerId':sid,'startFrame':_frame(offset,fps),'endFrame':_frame(offset+len(samples)/SR,fps),
                       'startSample':0,'endSample':len(samples),'sampleRate':SR,'sourceOriginSeconds':info['origin']})
+        for key in ('instanceKey','inputKey'):
+            if key in channel:valid[-1][key]=channel[key]
         levels=[]; clipped=0
         for a in range(0,len(samples),SR):
             chunk=np.asarray(samples[a:a+SR]); levels.append(float(np.sqrt(np.mean(chunk.astype(np.float64)**2)))); clipped+=int(np.count_nonzero(np.abs(chunk)>=.999))
         evidence.append({'speakerId':sid,'noiseFloorRms':float(np.percentile(levels,10)),'levelRms':float(np.percentile(levels,90)),
                          'clippedSamples':clipped,'vadScoreRange':[min((r[4] for r in rows),default=0),max((r[4] for r in rows),default=0)],
                          'speechSampleRanges':sample_ranges,'sessionOriginSeconds':offset,'sampleRate':SR})
-        coverage=valid[-1]
-        for lo,hi in ((frame_range['startFrame'],coverage['startFrame']),(coverage['endFrame'],frame_range['endFrame'])):
-            lo,hi=max(lo,frame_range['startFrame']),min(hi,frame_range['endFrame'])
-            if lo<hi:
-                unknown.append((lo,hi)); reviews.append({'code':'AUDIO_COVERAGE_GAP','assetId':channel['assetId'],'startFrame':lo,'endFrame':hi})
+        for key in ('instanceKey','inputKey','assetId'):
+            if key in channel:evidence[-1][key]=channel[key]
+    for sid in steps:
+        cursor=frame_range['startFrame']
+        for coverage in sorted((r for r in valid if r['speakerId']==sid),key=lambda r:r['startFrame']):
+            lo,hi=cursor,min(coverage['startFrame'],frame_range['endFrame'])
+            if lo<hi:unknown.append((lo,hi));reviews.append({'code':'AUDIO_COVERAGE_GAP','speakerId':sid,'startFrame':lo,'endFrame':hi})
+            cursor=max(cursor,coverage['endFrame'])
+        if cursor<frame_range['endFrame']:
+            unknown.append((cursor,frame_range['endFrame']));reviews.append({'code':'AUDIO_COVERAGE_GAP','speakerId':sid,'startFrame':cursor,'endFrame':frame_range['endFrame']})
     duplicates=set()
     for i,j in itertools.combinations(range(len(decoded)),2):
+        if channels[i]['speakerId']==channels[j]['speakerId']:continue
         a,b=decoded[i],decoded[j]; lo=max(a['sessionOrigin'],b['sessionOrigin']); hi=min(a['sessionOrigin']+len(a['samples'])/SR,b['sessionOrigin']+len(b['samples'])/SR)
         correlations=[]; gains=[]
         for pos in np.linspace(lo,max(lo,hi-1),5):
@@ -280,29 +336,43 @@ def _separate(decoded,channels,settings,fps,frame_range,cancel):
             reviews.append({'code':'DUPLICATE_CHANNELS','speakers':[channels[i]['speakerId'],channels[j]['speakerId']],'correlations':correlations,'gainRatios':gains})
     patterns={}
     for example in settings.get('calibration',[]):
-        sid=example['speakerId']; lo=_seconds(example['startFrame'],fps); hi=_seconds(example['endFrame'],fps); levels={}
+        if not isinstance(example,dict) or type(example.get('startFrame')) is not int or type(example.get('endFrame')) is not int or example['startFrame']<0 or example['endFrame']<=example['startFrame']:
+            raise CutError('INVALID_AUDIO_INPUT','Calibration requires a bounded solo frame range.')
+        sid=example.get('speakerId'); lo=_seconds(example['startFrame'],fps); hi=_seconds(example['endFrame'],fps); levels={};bindings={};bounds={}
         for channel,info in zip(channels,decoded):
+            if lo<info['sessionOrigin']-1/SR or hi>info['sessionOrigin']+len(info['samples'])/SR+1/SR:continue
             a=max(0,round((lo-info['sessionOrigin'])*SR)); b=min(len(info['samples']),round((hi-info['sessionOrigin'])*SR))
-            if b>a: levels[channel['speakerId']]=float(np.sqrt(np.mean(np.square(info['samples'][a:b],dtype=np.float64))))
-        if levels.get(sid,0)>1e-4: patterns[sid]={other:level/levels[sid] for other,level in levels.items()}
+            if b>a:
+                person=channel['speakerId'];key=source_key(channel)
+                if person==sid and example.get('inputKey') and example['inputKey']!=key:continue
+                if person in bindings:raise CutError('CALIBRATION_AMBIGUOUS','Select a unique microphone segment for this solo example.')
+                bindings[person]=key;bounds[person]=(info['sessionOrigin'],info['sessionOrigin']+len(info['samples'])/SR)
+                levels[person]=float(np.sqrt(np.mean(np.square(info['samples'][a:b],dtype=np.float64))))
+        if levels.get(sid,0)>1e-4:
+            span=bounds[sid];valid_lo=example.get('validStartFrame',_frame(span[0],fps));valid_hi=example.get('validEndFrame',_frame(span[1],fps))
+            if type(valid_lo) is not int or type(valid_hi) is not int or valid_lo>=valid_hi or valid_lo<_frame(span[0],fps) or valid_hi>_frame(span[1],fps):raise CutError('INVALID_AUDIO_INPUT','Calibration validity must stay inside its recording segment.')
+            patterns.setdefault(sid,[]).append({'levels':{other:level/levels[sid] for other,level in levels.items()},'inputs':bindings,'startFrame':valid_lo,'endFrame':valid_hi})
+    starts={}
+    for sid,rows in steps.items():rows.sort(key=lambda r:r[0]);starts[sid]=[r[0] for r in rows]
     turns=[]; bleed_count=0; ongoing={}; calibration_reviews=[]
     for frame in range(frame_range['startFrame'],frame_range['endFrame']):
         if frame%100==0: check_cancel(cancel)
-        t=_seconds(frame,fps); levels={}; candidates=[]
+        t=_seconds(frame,fps); levels={}; candidates=[];segments={}
         for sid,rows in steps.items():
-            ix=int((t-rows[0][0])*SR/512) if rows else -1
+            ix=bisect_right(starts[sid],t)-1
             if 0<=ix<len(rows):
-                a,b,active,rms,p=rows[ix]
-                if a<=t<b and active: candidates.append(sid); levels[sid]=rms
+                a,b,active,rms,p,key=rows[ix]
+                if a<=t<b and active: candidates.append(sid); levels[sid]=rms;segments[sid]=key
+        applicable={sid:next((p['levels'] for p in reversed(patterns.get(sid,[])) if p['startFrame']<=frame<p['endFrame'] and all(p['inputs'].get(person)==key for person,key in segments.items())),None) for sid in candidates}
         retained=set(candidates)
         for dominant in candidates:
-            pattern=patterns.get(dominant)
+            pattern=applicable.get(dominant)
             if dominant in duplicates or not pattern: continue
             for sid in candidates:
                 if sid!=dominant and sid not in duplicates and pattern.get(sid,1)<.5 and levels.get(sid,0)<=levels.get(dominant,0)*pattern.get(sid,0)*float(settings.get('bleedTolerance',1.8)):
                     retained.discard(sid); bleed_count+=1
         if len(retained)>1:
-            unresolved=sorted(sid for sid in retained if sid not in patterns or not set(candidates).issubset(patterns[sid]))
+            unresolved=sorted(sid for sid in retained if not applicable.get(sid) or not set(candidates).issubset(applicable[sid]))
             if unresolved:
                 unknown.append((frame,frame+1))
                 if calibration_reviews and calibration_reviews[-1]['speakers']==unresolved and calibration_reviews[-1]['endFrame']==frame:
@@ -322,40 +392,48 @@ def _separate(decoded,channels,settings,fps,frame_range,cancel):
 
 def analyze_audio(mode,sources,settings,cancel=None):
     if mode not in ('separate','mixed') or not sources: raise CutError('INVALID_AUDIO_INPUT','Choose separate or mixed recording mode.')
-    fps=settings['fps']; offsets=settings.get('offsets',{}); source_map={s['assetId']:s for s in sources}
+    fps=settings['fps']; offsets=settings.get('offsets',{}); source_map={source_key(s):s for s in sources}
+    if len(source_map)!=len(sources):raise CutError('INVALID_AUDIO_INPUT','Recording inputs require distinct instance identities.')
+    hashes={s['path']:media_digest(s['path'],cancel) for s in sources}
     for s in sources: _probe(s,settings,cancel)
     with tempfile.TemporaryDirectory(prefix='contentrium-analysis-') as directory:
         decoded=[]
         try:
             if mode=='mixed':
-                if len(sources)!=1: raise CutError('INVALID_AUDIO_INPUT','Mixed mode requires one selected recording.')
-                source=sources[0]; info=_decode(source,directory,0,settings,cancel,mixed=True); decoded.append(info)
-                origin=float(source['sequenceStartSeconds']) if 'sequenceStartSeconds' in source else info['origin']+float(offsets.get(source['assetId'],source.get('offsetSeconds',0))); info['sessionOrigin']=origin
-                frame_range=settings.get('range',{'startFrame':_frame(origin,fps),'endFrame':_frame(origin+len(info['samples'])/SR,fps)})
-                maximum=float(settings.get('maxMixedSeconds',7200))
-                if len(info['samples'])/SR>maximum: raise CutError('AUDIO_RESOURCE_LIMIT','Whole-session diarization limit exceeded; explicit chunk identity linking is required.',{'maxMixedSeconds':maximum})
-                engine=CommunityDiarizer(ModelManager(settings.get('modelRoot'))); wav=Path(directory)/'mixed.wav'
-                _run([info['ffmpeg'],'-v','error','-nostdin','-f','f32le','-ar','16000','-ac','1','-i',info['pcmPath'],'-c:a','pcm_s16le',str(wav)],cancel)
-                raw=engine.turns(wav,settings.get('speakerCount'),cancel)
-                labels=sorted({r[2] for r in raw},key=lambda label:(min(a for a,b,s in raw if s==label),label))
-                ids={label:chr(65+i) if i<26 else 'S%d'%(i+1) for i,label in enumerate(labels)}
-                turns=[(origin+a,origin+b,ids[s]) for a,b,s in raw]
-                valid=[{'assetId':source['assetId'],'startFrame':_frame(origin,fps),'endFrame':_frame(origin+len(info['samples'])/SR,fps),'startSample':0,'endSample':len(info['samples']),'sampleRate':SR,'sourceOriginSeconds':info['origin']}]
-                unknown=[]; revision=engine.revision; evidence={'localToSessionIds':ids,'output':'speaker_diarization', 'channelSelection': info['channelSelection'],
-                    'sourceIntervals':[{'startSample':round(a*SR),'endSample':round(b*SR),'localSpeakerId':s,'sessionSpeakerId':ids[s]} for a,b,s in raw]}; reviews=[]
-                if settings.get('speakerCount') and len(ids)!=int(settings['speakerCount']): reviews.append({'code':'SPEAKER_COUNT_CONFLICT','expected':int(settings['speakerCount']),'actual':len(ids)})
+                for n,source in enumerate(sources):
+                    info=_decode(source,directory,n,settings,cancel,mixed=True);decoded.append(info)
+                    info['sessionOrigin']=float(source['sequenceStartSeconds'])+info['origin']-source.get('sourceStartSeconds',0) if 'sequenceStartSeconds' in source else info['origin']+float(offsets.get(source['assetId'],source.get('offsetSeconds',0)))
+                ordered=sorted(decoded,key=lambda i:i['sessionOrigin'])
+                if any(a['sessionOrigin']+len(a['samples'])/SR>b['sessionOrigin']+1/SR for a,b in zip(ordered,ordered[1:])):
+                    raise CutError('SOURCE_ASSIGNMENT_CONFLICT','Mixed recording placements may not overlap in the session.')
+                frame_range=settings.get('range',{'startFrame':min(_frame(i['sessionOrigin'],fps) for i in decoded),'endFrame':max(_frame(i['sessionOrigin']+len(i['samples'])/SR,fps) for i in decoded)})
+                engine=CommunityDiarizer(ModelManager(settings.get('modelRoot'),cancel=cancel),settings,cancel)
+                turns,valid,reviews,unknown,evidence=diarize_chunks(sources,decoded,engine,settings,fps,directory,cancel);revision=engine.revision
+                if settings.get('speakerCount') and len({s for _,_,s in turns})!=int(settings['speakerCount']):reviews.append({'code':'SPEAKER_COUNT_CONFLICT','expected':int(settings['speakerCount']),'actual':len({s for _,_,s in turns})})
+                reviews.extend(getattr(engine,'reviews',[]))
             else:
-                channels=settings.get('channels') or [{'assetId':s['assetId'],'speakerId':chr(65+i),'channelIndex':s.get('channelIndex',0)} for i,s in enumerate(sources)]
-                if len({c['speakerId'] for c in channels})!=len(channels): raise CutError('INVALID_AUDIO_INPUT','Separate microphones require distinct session speaker IDs.')
+                channels=[dict(c) for c in (settings.get('channels') or [{'assetId':s['assetId'],'inputKey':source_key(s),'speakerId':chr(65+i),'channelIndex':s.get('channelIndex',0)} for i,s in enumerate(sources)])]
+                selected_sources=[]
                 for n,c in enumerate(channels):
-                    if c['assetId'] not in source_map: raise CutError('MISSING_AUDIO','Assigned microphone source is missing.')
-                    source=dict(source_map[c['assetId']]); source['channelIndex']=c.get('channelIndex',source.get('channelIndex',0))
+                    key=c.get('inputKey') or c.get('instanceKey') or c['assetId']
+                    if key not in source_map: raise CutError('MISSING_AUDIO','Assigned microphone source is missing.')
+                    source=dict(source_map[key]); source['channelIndex']=c.get('channelIndex',source.get('channelIndex',0));source['streamIndex']=c.get('streamIndex',source.get('streamIndex',0))
+                    for field in ('instanceKey','inputKey'):
+                        if field in source:c.setdefault(field,source[field])
+                    selected_sources.append(source)
                     info=_decode(source,directory,n,settings,cancel); decoded.append(info)
-                    info['sessionOrigin']=float(source['sequenceStartSeconds']) if 'sequenceStartSeconds' in source else info['origin']+float(offsets.get(c['assetId'],source.get('offsetSeconds',0)))
+                    info['sessionOrigin']=float(source['sequenceStartSeconds'])+info['origin']-source.get('sourceStartSeconds',0) if 'sequenceStartSeconds' in source else info['origin']+float(offsets.get(c['assetId'],source.get('offsetSeconds',0)))
+                check_assignments(channels,selected_sources,decoded)
                 frame_range=settings.get('range',{'startFrame':min(_frame(i['sessionOrigin'],fps) for i in decoded),'endFrame':max(_frame(i['sessionOrigin']+len(i['samples'])/SR,fps) for i in decoded)})
                 turns,valid,reviews,unknown,revision,evidence=_separate(decoded,channels,settings,fps,frame_range,cancel)
             check_cancel(cancel)
-            return {'schemaVersion':1,'modelRevision':revision,'intervals':_intervals(turns,valid,fps,frame_range,unknown),
-                    'sessionSpeakerIds':sorted({s for _,_,s in turns}),'reviews':reviews,'validAudioRanges':valid,'evidence':evidence}
+            source_inputs=[]
+            for source,info in zip(sources if mode=='mixed' else selected_sources,decoded):
+                if media_digest(source['path'],cancel)!=hashes[source['path']]:raise CutError('SOURCE_CHANGED','Source media changed during analysis.')
+                source_inputs.append(dict(source,path=info['path'],sha256=hashes[source['path']],sessionOriginSeconds=info['sessionOrigin'],requestedSourceStartSeconds=source.get('sourceStartSeconds',0),sourceStartSeconds=info['origin'],audioStreamOriginSeconds=info['audioStreamOriginSeconds'],sourcePtsOriginSeconds=info['sourcePtsOriginSeconds'],sourceSampleRate=info['sampleRate'],decodedSampleRate=SR,decodedSampleCount=len(info['samples'])))
+            intervals=_intervals(turns,valid,fps,frame_range,unknown)
+            timeline=[{'startFrame':r['startFrame'],'endFrame':r['endFrame'],'startTicks':frame_ticks(r['startFrame'],fps),'endTicks':frame_ticks(r['endFrame'],fps)} for r in intervals]
+            return {'schemaVersion':1,'modelRevision':revision,'intervals':intervals,
+                    'sessionSpeakerIds':sorted({s for _,_,s in turns}),'reviews':reviews,'validAudioRanges':valid,'evidence':evidence,'sourceInputs':source_inputs,'timelineEvidence':timeline,'fps':fps,'mode':mode}
         finally:
             for info in decoded: info['samples']._mmap.close()

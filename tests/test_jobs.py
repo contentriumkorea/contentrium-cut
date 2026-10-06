@@ -2,26 +2,56 @@ import tempfile
 import time
 import unittest
 import threading
+import os
+import wave
 from contextlib import contextmanager
 from unittest.mock import patch
 from pathlib import Path
 
 from contentrium_cut.contract import CutError
 from contentrium_cut.jobs import JobManager
+from test_cache import analysis_fixture
 
 class JobsTest(unittest.TestCase):
+    @unittest.skipUnless(os.environ.get('CONTENTRIUM_TEST_MODEL_ROOT'), 'real Silero model root not configured')
+    def test_real_silero_worker_completes_and_reuses_validated_cache(self):
+        from contentrium_cut.models import ModelManager
+        from test_audio import FFMPEG
+        model_root=os.environ['CONTENTRIUM_TEST_MODEL_ROOT'];revision=ModelManager(model_root).state('silero')['revision']
+        with tempfile.TemporaryDirectory() as directory:
+            source=Path(directory)/'silence.wav'
+            with wave.open(str(source),'wb') as stream:
+                stream.setnchannels(1);stream.setsampwidth(2);stream.setframerate(16000);stream.writeframes(b'\0\0'*48000)
+            payload={'mode':'separate','sources':[{'assetId':'a','path':str(source)}],
+                     'settings':{'fps':{'num':30,'den':1},'range':{'startFrame':0,'endFrame':90},
+                                 'channels':[{'assetId':'a','speakerId':'A'}],'modelRoot':model_root,
+                                 'modelRevision':revision,'ffmpeg':FFMPEG}}
+            jobs=JobManager(Path(directory)/'data')
+            try:
+                results=[]
+                for iteration in range(2):
+                    job=jobs.submit('analysis',payload);deadline=time.monotonic()+20
+                    while not jobs.quiescent() and time.monotonic()<deadline:time.sleep(.03)
+                    self.assertTrue(jobs.quiescent());state=jobs.get(job['jobId']);self.assertEqual(state['status'],'completed',state)
+                    results.append(state)
+                    self.assertEqual(state['result']['intervals'],[{'startFrame':0,'endFrame':90,'speakers':[],'unknown':False}])
+                self.assertEqual(results[0]['cacheKey'],results[1]['cacheKey'])
+                import json
+                persisted=json.loads((jobs.root/'cache'/(results[0]['cacheKey']+'.json')).read_text())
+                self.assertEqual(persisted['status'],'completed');self.assertEqual(persisted['kind'],'analysis')
+            finally:jobs.close()
     def test_update_during_cache_staging_cannot_promote_result(self):
         with tempfile.TemporaryDirectory() as directory:
-            jobs=JobManager(Path(directory));jobs.jobs['job']={'jobId':'job','status':'running','epoch':0}
+            jobs=JobManager(Path(directory));jobs.jobs['job']={'jobId':'job','kind':'analysis','status':'running','epoch':0}
             from contentrium_cut.jobs import atomic_json
             staged=threading.Event();resume=threading.Event();outcome=[]
             def paused(path,value):
                 if str(path).endswith('.pending.json'):staged.set();resume.wait(2)
                 atomic_json(path,value)
             with patch('contentrium_cut.jobs.atomic_json',side_effect=paused):
-                worker=threading.Thread(target=lambda:outcome.append(jobs.commit_result('job',0,{'value':42},'cachekey')));worker.start()
+                worker=threading.Thread(target=lambda:outcome.append(jobs.commit_result('job',0,analysis_fixture(),'a'*64)));worker.start()
                 self.assertTrue(staged.wait(1));jobs.stop_all(1);resume.set();worker.join(2)
-            self.assertEqual(outcome,[False]);self.assertFalse((Path(directory)/'cache'/'cachekey.json').exists());jobs.close()
+            self.assertEqual(outcome,[False]);self.assertFalse((Path(directory)/'cache'/('a'*64+'.json')).exists());jobs.close()
     def test_rejected_success_is_canceled_and_monitor_survives(self):
         with tempfile.TemporaryDirectory() as directory:
             jobs=JobManager(Path(directory),admit=lambda epoch:(_ for _ in ()).throw(CutError('UPDATE_IN_PROGRESS','Stopped')))

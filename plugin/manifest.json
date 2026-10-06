@@ -2,8 +2,13 @@
   "manifestVersion": 5,
   "id": "com.contentrium.cut",
   "name": "Contentrium CUT",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "main": "index.html",
+  "featureFlags": {
+    "CSSNextSupport": [
+      "boxShadow"
+    ]
+  },
   "host": {
     "app": "premierepro",
     "minVersion": "26.3.0"
@@ -11,15 +16,13 @@
   "requiredPermissions": {
     "network": {
       "domains": [
-        "http://localhost:41737",
-        "http://localhost",
-        "127.0.0.1"
+        "http://127.0.0.1:41737"
       ]
     },
     "localFileSystem": "request",
     "launchProcess": {
       "schemes": [
-        "contentrium-cut"
+        "https"
       ]
     }
   },
@@ -31,7 +34,7 @@
         "default": "Contentrium CUT"
       },
       "minimumSize": {
-        "width": 360,
+        "width": 320,
         "height": 500
       },
       "maximumSize": {
@@ -39,7 +42,7 @@
         "height": 2400
       },
       "preferredDockedSize": {
-        "width": 440,
+        "width": 420,
         "height": 800
       },
       "preferredFloatingSize": {

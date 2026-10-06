@@ -1,32 +1,44 @@
 # Contentrium CUT
 
-Premiere Pro에서 시퀀스의 오디오를 로컬로 분석하고, 화자에 따라 카메라를 전환하는 UXP 패널과 Windows Companion입니다. 자동 싱크는 원본을 보존한 새 시퀀스에 적용합니다.
+Premiere Pro 패널에서 트랙을 설정하고, 오디오를 로컬로 분석해 말하는 화자에 맞춰 카메라를 전환하는 플러그인입니다. 자동 싱크와 컷 편집 결과는 Premiere에서 계속 수정할 수 있는 새 시퀀스로 만듭니다.
 
-## 설치와 실행
+이 소스는 **0.1.1** 배포 대상입니다. 공개 파일과 서명 검증 결과는 [최신 검수 기록](docs/qa/2026-10-06-update-responsiveness.md)에서 확인합니다. 실제 설치된 새 패널의 Premiere 검증과 0.1.0 설치의 전환은 아직 완료하지 않았으며, 공개 배포와 구분합니다.
 
-1. [GitHub Releases](https://github.com/contentriumkorea/contentrium-cut/releases)에서 `Contentrium-CUT-Setup.exe`를 내려받습니다.
-2. Premiere Pro를 정상 종료하고 설치 파일을 실행합니다. 설치기는 서명된 업데이트 정보와 실제 다운로드의 해시를 검증합니다.
-3. 시작 메뉴의 **Contentrium CUT**을 실행하고 Premiere의 **Window → UXP Plugins → Contentrium CUT** 패널을 엽니다.
-4. Companion에 표시된 연결 코드를 패널에 입력하고 편집할 시퀀스를 연결합니다.
-5. 화자별 마이크 또는 혼합 녹음을 선택하고, 화자와 카메라를 연결합니다. 편집안을 검토한 뒤 적용하면 복제 시퀀스가 생성됩니다.
+## 단일 패널 사용 흐름
+
+설치 파일은 [콘텐츠리움 GitHub](https://github.com/contentriumkorea/contentrium-cut/releases)의 `Contentrium-CUT-Setup.exe`로 제공합니다. 설치할 때 Premiere를 정상 종료하며, 설치기는 서명된 배포 정보와 파일 해시를 검증합니다.
+
+1. Premiere의 **Window → UXP Plugins → Contentrium CUT** 패널을 엽니다. 패널이 현재 시퀀스와 백그라운드 엔진을 자동으로 확인합니다.
+2. **트랙**에서 실제 V/A 트랙의 카메라 역할, 분석할 마이크, 오디오 스트림·채널과 적용 범위를 지정합니다. 필요한 경우 자동·수동·타임코드 싱크를 설정합니다.
+3. **화자**에서 화자별 마이크 또는 혼합 녹음을 분석합니다. 예시를 듣고 이름·카메라를 연결하며, 겹침이나 불확실한 화자는 직접 교정합니다.
+4. **컷 편집**에서 최소 샷 길이, 짧은 발화, 동시 발화와 수동 고정 구간을 설정합니다.
+5. **검토**에서 컷의 위치와 선택 이유를 확인하고 Premiere에 적용합니다. 원본을 보존한 결과 시퀀스가 생성됩니다.
+
+영상 결과는 모든 영상 트랙 위의 **Contentrium CUT** 트랙에 개별 컷으로 정리합니다. 기존 자막 트랙과 오디오·그래픽 데이터는 보존합니다. 로고 배치와 추가 그래픽 편집은 사용자가 직접 합니다.
+
+모델, 자원·캐시, 업데이트와 중단된 편집 복구도 패널의 설정에서 제어합니다.
 
 현재 실제 호스트 검증 대상은 **Windows / Premiere Pro 26.5.2**입니다. 다른 호스트 버전은 검증 없이 편집을 허용하지 않습니다.
 
 ## 모델과 개인정보
 
-화자별 마이크 모드는 포함된 Silero VAD를 사용합니다. 혼합 녹음의 Community-1 모델은 제공자의 계정 접근 권한과 이용 조건 동의가 필요합니다. Companion에서 Hugging Face 토큰과 고정 리비전을 입력해 설치하며 토큰을 저장하지 않습니다. 모델 설치 후 오디오 분석은 로컬에서 수행합니다. 원음·프로젝트·화자 정보는 GitHub에 전송하지 않습니다.
+화자별 마이크 모드는 포함된 Silero VAD를 사용합니다. 혼합 녹음의 Community-1 모델은 제공자의 계정 접근 권한과 이용 조건 동의가 필요합니다. 패널 설정에서 Hugging Face 토큰과 고정 리비전으로 설치하며 토큰을 저장하지 않습니다. 모델 설치 후 오디오 분석은 로컬에서 수행합니다. 원음·프로젝트·화자 정보는 GitHub에 전송하지 않습니다.
 
 FFmpeg는 설치 중 제공자의 고정 버전 패키지를 사용자의 PC에 직접 내려받습니다. 콘텐츠리움의 배포 파일에는 FFmpeg 바이너리를 재배포하지 않습니다. 다운로드 출처·버전·해시·공급자 라이선스는 로컬에 보관합니다.
 
 ## 업데이트
 
-패널과 Companion을 열면 같은 저장소의 게시된 업데이트를 확인합니다. 새 버전이 없으면 편집을 계속합니다. **업데이트**를 누르면 설치 전체의 새 작업을 차단하고 실행 중인 CUT 작업을 중단합니다. 다운로드와 검증 이후 Premiere 정상 종료를 기다려 Adobe 설치기로 패널을 교체합니다. 새 패널과 Companion의 연결이 확인되어야 작업 차단이 해제됩니다. 중단된 편집은 자동 재개하지 않습니다.
+패널을 열면 같은 저장소의 게시된 업데이트를 확인합니다. 새 버전이 없으면 편집을 계속하고, 있으면 패널 안에 업데이트 알림을 표시합니다. **업데이트**를 누르면 즉시 새 CUT 작업을 차단하고 분석을 취소합니다. 이미 실행 중인 Premiere 편집 호출은 반환 경계에서 멈춥니다. 다운로드와 검증 이후 Premiere 정상 종료를 기다려 Adobe 설치기로 패널을 교체합니다. 새 패널과 백그라운드 엔진의 버전·연결이 확인되어야 작업 차단이 해제됩니다. 중단된 편집은 자동 재개하지 않습니다.
 
 업데이트 정보는 Ed25519로 서명합니다. Windows 실행 파일의 Authenticode 서명과는 별개입니다.
 
+GitHub 확인은 백그라운드에서 처리하며 이미 검증된 후보의 업데이트 시작을 막지 않습니다. 미리보기 종료가 느려도 서버 중단 요청을 먼저 보냅니다. 응답이 유실되면 편집을 재개하지 않고 같은 요청 ID로 재시도합니다.
+
+원래 공개 0.1.0의 설치 검증 오류와 새 실행 구조 사이 전환은 [소스 보조 0.1.0 → 0.1.1 전환 절차](docs/source-assisted-migration.md)를 사용합니다. 전용 headless 도구의 소스 검증과 실제 설치 성공은 구분하며, 기존 실패 기록을 보존합니다.
+
 ## 검증 범위
 
-[설계](docs/superpowers/specs/2026-10-05-premiere-speaker-cut-design.md), [호스트 컷·렌더 증거](docs/qa/native-host-proof.json), [영상·연결 오디오 싱크 증거](docs/qa/native-sync-proof.json), [실행 기록](docs/qa/execution-ledger.md)을 제공합니다. 합성 자료의 SDK 검증과 실제 사람의 목소리 구분 정확도는 구별합니다. 제공자 접근이 필요한 모델의 실제 추론 정확도는 접근 권한을 확보한 환경에서 별도 평가해야 합니다.
+[상세 설계](docs/superpowers/specs/2026-10-05-premiere-speaker-cut-design.md), [단일 패널 개편 설계](docs/superpowers/specs/2026-10-06-contentrium-cut-single-panel-design.md), [1차 호스트 컷·렌더 증거](docs/qa/native-host-proof.json), [1차 영상·연결 오디오 싱크 증거](docs/qa/native-sync-proof.json), [실행 기록](docs/qa/execution-ledger.md)을 제공합니다. 1차 증거는 개편된 패널의 실제 동작 증거를 대신하지 않습니다. 합성 자료의 SDK 검증과 실제 사람의 목소리 구분 정확도는 구별하며, Community-1의 실제 추론은 아직 검증하지 않았습니다.
 
 일반 속도·일반 미디어 클립을 첫 대상으로 합니다. 검증하지 않은 시간 재매핑·중첩·멀티캠·일부 프록시와 전환 효과 구성은 적용을 차단합니다. 드리프트가 있거나 근거가 부족한 싱크는 자동 적용하지 않습니다. 기본 기능은 영상 컷과 화자 선택이며 전사·자막·음성 복원은 기본 범위에 포함하지 않습니다.
 
@@ -34,4 +46,4 @@ FFmpeg는 설치 중 제공자의 고정 버전 패키지를 사용자의 PC에 
 
 Python 3.12 환경에 `requirements.lock`을 설치하고 `PYTHONPATH=companion python -m unittest discover -s tests`를 실행합니다. CPU PyTorch 배포 인덱스는 `https://download.pytorch.org/whl/cpu`입니다. Node 테스트는 `npm test`입니다. 실제 Premiere 시험 자료·접근 토큰·게시 서명 개인키는 저장소에 포함하지 않습니다.
 
-패키지 생성은 `tools/collect_licenses.py`, `tools/build_runtime.py`, `tools/build_setup.py` 순서입니다. 서명 개인키는 저장소 외부에 보관합니다. 제3자 라이선스와 귀속 자료는 `licenses/` 및 패널의 `vendor/`에 있습니다.
+패키지 생성은 `tools/collect_licenses.py`, `tools/build_runtime.py --silero-dir <검증된 모델 경로>`, `tools/build_setup.py` 순서입니다. 모델 경로는 명시적으로 지정하며 공개 자산에 설치별 인증 정보가 있으면 빌드를 차단합니다. 이미 생성한 같은 버전의 배포 파일은 덮어쓰지 않습니다. 서명 개인키는 저장소 외부에 보관합니다. 제3자 라이선스와 귀속 자료는 `licenses/` 및 패널의 `vendor/`에 있습니다.

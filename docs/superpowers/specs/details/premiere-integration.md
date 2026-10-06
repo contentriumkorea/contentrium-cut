@@ -2,6 +2,8 @@
 
 기준일: 2026-10-05. [상위 설계](../2026-10-05-premiere-speaker-cut-design.md)의 연동 부록. **실제 연동은 미검증**이다. 기존에 확인한 Windows Premiere 26.5.2가 첫 대상이며 이번 작업은 실행·설치·프로젝트 변경 없는 공식 문서 조사다.
 
+2026-10-06 개편: 설치별 비공개 bootstrap을 통한 자동 상호 인증과 숨겨진 실행 구조는 [단일 패널 재설계](../2026-10-06-contentrium-cut-single-panel-design.md)를 따른다. 초기 문서 작성 이후의 실제 검증은 [검수 기록](../../../qa/round-2.md)에서 확인한다.
+
 ## 1. 제품과 입력 경계
 
 Contentrium CUT은 Mono Studio 스타일을 적용한 Manifest v5, `host.app="premierepro"`의 도킹 UXP panel이다. 실제 `require("premierepro")` 결과를 표시하고 Premiere와 companion 연결을 나눈다. 선언된 최소 버전 이상의 모든 빌드를 검증했다고 표시하지 않는다. 브라우저 시안·모의 응답은 연동 증거가 아니다. [Manifest][manifest]
@@ -51,7 +53,7 @@ G04는 **복제본의 빈 끝부분에서 clone+trim**을 시험한다. `[s,e)�
 1. 전체 끝 뒤 빈 위치로 영상 인스턴스를 복제한다. 인수는 원본 대비 offset이며 `isInsert=false`다. 예상치 않은 오디오 복제·다른 트랙 이동은 즉시 실패다.
 2. 기존 왼쪽과 복제 오른쪽의 네 경계를 맞춘다. setter 순서가 교환 가능하거나 razor와 같다고 가정하지 않는다. 소스/타임라인 경계의 상호 작용을 시험해 고정한 순서만 사용한다.
 3. 오른쪽을 b로 이동하고 경계·소스 프레임·효과를 재조회한다. move Action의 절대값/offset 의미도 시험으로 확정한다. 임시 구간이 비고 전체 길이가 복원되어야 한다.
-4. 분석 양끝과 전환점에서 카메라 클립을 분할하고 비선택 영상 조각만 disabled 처리한다. 트랙 순서·상단 오버레이를 유지하며 오디오 Action은 만들지 않는다.
+4. 2026-10-06 확정 출력은 구간별 실제 클립을 모든 영상 트랙 중 최상단의 새 `Contentrium CUT` 트랙에 모으는 방식이다. 선택 범위의 카메라 원본 조각은 결과 복제본에서 교체하고 범위 밖 조각은 원래 트랙에 유지한다. 임시 조각도 같은 최상단 트랙의 시퀀스 끝 이후에 두며, 정확히 식별한 임시 복제본만 정리한다. 기존 비카메라 트랙과 오디오는 변경하지 않는다. 자막은 별도 자막 트랙이며 로고·그래픽의 최종 배치·합성은 사용자가 편집한다. 이 출력 계약은 위 G05의 비활성 토글 후보와 이전 상단 오버레이 배치 제안보다 우선한다.
 
 끝쪽 임시 배치는 작업중 길이를 늘릴 수 있다. 모든 원본 소스 범위를 지키고, 완료 시 임시 조각 0·기준 길이·범위 밖 구조를 재검증한다. track-matte·다른 카메라와의 blend처럼 disabled가 합성에 영향을 주는 구성은 보존 검증 전 차단한다. EditPlan은 표시 화면 구간이다. 실행기가 컴파일한 물리 조각/disabled 상태를 별도로 검증하며, 숨겨진 조각을 화면 커버리지나 UI 전환 수로 세지 않는다.
 
@@ -91,7 +93,7 @@ Windows loopback HTTP+JSON/polling을 우선한다. 127.0.0.1 전용 origin만 �
 
 companion 전용 scheme과 `shell.openExternal()`을 후보로 둔다. manifest launchProcess.schemes와 UXP 사용자 동의가 필요하다. shell 성공 후 실제 handshake로 준비를 확인한다. scheme 등록·서명·배포와 독립 업데이트 관리자 실행은 [배포·업데이트 설계](distribution-and-updates.md)를 따르며 실제 설치 검증은 남아 있다. [Launch][launch]
 
-loopback에도 인증이 필요하다. companion에서 확인한 일회용 pairing 값으로 세션 토큰을 교환한다. 토큰·경로를 URL query/로그에 넣지 않는다. 서버는 토큰·프로토콜·크기·Host/Origin을 검사하고 CORS를 인증으로 대신하지 않는다.
+loopback에도 인증이 필요하다. 설치 프로그램이 해당 제품의 External UXP data folder에 배치한 비공개 bootstrap으로 서버와 패널을 상호 인증한다. 서버를 검증한 뒤에만 프로젝트 정보를 보내며, 요청·응답은 세션 키와 단조 증가 카운터로 인증한다. 키·토큰·경로를 URL query/로그에 넣지 않는다. 서버는 프로토콜·크기·Host/Origin을 검사하고 CORS를 인증으로 대신하지 않는다. 부트스트랩 누락 시 수동 pairing이나 인증 생략으로 우회하지 않는다.
 
 선택 ProjectItem 경로만 등록해 assetId로 바꾼다. Windows 정규 경로·실제 file identity·reparse target을 확인한다. 임의 경로 HTTP 서버, 외부 URL, 디바이스 경로·경로 탈출은 허용하지 않는다. UNC/placeholder는 명시 입력과 실제 읽기 가능성이 검증되어야 한다. 명령은 argv 배열로 전달하고 경로를 쉘 문자열로 조립하지 않는다.
 

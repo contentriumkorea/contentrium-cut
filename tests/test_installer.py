@@ -13,11 +13,29 @@ import test_windows_install as windows_tests
 
 
 class InstallerTests(unittest.TestCase):
+    def private_integration_options(self):
+        roaming=self.fixture.root/'isolated-roaming'
+        data=roaming/'Adobe/UXP/PluginsStorage/PPRO/26/External/com.contentrium.cut/PluginData'
+        data.mkdir(parents=True,exist_ok=True)
+        return dict(mapping_evidence=dict(schemaVersion=1,productId='com.contentrium.cut',hostMajor=26,
+                    verifiedBy='installed-uxp-getDataFolder',canonicalPluginData=str(data),receiptHash='ab'*32),
+                    owner_sid='S-1-5-21-123',roaming_root=roaming,protect=lambda *a:None,popen=lambda *a,**kw:None)
     def setUp(self):
+        for target in ['tkinter.Tk', 'tkinter.messagebox.showerror']:
+            guard = patch(target, side_effect=AssertionError('Unexpected GUI path blocked by installer test guard'))
+            guard.start(); self.addCleanup(guard.stop)
+        physical = patch('contentrium_cut.bootstrap._physical_path', side_effect=lambda path:path.resolve())
+        physical.start(); self.addCleanup(physical.stop)
         self.fixture = updater_tests.UpdaterTests('runTest')
         self.fixture.setUp()
         self.addCleanup(self.fixture.doCleanups)
         self.entry = importlib.import_module('tools.install_entry')
+        gui = patch.object(self.entry, 'show_gui', side_effect=AssertionError('Unexpected Setup GUI blocked by installer test guard'))
+        gui.start(); self.addCleanup(gui.stop)
+        # Existing tests isolate first-install/update selection from B2 enrollment.
+        # Dedicated test_install_completion exercises the real preparation path.
+        self.preparation_patch=patch.object(self.entry,'prepare_installation',return_value={'status':'PREPARED'})
+        self.preparation_patch.start();self.addCleanup(self.preparation_patch.stop)
         self.root = self.fixture.root / 'install'
         self.setup = self.fixture.root / 'Setup.exe'
         self.setup.write_bytes(b'MZ frozen installer boundary')
@@ -38,13 +56,13 @@ class InstallerTests(unittest.TestCase):
             dependency_installer=lambda root: self.calls.append('ffmpeg'),
             integration_installer=lambda *args, **kw: self.calls.append('integration') or {'launcher':'boundary','shortcut':'boundary'}, **kwargs)
 
-    def actual_windows_payload(self):
+    def actual_windows_payload(self, extra=None):
         import hashlib
         windows = windows_tests.WindowsInstallationTests('runTest')
         windows.setUp(); self.addCleanup(windows.doCleanups)
         self.root = windows.root
         self.hooks = windows.hooks
-        manifest, paths = windows.payload('0.2.0','bundle-new')
+        manifest, paths = windows.payload('0.2.0','bundle-new',extra=extra)
         binary = {role:path.read_bytes() for role,path in paths.items()}
         def change(signed):
             for asset in signed['assets']:
@@ -55,6 +73,17 @@ class InstallerTests(unittest.TestCase):
             if role:
                 self.fixture.network.documents[asset['browser_download_url']]=binary[role]
                 asset['size']=len(binary[role])
+        # The stable Setup is an exact signed installer-role asset, not arbitrary bytes.
+        manifest=self.fixture.manifest;prefix=self.fixture.network.release['assets'][0]['browser_download_url'].rsplit('/',1)[0]+'/'
+        setup=self.setup.read_bytes();name='Contentrium-CUT-Setup.exe'
+        manifest['assets'].append(dict(role='installer',assetId=105,name=name,size=len(setup),sha256=hashlib.sha256(setup).hexdigest()))
+        self.fixture.network.release['assets'].append(dict(id=105,name=name,size=len(setup),state='uploaded',browser_download_url=prefix+name))
+        self.fixture.network.documents[prefix+name]=setup
+        raw=json.dumps(manifest,separators=(',',':')).encode()
+        signature=json.dumps(dict(algorithm='Ed25519',keyId=manifest['signingKeyId'],signature=base64.b64encode(self.fixture.key.sign(raw)).decode())).encode()
+        for name,value in [('update-manifest.json',raw),('update-manifest.sig',signature)]:
+            self.fixture.network.documents[prefix+name]=value
+            next(a for a in self.fixture.network.release['assets'] if a['name']==name)['size']=len(value)
         self.fixture.network.release_by_id[42]=json.loads(json.dumps(self.fixture.network.release))
         return windows
 
@@ -67,11 +96,16 @@ class InstallerTests(unittest.TestCase):
             fail=True
             @staticmethod
             def CreateKey(hive,key): return nullcontext(key)
+            @staticmethod
+            def QueryValueEx(key,name): raise FileNotFoundError()
+            @staticmethod
+            def OpenKey(hive,key):raise FileNotFoundError()
             @classmethod
             def SetValueEx(cls,*args):
                 if cls.fail: raise PermissionError('controlled registry failure')
         def integrate(root, config, **kwargs):
-            return integration.install_integration(root,config,**kwargs,registry=Registry,menu_root=windows.root.parent/'menu')
+            kwargs.pop('mapping_evidence',None)
+            return integration.install_integration(root,config,**kwargs,**self.private_integration_options(),registry=Registry,menu_root=windows.root.parent/'menu')
         arguments = dict(installation=windows.hooks,transport=self.fixture.network,launcher_source=self.setup,
             resource_root=self.setup.parent,dependency_installer=lambda root:None,integration_installer=integrate,mutex=lambda root:nullcontext())
         with self.assertRaises(PermissionError): self.entry.install(self.config,self.root,**arguments)
@@ -209,23 +243,24 @@ class InstallerTests(unittest.TestCase):
         directory = self.root / 'app' / 'versions' / '0.2.0'
         directory.mkdir(parents=True)
         (directory / 'Contentrium CUT.exe').write_bytes(b'MZ app boundary')
+        (directory / 'config.json').write_text('{"appVersion":"0.2.0","bundleId":"new"}')
         (self.root / 'app' / 'active.json').write_text(json.dumps({'schemaVersion':1,'productId':'com.contentrium.cut',
             'appVersion':'0.2.0','bundleId':'new','versionDirectory':'versions/0.2.0'}))
         launches = []
         integration.open_active(self.root, installation=Installed(), popen=lambda args, **kw: launches.append(args))
-        self.assertEqual(launches, [[str(directory / 'Contentrium CUT.exe')]])
+        self.assertEqual(launches, [[str(directory / 'Contentrium CUT.exe'),'--supervisor','--root',str(self.root),'--config',str(directory / 'config.json')]])
         with self.assertRaises(Exception):
             integration.open_active(self.root, installation=type('Bad',(),{'verify_application':lambda *a:False})(),
                                     popen=lambda *a,**kw:launches.append('unverified'))
         with self.assertRaises(Exception):
             integration.open_active(self.root, installation=type('Claim',(),{'verify_application':lambda *a:{'claimed':True}})(),
                                     popen=lambda *a,**kw:launches.append('claim'))
-        self.assertEqual(launches, [[str(directory / 'Contentrium CUT.exe')]])
+        self.assertEqual(launches, [[str(directory / 'Contentrium CUT.exe'),'--supervisor','--root',str(self.root),'--config',str(directory / 'config.json')]])
 
     def test_protocol_is_stable_exe_without_uri_input_or_version_path(self):
         integration = importlib.import_module('contentrium_cut.integration')
         command = integration.protocol_command(self.root)
-        self.assertEqual(command, '"' + str(self.root / 'Contentrium CUT Launcher.exe') + '" --open')
+        self.assertEqual(command, '"' + str(self.root / 'Contentrium CUT Launcher.exe') + '" --open --root "'+str(self.root)+'"')
         self.assertNotIn('%1', command)
         self.assertNotIn('.cmd', command)
 
@@ -241,10 +276,14 @@ class InstallerTests(unittest.TestCase):
             @staticmethod
             def CreateKey(hive, key): return nullcontext(key)
             @staticmethod
+            def QueryValueEx(key,name): raise FileNotFoundError()
+            @staticmethod
+            def OpenKey(hive,key):raise FileNotFoundError()
+            @staticmethod
             def SetValueEx(key,name,reserved,kind,value): values.append((key,name,value))
         config = {'publicKey':'public key boundary','appVersion':'0.1.0'}
         result = integration.install_integration(self.root, config, launcher_source=self.setup,
-            resource_root=resources, registry=Registry, menu_root=self.fixture.root / 'menu')
+            resource_root=resources, registry=Registry, menu_root=self.fixture.root / 'menu',**self.private_integration_options())
         self.assertEqual(Path(result['launcher']).read_bytes(), self.setup.read_bytes())
         self.assertEqual(json.loads((self.root / 'launcher-config.json').read_text()), config)
         self.assertEqual((self.root / 'licenses' / 'licenses' / 'cryptography.txt').read_text(), 'license boundary')

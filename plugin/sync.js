@@ -80,7 +80,7 @@ function preflight(plan,snapshot,hash){
 function install(host){
   host.applySync=async function(plan,input,control={}){
     if(typeof control.check!=='function')fail('SYNC_AUTHORIZATION_REQUIRED');
-    const prepared=preflight(plan,input,host.hash),live=await host.snapshot();
+    const prepared=preflight(plan,input,host.hash),live=await (host.resolveInput?host.resolveInput(input):host.snapshot());
     const originalHash=input.hostSnapshotHash||input.snapshotHash;
     if(live.snapshot.snapshotHash!==originalHash)fail('SYNC_SNAPSHOT_CHANGED');
     verifyReadback(live.snapshot,{expectedClips:input.clips},input,host.hash);
@@ -101,11 +101,8 @@ function install(host){
       }
     }
     let result;
-    async function check(){await control.check();if(control.stopped?.())fail('CANCELED');}
-    async function batch(name,build){
-      await check();control.onBatch?.(true);
-      try{host.transaction(live.project,name,build);}finally{control.onBatch?.(false);}
-    }
+    const mutations=require('./mutation.js').controller(host,input.sequenceRef,control);
+    const check=mutations.check,batch=(name,build)=>mutations.batch(live.project,name,build);
     async function readback(expected){
       const after=await host.snapshot(result,live.project);
       verifyReadback(after.snapshot,expected,live.snapshot,host.hash);
@@ -116,7 +113,7 @@ function install(host){
       const existing=new Set((await live.project.getSequences()).map(s=>String(s.guid)));
       await batch('Contentrium CUT · 싱크 원본 보존 복제',c=>c.addAction(live.sequence.createCloneAction()));
       const created=(await live.project.getSequences()).filter(s=>!existing.has(String(s.guid)));
-      if(created.length!==1)fail('SYNC_CLONE_IDENTITY_FAILED');result=created[0];control.onResult?.(String(result.guid));
+      if(created.length!==1)fail('SYNC_CLONE_IDENTITY_FAILED');result=created[0];await mutations.result(String(result.guid));
       const item=await result.getProjectItem();
       await batch('Contentrium CUT · 싱크 결과 이름',c=>c.addAction(item.createSetNameAction('Contentrium CUT · 싱크 · '+live.sequence.name)));
       let current=await readback({expectedClips:input.clips});
@@ -139,7 +136,7 @@ function install(host){
         await batch('Contentrium CUT · 싱크 배치',c=>{for(const move of moving)c.addAction(targetObjects.get(move.instanceKey).createMoveAction(host.time(tick(move.startTicks)-tick(staging.get(move.instanceKey)))));});
       }
       await readback(prepared);await check();
-      await live.project.openSequence(result);await check();await live.project.save();
+      if(await live.project.openSequence(result)!==true)fail('HOST_OPEN_RESULT_FAILED');await check();if(await live.project.save()!==true)fail('HOST_SAVE_FAILED');
       const after=await readback(prepared);
       return {originalUnchanged:true,readbackVerified:true,sequenceRef:String(result.guid),sequenceName:result.name,snapshot:after.snapshot};
     }catch(error){

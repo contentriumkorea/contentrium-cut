@@ -2,18 +2,32 @@
 
 This pins inter-module integration values; the approved design remains authoritative. User authorizes three rounds of implementation/install/deploy, with no local install in round 3. Do not publish or install from worker agents.
 
+2026-10-06 single-panel addendum: use the [current panel/auth/lifecycle spec](superpowers/specs/2026-10-06-contentrium-cut-single-panel-design.md). Source implementation and native installation evidence are separate gates; current [round-2 status](qa/round-2.md) remains incomplete. The user currently prohibits all computer use until a separate instruction.
+
 ## Shared data
 
 - `schemaVersion: 1`, `appVersion: "0.1.0"` initially. Tick strings are decimal integers; Premiere ticks per second = `254016000000`. FPS `{num,den}`. Segments `[startFrame,endFrame)` integer frames.
 - `InputSnapshot`: `{schemaVersion, projectRef, sequenceRef, projectName, sequenceName, fps, range:{startFrame,endFrame}, tracks, clips, sources, supportFlags, snapshotHash}`.
 - A track is `{trackRef, mediaType:"video"|"audio", index, name, muted, protected}`. Camera tracks are explicit user choices; all others are protected.
+- Cut output (user-confirmed 2026-10-06): clone the source sequence and place ordinary editable source-backed cut clips on one newly appended, highest video track named `Contentrium CUT`. Return its `outputTrackRef` from `host.apply` and verify every applied segment is on that track; this is host readback metadata, not a new persisted apply-journal receipt field. Stage beyond the sequence end on this same track and delete only the exact staged copies, never the final clips. Existing camera fragments outside the selected range stay on their original tracks. Keep existing non-camera clip data unchanged; caption tracks are outside this video's mutation scope and logo/graphic layout is user editing, not an automatic composition-preservation promise. Batch count remains `3 * fragments + 4`, with track naming in the cleanup transaction.
 - `SourceAsset`: `{assetId, canonicalPath, size?,mtime?,fingerprint?,streams?}`. Registered paths come only from Premiere snapshot/source selection; backend revalidates real path/file metadata.
 - `SourceClip`: `{instanceKey, assetId, projectItemRef, trackRef, mediaType, startTicks,endTicks,inTicks,outTicks,speed,disabled,channelMap,effectFingerprint,supportFlags}`. A camera binding points to these instances.
 - `SpeakerAnalysis`: `{schemaVersion, modelRevision, intervals:[{startFrame,endFrame,speakers:[sessionSpeakerId],unknown:false,reason?}], sessionSpeakerIds, reviews, validAudioRanges}`. Speaker intervals MAY overlap; normalization must preserve actual simultaneous voices. `unknown` is a flag, not a fake speaker.
 - `SpeakerMapping` for policy: `{speakers:{"A":"CA","B":"CB"}, cameras:[{cameraId,role:"speaker"|"wide"|"two-shot"|"reserve",coveredSpeakers,clips:[{instanceKey,startFrame,endFrame}],priority?}], startCameraId:"W", fallbackOrder:[]}`. Camera clips refer to source instances in snapshot.
 - `Policy`: `{minShot:2.0,shortTurn:0.6,suppressShort:true,overlap:0.8,overrides:[{startFrame,endFrame,cameraId}]}`; durations in decimal seconds interpreted exactly using rational FPS.
 - `EditPlan`: `{schemaVersion,snapshotHash,segments:[{startFrame,endFrame,cameraId,sourceClipInstanceKey,reason}],reviews,planHash}`. No invalid coverage/length/gaps. Typed blocking error has `code` and details; do not report errors as silence.
-- `ApplyReceipt`: `{schemaVersion,appVersion,jobId,planHash,outputSequenceRef,batches,readback,sourceUnchanged,status}`; completed only after real host comparison.
+- Cut/sync completion receipt: `{planHash,sourceSnapshotHash,resultSnapshotHash,resultSequenceRef,sourceUnchanged:true,readback:{verified:true},saved:true}`. Input creation receipt instead binds `{planHash,resultSequenceRef,resultSnapshotHash,sourceRecordsDigest,priorSequencesHash,originalsUnchanged:true,saved:true}`. Only actual post-save native comparison may produce these receipts.
+- Each mutation uses a persisted client requestId and durable service applyId. `/apply/check` without batch fields is read-only; a batch requires the exact next ordinal, operationDigest and bound resultSequenceRef. Persist the permit before the native call and persist `/apply/batch-end` after it returns. Exact duplicate begin/batch requests return `execute:false`; no automatic SDK replay. `/apply/result` durably binds the discovered output sequence before later changes. Lost responses, service restart and unresolved batches require explicit recovery; heartbeat expiry is never host-exit evidence.
+- A mixed analysis's generated A/B identifiers are scoped to its analysisId. Corrections within that analysis retain explicit user mappings; a fresh analysis must clear every mapping based on those generated identities, including camera coveredSpeakers. Immutable raw analysis plus revisioned corrections drive planning and listening examples.
+
+## Current source validation
+
+- Stored analysis retrieval, planning, apply begin and the first native batch require current source SHA-256 evidence. Matching paths, size, timestamps or native snapshot alone cannot establish matching media contents.
+- Full source reads run in owned, cancellable workers outside admission/auth/update locks. Production Windows readers deny write/delete sharing and retain their handles through the short final commit. Final admission rechecks captured session generation, native host, project, epoch, revision and request scope; it performs no source-file I/O.
+- Cut-plan preparation runs in that same owned worker while source handles remain held. The final take publishes the prepared plan only after the captured coordinator session and correction revision still match; it never calls the long planner while holding admission locks or after its HTTP response deadline. Stop, stale authority or changed correction state must leave the plan table unchanged.
+- Expensive original routes return `{continuation:{id,status:"pending",pollAfterMs:250,expiresInMs:1800000,epoch}}`. The ID is 32 lowercase hex characters. Each physical request keeps signed envelopes, counters and the 8-second deadline. Waiting/polling occurs outside the physical request queue so heartbeat, cancellation and update commands remain available.
+- `GET /continuations/<id>` reports `pending|ready|failed|canceled|consumed`. `POST /continuations/<id>/take {epoch}` consumes the proof and returns the original result once; `POST /continuations/<id>/cancel {}` stops it. The total worker limit is 30 minutes and a ready proof expires after 60 seconds. Lost take responses remain unknown outcomes; neither take nor the original mutation is automatically replayed.
+- Cancellation drains confirmed owned workers; a stalled read has a separate bounded termination path. Update quiescence requires actual worker exit. A canceled, reconnected, revised or superseded request cannot promote a late proof or execution permit.
 
 ## Python integration
 
@@ -23,7 +37,17 @@ This pins inter-module integration values; the approved design remains authorita
 - `audio.sync_sources(sources, reference, fps, cancel=None)` accepts source descriptors `{assetId,path,streamIndex:0,channelIndex:0,offsetSeconds?:0}`; reference assetId. Returns per-source offsets and evidence/reviews. Decode/correlation can use locally installed NumPy/SciPy and configured FFmpeg.
 - `audio.analyze_audio(mode,sources,settings,cancel=None)` returns SpeakerAnalysis; settings include fps/range/offsets/channels/speakerCount/modelRoot/ffmpeg. `mode` is `separate` or `mixed`.
 - Cancel callable raises `CutError("CANCELED",...)` when signaled, and must be checked between ranges/expensive stages. Parent terminates only confirmed owned worker if bounded cooperative cancellation fails.
-- Models must be local and provider terms must not be silently accepted. Model tokens belong in DPAPI-protected user storage, never source/project/logs. Absence is MODEL_NOT_READY; source missing is MISSING_AUDIO.
+- Models must be local and provider terms must not be silently accepted. Model access tokens remain transient during the explicit authorized setup operation and are never saved in source/projects/jobs/settings/logs. Absence is MODEL_NOT_READY; source missing is MISSING_AUDIO.
+
+## First installation and enrollment
+
+- Normal Setup resolves the exact verified registered installation before a fresh Known Folder root. It accepts only the product's pinned modern command formats or the evidenced legacy quoted Launcher plus `--open`; registry values are never executed. Conflicting registrations cannot silently fall back to a new root.
+- After the signed runtime/CCX transaction, Setup persists `PROVISIONING_PENDING`. `installer_preparation.prepare_installation(root, config, ...)` independently verifies that exact active target and returns `PENDING_PROVISIONING` or `PREPARED`; it does not depend on `first-install.json` and never creates an activation ticket.
+- Enrollment uses a public ten-minute challenge in the one guarded External product PluginData candidate. Only a matching receipt from the actual UXP own-folder `getDataFolder()`/`nativePath` can authorize initial private provisioning. Challenge/receipt identity includes product, host major 26, target version/bundle, nonce, expiry and exact folder. Invalid private bootstrap is an error, not permission to replace it. Retained valid bootstrap avoids new enrollment.
+- The responsive GUI worker waits on a cancelable Event. Closing/relaunching preserves the exact pending target and resumes provisioning without reinstalling CCX while Premiere is open. An exact owned incomplete receipt gets at most three 0.1-second read waits; persistent invalid bytes are retained with an explicit error.
+- Preparation validates bundled Silero only under the exact signed runtime, stages/verifies before committing, and retains an already valid user model. No Community-1/provider request is part of this step. `PREPARED` carries nonsecret `mappingEvidence` and `modelPreparation` for integration.
+- Integration records readiness only after registration succeeds. Its internal `launch=False` option preserves registration/startup checks while deferring immediate hidden dispatch for the source maintenance handoff. Ticket creation and the sole activation dispatch must follow preparation and integration.
+- Actual installed UXP folder visibility, DACL, frozen Setup dependencies and startup/activation remain native acceptance requirements; temporary-folder tests do not establish them.
 
 ## Updating integration
 
@@ -33,7 +57,7 @@ This pins inter-module integration values; the approved design remains authorita
 - Update manager runs independently of worker cancellation; start must latch gate/epoch and invoke stop_all before download. All registered participants must acknowledge or have actually exited before replacement.
 - Signature contract: Ed25519 detached signature over exact manifest UTF-8 bytes; JSON signature wrapper `{algorithm:"Ed25519",keyId,signature:<base64>}`. Manifest assets only installation payloads, not itself/signature. Asset fields `{role,assetId,name,size,sha256}`. Download via GitHub returned HTTPS asset URL; allowlisted GitHub/CDN redirects only.
 - Manifest fields: schemaVersion/productId/displayName/appVersion/channel/releaseId/tag/builtAt/platform/architecture/panelVersion/companionVersion/bundleId/updateProtocolRange/minUpdaterVersion/dataSchemaFrom/dataSchemaTo/migrationId/assets/modelCompatibility/releaseNotes/signingKeyId.
-- Data root `%LOCALAPPDATA%/Contentrium CUT/`; versioned app files separate from data/models/cache/updates. Updater does not kill Premiere. Actual active plugin+Companion must both match before COMPLETE. Keep previous verified install for rollback.
+- Resolve and persist the installation's physical root through Windows handle identity, then pass explicit `--root` across launcher/supervisor/runtime. Do not infer an existing root from the launching process's `%LOCALAPPDATA%` under MSIX redirection. Keep versioned app files separate from data/models/cache/updates. Updater does not kill Premiere. Actual active plugin and background runtime must both match before COMPLETE. Keep the previous verified install for rollback.
 
 ## Implementation ownership
 

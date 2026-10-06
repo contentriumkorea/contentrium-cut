@@ -212,6 +212,23 @@ def validate_zip(path, max_uncompressed=4 * 1024**3):
             raise CutError('UPDATE_PACKAGE', 'Corrupt package member')
 
 
+def _commit_journal_file(temporary, journal):
+    """Commit only the updater journal; native write-through stays at this boundary."""
+    if os.name == 'nt':
+        import ctypes
+        move = ctypes.WinDLL('kernel32', use_last_error=True).MoveFileExW
+        move.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint]
+        if not move(str(temporary), str(journal), 0x1 | 0x8):
+            raise ctypes.WinError(ctypes.get_last_error())
+    else:
+        os.replace(temporary, journal)
+        descriptor = os.open(journal.parent, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+
+
 class UpdateManager:
     """The caller serializes `advance` in an independent manager, never a worker.
 
@@ -426,6 +443,40 @@ class UpdateManager:
             self._commit(_activationHandoff=authorization)
             return {'updateId': saved['updateId'], 'token': token, 'expiresAt': now + 300}
 
+    def resume_preparation(self, candidate_id, manifest_digest):
+        """Resume only pre-handoff preparation, never installation or activation.
+
+        A trusted maintenance caller owns both native leases, pins the saved
+        signed release and verifies its original installation. Issuing a ticket
+        closes this path permanently; recovery must then use recover().
+        """
+        with self._operation, self._lock:
+            saved = _json(self.journal.read_bytes())
+            self._validate_journal(saved)
+            if (self._journal_bad or self._state['updateState'] != 'RECOVERY_REQUIRED'
+                    or self._state.get('interruptedPhase') != 'PENDING_ACTIVATION'
+                    or saved['updateState'] != 'PENDING_ACTIVATION' or saved['gateOpen']
+                    or saved.get('_activationHandoff') is not None or saved['cancelRequested']
+                    or saved['stopInFlight'] or not saved['stopSignaled']
+                    or self.runtime_version != saved['oldVersion']
+                    or (saved['candidateId'], saved['manifestDigest']) != (candidate_id, manifest_digest)
+                    or (saved['updateId'], saved['updateEpoch']) != (self._state['updateId'], self._state['updateEpoch'])):
+                raise CutError('UPDATE_PREPARATION', 'Only the exact unissued pending preparation can resume.')
+            manifest, _ = self._candidate()
+            self._verify_prepared(manifest)
+            self.installation._verify_snapshot(saved['snapshot'])
+            result = saved['installerResult']
+            if (result.get('status') != 'PENDING_ACTIVATION'
+                    or result.get('appVersion') != saved['newVersion'] or result.get('bundleId') != saved['bundleId']
+                    or self.installation.verify_application(saved['newVersion'], saved['bundleId']) is not True):
+                raise CutError('UPDATE_PREPARATION', 'The installed pending target could not be verified.')
+            updated = dict(saved, gateOpen=False, error=None)
+            updated.pop('interruptedPhase', None)
+            self._validate_journal(updated)
+            self._persist(updated)
+            self._state, self._blocked = updated, True
+            return self.state()
+
     def accept_activation_handoff(self, token):
         """Consume one bound token durably, keeping CUT admission closed.
 
@@ -466,19 +517,7 @@ class UpdateManager:
                 output.write(json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(',', ':')).encode('utf-8'))
                 output.flush()
                 os.fsync(output.fileno())
-            if os.name == 'nt':
-                import ctypes
-                move = ctypes.WinDLL('kernel32', use_last_error=True).MoveFileExW
-                move.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint]
-                if not move(str(temporary), str(self.journal), 0x1 | 0x8):
-                    raise ctypes.WinError(ctypes.get_last_error())
-            else:
-                os.replace(temporary, self.journal)
-                descriptor = os.open(self.updates, os.O_RDONLY)
-                try:
-                    os.fsync(descriptor)
-                finally:
-                    os.close(descriptor)
+            _commit_journal_file(temporary, self.journal)
         finally:
             temporary.unlink(missing_ok=True)
 
@@ -603,9 +642,11 @@ class UpdateManager:
                 cached = self._state.get('_verifiedRelease')
                 if cached and self._state.get('_etag'):
                     headers['If-None-Match'] = self._state['_etag']
-            try:
                 self._commit(checkState='CHECKING', error=None)
+            try:
                 response = self._get(LATEST_URL, headers)
+                with self._lock:
+                    if self._blocked:return self.state()
                 self._rate_limit(response)
                 if response.status == 304:
                     if not cached:
@@ -619,9 +660,11 @@ class UpdateManager:
                         if candidate:
                             candidate.update(expiresAt=self.clock() + 3600, compatibilityReasons=reasons)
                         check_state = ('INCOMPATIBLE' if reasons else 'AVAILABLE') if newer else 'CURRENT'
-                        self._commit(checkState=check_state, candidate=candidate,
-                                     _verifiedRelease={'checkState': check_state, 'candidate': candidate},
-                                     lastCheckedAt=self.clock(), error=None)
+                        with self._lock:
+                            if self._blocked: return self.state()
+                            self._commit(checkState=check_state, candidate=candidate,
+                                         _verifiedRelease={'checkState': check_state, 'candidate': candidate},
+                                         lastCheckedAt=self.clock(), error=None)
                         return self.state()
                 if response.status != 200:
                     raise CutError('UPDATE_HTTP', 'GitHub update check failed', {'status': response.status})
@@ -637,6 +680,8 @@ class UpdateManager:
                 for name, limit in [('update-manifest.json', 1024 * 1024), ('update-manifest.sig', 16384)]:
                     asset = next(item for item in assets if item['name'] == name)
                     downloaded = self._get(asset['browser_download_url'], BINARY_HEADERS, limit)
+                    with self._lock:
+                        if self._blocked:return self.state()
                     if downloaded.status != 200 or len(downloaded.body) != asset['size']:
                         raise CutError('UPDATE_ASSET', 'Manifest asset download failed')
                     docs.append(downloaded.body)
@@ -702,7 +747,8 @@ class UpdateManager:
                 if (not isinstance(request_id, str) or not request_id or len(request_id) > 256
                         or not candidate or candidate['candidateId'] != candidate_id
                         or candidate['manifestDigest'] != manifest_digest or candidate['expiresAt'] <= self.clock()
-                        or self._state['checkState'] != 'AVAILABLE'):
+                        or self._state['checkState'] not in {'AVAILABLE','CHECKING'}
+                        or self._state.get('_verifiedRelease',{}).get('checkState')!='AVAILABLE'):
                     raise CutError('UPDATE_CANDIDATE', 'Update candidate is unknown, expired or incompatible')
                 pinned = self._state['_candidate']
                 raw = base64.b64decode(pinned['raw'])
@@ -792,7 +838,9 @@ class UpdateManager:
         release = _json(response.body)
         if (release.get('id') != manifest['releaseId'] or release.get('tag_name') != manifest['tag']
                 or release.get('name') != 'Contentrium CUT' or release.get('draft') is not False
-                or release.get('prerelease') is not False):
+                or release.get('prerelease') is not False
+                or ('target_commitish' in pinned_release and
+                    release.get('target_commitish') != pinned_release['target_commitish'])):
             raise CutError('UPDATE_WITHDRAWN', 'Selected release identity or stable status changed')
         fields = ('id', 'name', 'size', 'state', 'browser_download_url')
         def metadata(assets):

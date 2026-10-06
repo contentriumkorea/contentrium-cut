@@ -21,3 +21,7 @@
 0.1.0은 검증된 현재 시퀀스 기반 핵심 경로의 초기 공개 시험판이다. 위 미구현·미검증 항목을 완료라고 표기하지 않으며, 2차/3차 검수에서 다시 추적한다.
 
 첫 설치 복구 수정: durable signed/pinned install journal, Adobe 등록 전 intent, 같은 서명된 ZIP 내용과 CCX 재검증 후 인계, 실패한 시작 메뉴·프로토콜 등록의 offline repair. 독립 110개 관련 검증과 전체 263개 검증 통과.
+
+실제 공개/설치: v0.1.0을 Contentrium CUT 제목으로 공개했다. frozen Setup의 Adobe 등록 후 교차 DB 등록 판정 실패를 확인했다. 원래 서명/다운로드/journal을 유지한 source installer 복구로 0.1.0을 설치했다. 실제 installed exe localhost health 0.1.0, UDT CUT Not loaded 상태에서 Premiere Window → UXP Plugins → Contentrium CUT 메뉴와 설치 패널 0.1.0을 확인했다. 패널을 실제 frozen engine에 연결하고 owned linked project의 현재 시퀀스 이름/30fps/780프레임 및 마이크·영상 트랙을 읽었다. frozen Setup/런처 결함을 통과로 기록하지 않는다. 0.1.1에서 두 frozen 프로그램을 재빌드해 교체한다.
+
+공개 URL: https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.0

@@ -2,11 +2,18 @@ function fail(code){throw new Error(code);}
 function integer(v){return Number.isSafeInteger(v);}
 function tick(v){if(typeof v!=='string'||!/^-?\d+$/.test(v))fail('INVALID_TICKS');return BigInt(v);}
 function frameTicks(frame,fps){if(!integer(frame)||!integer(fps.num)||!integer(fps.den)||fps.num<=0||fps.den<=0)fail('INVALID_TIME');const n=BigInt(frame)*254016000000n*BigInt(fps.den),d=BigInt(fps.num);if(n%d!==0n)fail('FRAME_RATE_UNSUPPORTED');return n/d;}
+// Must match the durable journal's 8,192 worst-case receipt storage budget.
+const MAX_BATCHES=8192;
+function editBatchCount(snapshot,plan,cameraTrackRefs){
+  const first=frameTicks(snapshot.range.startFrame,snapshot.fps),last=frameTicks(snapshot.range.endFrame,snapshot.fps);let fragments=plan.segments.length;
+  for(const c of snapshot.clips)if(c.mediaType==='video'&&cameraTrackRefs.includes(c.trackRef)&&tick(c.startTicks)<last&&tick(c.endTicks)>first){if(tick(c.startTicks)<first)fragments++;if(tick(c.endTicks)>last)fragments++;}
+  const count=3*fragments+4;if(!Number.isSafeInteger(count)||count+1>MAX_BATCHES)fail('APPLY_CAPACITY_EXCEEDED: '+count+' batches plus one recovery batch; maximum '+MAX_BATCHES+'. Split the review range or reduce cut density.');return count;
+}
 function validateApply(snapshot,plan,cameraTrackRefs,hash){
   if(!snapshot||!plan||!Array.isArray(plan.segments)||!plan.segments.length)fail('INVALID_PLAN');
   if(plan.snapshotHash!==snapshot.snapshotHash)fail('SNAPSHOT_MISMATCH');
   const content={...plan};delete content.planHash;if(hash(content)!==plan.planHash)fail('PLAN_HASH_MISMATCH');
-  for(const flag of ['timeMappingSupported','audioPreservationSupported','effectPreservationSupported'])if(snapshot.supportFlags?.[flag]!==true)fail('HOST_SUPPORT_REQUIRED');
+  for(const flag of ['timeMappingSupported','audioPreservationSupported','effectPreservationSupported','hostApplyVerified'])if(snapshot.supportFlags?.[flag]!==true)fail('HOST_SUPPORT_REQUIRED');
   if(!Array.isArray(cameraTrackRefs)||!cameraTrackRefs.length||new Set(cameraTrackRefs).size!==cameraTrackRefs.length)fail('CAMERA_TRACKS_REQUIRED');
   const tracks=new Map(snapshot.tracks.map(t=>[t.trackRef,t])),clips=new Map(snapshot.clips.map(c=>[c.instanceKey,c]));
   for(const ref of cameraTrackRefs){const t=tracks.get(ref);if(!t||t.mediaType!=='video'||t.protected||t.muted)fail('CAMERA_TRACK_PROTECTED');}
@@ -19,6 +26,6 @@ function validateApply(snapshot,plan,cameraTrackRefs,hash){
     if(tick(segment.sourceIn)!==tick(c.inTicks)+first-tick(c.startTicks)||tick(segment.sourceOut)!==tick(c.inTicks)+last-tick(c.startTicks))fail('SOURCE_TIME_MISMATCH');
     if(typeof segment.reason!=='string'||!segment.reason)fail('PLAN_REASON_REQUIRED');cursor=segment.endFrame;
   }
-  if(cursor!==end)fail('PLAN_GAP_OR_OVERLAP');return true;
+  if(cursor!==end)fail('PLAN_GAP_OR_OVERLAP');editBatchCount(snapshot,plan,cameraTrackRefs);return true;
 }
-module.exports={validateApply,frameTicks,tick};
+module.exports={validateApply,frameTicks,tick,editBatchCount,MAX_BATCHES};

@@ -1,11 +1,33 @@
 import copy
 import tempfile
 import unittest
+from collections import namedtuple
 from pathlib import Path
+from unittest.mock import patch
 from contentrium_cut.contract import CutError, canonical_hash, TICKS_PER_SECOND
 from contentrium_cut.coordinator import Coordinator
 
 class CoordinatorTests(unittest.TestCase):
+    def setUp(self):
+        usage=namedtuple('Usage','total used free')(100*1024**3,20*1024**3,80*1024**3)
+        for target,value in [('contentrium_cut.resource.available_memory',8*1024**3),('contentrium_cut.resource.shutil.disk_usage',usage)]:
+            mock=patch(target,return_value=value);mock.start();self.addCleanup(mock.stop)
+
+    def test_prepare_is_pure_and_publish_rejects_identical_snapshot_rebind(self):
+        from contentrium_cut.coordinator import prepare_plan
+        from test_policy import fixture,speech
+        snapshot,analysis,mapping,policy=fixture();analysis['intervals']=[speech(0,200,'A')]
+        snapshot['snapshotHash']=canonical_hash({k:v for k,v in snapshot.items() if k!='snapshotHash'})
+        with tempfile.TemporaryDirectory() as directory:
+            coordinator=Coordinator(directory);coordinator.bind('panel',snapshot)
+            request=coordinator.capture_plan('panel',analysis,mapping,policy)
+            before=copy.deepcopy(request);plan=prepare_plan(request)
+            self.assertEqual(request,before);self.assertEqual(coordinator.session('panel')['plans'],{})
+            coordinator.bind('panel',snapshot)
+            with self.assertRaises(CutError) as error:coordinator.publish_plan('panel',request,plan)
+            self.assertEqual(error.exception.code,'PLAN_SCOPE');self.assertEqual(coordinator.session('panel')['plans'],{})
+            self.assertEqual(coordinator.plan('panel',analysis,mapping,policy),plan)
+
     def sync_fixture(self):
         snapshot=self.fixture();snapshot['clips'][0]['trackRef']='audio-a'
         snapshot['clips'].append({'instanceKey':'mic-b','assetId':'b','trackRef':'audio-b','mediaType':'audio','startTicks':str(7*TICKS_PER_SECOND),'endTicks':str(10*TICKS_PER_SECOND),'inTicks':'0','outTicks':str(3*TICKS_PER_SECOND),'speed':1,'disabled':False})
@@ -108,8 +130,8 @@ class CoordinatorTests(unittest.TestCase):
             c=Coordinator(d);c.bind('panel',self.fixture())
             with self.assertRaises(CutError) as e:c.audio_payload('panel',{'mode':'mixed','microphones':[{'instanceKey':'unknown','path':'C:/private.wav'}]})
             self.assertEqual(e.exception.code,'SOURCE_SCOPE')
-    def test_repeated_asset_different_timeline_offsets_requires_distinct_processing(self):
+    def test_same_source_samples_cannot_be_assigned_to_different_people(self):
         with tempfile.TemporaryDirectory() as d:
             c=Coordinator(d);s=self.fixture();b=copy.deepcopy(s['clips'][0]);b.update(instanceKey='mic2',startTicks='1016064000000');s['clips'].append(b);s.pop('snapshotHash');s['snapshotHash']=canonical_hash(s);c.bind('panel',s)
             with self.assertRaises(CutError) as e:c.audio_payload('panel',{'mode':'separate','microphones':[{'instanceKey':'mic','speakerId':'A'},{'instanceKey':'mic2','speakerId':'B'}]})
-            self.assertEqual(e.exception.code,'INSTANCE_PROCESSING_REQUIRED')
+            self.assertEqual(e.exception.code,'SOURCE_ASSIGNMENT_CONFLICT')

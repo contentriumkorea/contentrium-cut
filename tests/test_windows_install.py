@@ -476,6 +476,42 @@ class WindowsInstallationTests(unittest.TestCase):
         self.assertEqual(self.w.upia_registration_records([missing]), [])
         self.assertFalse(missing.exists())
 
+    def test_user_extension_product_reference_resolves_from_system_database(self):
+        system=self.upia_identity_database([])
+        user=self.upia_identity_database([('com.contentrium.cut','Contentrium CUT','0.1.0','Enabled')])
+        with closing(sqlite3.connect(system)) as db:
+            db.execute('UPDATE Tb_ProductInfo SET ProdID=315');db.commit()
+        with closing(sqlite3.connect(user)) as db:
+            db.execute('DELETE FROM Tb_ProductInfo')
+            db.execute('UPDATE Tb_ExtProductMap SET ProdID=315');db.commit()
+        before=[path.read_bytes() for path in (system,user)]
+        output='1 extension installed for Premiere Pro (ver 26.5.2)\n Status  Extension Name  Version\n=========  ===========  =========\n Enabled    Contentrium CUT    0.1.0\n'
+        class Captured:
+            def run(inner,args,timeout):return self.w.CommandResult(0,output,'')
+        hooks=self.w.WindowsInstallation(self.root,upia_path=self.upia,runner=Captured(),registration_databases=[system,user])
+        self.assertTrue(hooks._registered('0.1.0'))
+        self.assertEqual([path.read_bytes() for path in (system,user)],before)
+
+    def test_cross_database_missing_or_conflicting_product_identity_fails_closed(self):
+        user=self.upia_identity_database([('com.contentrium.cut','Contentrium CUT','0.1.0','Enabled')])
+        with closing(sqlite3.connect(user)) as db:
+            db.execute('DELETE FROM Tb_ProductInfo');db.commit()
+        with self.assertRaises(self.w.CutError):self.w.upia_registration_records([user])
+        system=self.upia_identity_database([])
+        other=self.upia_identity_database([])
+        with closing(sqlite3.connect(other)) as db:
+            db.execute("UPDATE Tb_ProductInfo SET ProdVersion='27.0.0'");db.commit()
+        with self.assertRaises(self.w.CutError):self.w.upia_registration_records([system,other,user])
+
+    def test_local_product_record_has_priority_over_other_database_ids(self):
+        user=self.upia_identity_database([('com.contentrium.cut','Contentrium CUT','0.1.0','Enabled')])
+        system=self.upia_identity_database([])
+        with closing(sqlite3.connect(system)) as db:
+            db.execute("UPDATE Tb_ProductInfo SET DisplayName='After Effects',ProdVersion='26.5.0'");db.commit()
+        rows=self.w.upia_registration_records([system,user])
+        self.assertEqual(rows[0]['product'],'Premiere Pro')
+        self.assertEqual(rows[0]['hostVersion'],'26.5.2')
+
 
 if __name__ == '__main__':
     unittest.main()

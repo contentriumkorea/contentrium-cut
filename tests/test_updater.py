@@ -9,6 +9,7 @@ import tempfile
 import threading
 import unittest
 import zipfile
+from unittest.mock import patch
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives import serialization
@@ -94,6 +95,13 @@ class UpdaterTests(unittest.TestCase):
             self.u = importlib.import_module('contentrium_cut.updater')
         except ModuleNotFoundError:
             self.fail('Updater implementation is absent')
+        # Handoff records the source owner identity; source tests never inspect
+        # the actual Python process or native handle table.
+        identity = patch('contentrium_cut.windows_install.process_identity', return_value={
+            'pid': 123, 'imagePath': 'fixture-python.exe', 'createdAtTicks': '5'})
+        identity.start(); self.addCleanup(identity.stop)
+        native = patch.object(self.u, '_commit_journal_file', side_effect=lambda source,target: Path(source).replace(target))
+        native.start(); self.addCleanup(native.stop)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
@@ -807,6 +815,25 @@ class UpdaterTests(unittest.TestCase):
         new = self.manager(current_version='0.2.0', activation_handoff=handoff['token'], clock=lambda: 1001)
         self.assertEqual(new.state()['updateState'], 'RECOVERY_REQUIRED')
         self.assertTrue(new._journal_bad)
+
+
+class FixtureIsolationTests(unittest.TestCase):
+    def test_reused_updater_fixture_preserves_other_modules_dll_interface(self):
+        from contentrium_cut import bootstrap
+        fixture = UpdaterTests('runTest')
+        # This guard is never called: any DLL access fails instead of reaching
+        # a native API, and fixture setup must leave that interface untouched.
+        with patch('ctypes.WinDLL', side_effect=AssertionError('Unexpected native DLL access'), create=True) as native:
+            try:
+                fixture.setUp()
+                self.assertIs(bootstrap.ctypes.WinDLL, native)
+                manager = fixture.manager()
+                self.assertEqual(manager.check()['checkState'], 'AVAILABLE')
+                self.assertEqual(json.loads(manager.journal.read_bytes())['checkState'], 'AVAILABLE')
+                self.assertIs(bootstrap.ctypes.WinDLL, native)
+                native.assert_not_called()
+            finally:
+                fixture.doCleanups()
 
 
 if __name__ == '__main__':

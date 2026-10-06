@@ -11,6 +11,8 @@ import uuid
 from contextlib import nullcontext
 
 from .contract import CutError, canonical_hash
+from .cache import ENGINE_SCHEMA, envelope, load as load_cache, validate_result
+from .process_scope import ProcessScope
 
 TERMINAL={'completed','failed','canceled','interrupted'}
 
@@ -41,17 +43,19 @@ def _worker(kind,payload,cancel,result,cache_root):
     os.environ['PYANNOTE_METRICS_ENABLED']='0'
     os.environ['DO_NOT_TRACK']='1'
     try:
-        key=None;fingerprints=None
-        if kind!='model-setup':
+        key=None;fingerprints=None;media_fingerprints=None
+        if kind in {'sync','analysis'}:
+            media_fingerprints=_fingerprints(payload.get('mediaSources',payload.get('sources',[])),cancel)
             fingerprints=_fingerprints(payload.get('sources',[]),cancel)
-            key=canonical_hash({'kind':kind,'payload':payload,'files':fingerprints,'engineSchema':1})
+            key=canonical_hash({'kind':kind,'payload':payload,'files':fingerprints,'media':media_fingerprints,'engineSchema':ENGINE_SCHEMA})
             cached=Path(cache_root)/(key+'.json')
             if cached.is_file():
-                try:
-                    value=json.loads(cached.read_text(encoding='utf-8'))
+                value=load_cache(cached,kind,key,payload)
+                if value is not None:
+                    if fingerprints!=_fingerprints(payload.get('sources',[]),cancel):raise CutError('SOURCE_CHANGED','Source changed while reading cached analysis.')
+                    if media_fingerprints!=_fingerprints(payload.get('mediaSources',payload.get('sources',[])),cancel):raise CutError('SOURCE_CHANGED','Sequence media changed while reading cached analysis.')
                     if cancel.is_set():raise CutError('CANCELED','Operation canceled')
                     result.put({'ok':True,'value':value,'cacheKey':key});return
-                except (ValueError,OSError):pass
         if kind=='sync':
             from .audio import sync_sources
             value=sync_sources(payload['sources'],payload['reference'],payload['fps'],cancel=cancel.is_set)
@@ -61,12 +65,34 @@ def _worker(kind,payload,cancel,result,cache_root):
         elif kind=='model-setup':
             from .models import ModelManager
             value=ModelManager(payload['modelRoot']).install_community(token=payload['token'],terms_accepted=payload['termsAccepted'],revision=payload['revision'],cancel=cancel.is_set)
+        elif kind=='example':
+            from .coordinator import Coordinator
+            coordinator=Coordinator(payload['root']);coordinator.bind(payload['owner'],payload['snapshot'])
+            state=coordinator.analysis_state(payload['owner'],payload['analysisId'])
+            if state['revision']!=payload['revision']:raise CutError('EXAMPLE_SCOPE','Analysis revision changed.')
+            value=coordinator.render_example(payload['owner'],payload['analysisId'],payload['exampleId'],cancel=cancel.is_set)
+        elif kind=='input-probe':
+            from .input_capabilities import probe_sources
+            value=probe_sources(payload,cancel=cancel.is_set)
         else:raise CutError('INVALID_JOB','Unsupported worker operation')
+        if media_fingerprints is not None and 'mediaSources' in payload:
+            if media_fingerprints!=_fingerprints(payload['mediaSources'],cancel):raise CutError('SOURCE_CHANGED','Sequence media changed during analysis.')
+            value.update(mediaSnapshotHash=payload['mediaSnapshotHash'],mediaInputs=[dict(assetId=source['assetId'],path=identity['path'],sha256=identity['hash']) for source,identity in zip(payload['mediaSources'],media_fingerprints)])
+        if key:validate_result(kind,value,payload)
         if fingerprints is not None and fingerprints!=_fingerprints(payload.get('sources',[]),cancel):raise CutError('SOURCE_CHANGED','Source changed during analysis.')
         if cancel.is_set():raise CutError('CANCELED','Operation canceled')
         result.put({'ok':True,'value':value,'cacheKey':key})
-    except CutError as error:result.put({'ok':False,'error':{'code':error.code,'message':error.message,'details':error.details}})
+    except CutError as error:
+        failure={'code':error.code,'message':'Local operation could not finish.'} if kind=='model-setup' else {'code':error.code,'message':error.message,'details':error.details}
+        result.put({'ok':False,'error':failure})
     except BaseException:result.put({'ok':False,'error':{'code':'WORKER_FAILED','message':'Local worker failed. See the operation and model status.'}})
+
+def _scoped_worker(start,cancel,target,args):
+    # Imports/model/decode/native descendants cannot begin before assignment.
+    deadline=time.monotonic()+30
+    while not start.wait(.1):
+        if cancel.is_set() or time.monotonic()>=deadline:return
+    if not cancel.is_set():target(*args)
 
 class JobManager:
     def __init__(self,root,admit=None,admission_guard=None):
@@ -90,30 +116,48 @@ class JobManager:
         if self.admit:self.admit(epoch)
 
     def submit(self,kind,payload,expected_epoch=None):
-        if kind not in {'sync','analysis','model-setup'}:raise CutError('INVALID_JOB','Unsupported job operation')
+        if kind not in {'sync','analysis','model-setup','example','input-probe'}:raise CutError('INVALID_JOB','Unsupported job operation')
         expected_epoch=self.epoch if expected_epoch is None else expected_epoch
         with self.admission_guard(expected_epoch) if self.admission_guard else nullcontext(), self.lock:
             self.assert_admitted(expected_epoch)
             if self.processes:raise CutError('JOB_BUSY','Another local operation is active.')
             job_id=uuid.uuid4().hex;state={'jobId':job_id,'kind':kind,'status':'running','epoch':self.epoch,'createdAt':time.time(),'cacheKey':None}
-            event=self.context.Event();result=self.context.Queue();process=self.context.Process(target=_worker,args=(kind,payload,event,result,str(self.root/'cache')),name='Contentrium-CUT-analysis')
-            process.daemon=True
-            self.assert_admitted(expected_epoch)
-            process.start()
-            state['workerPid']=process.pid;self.jobs[job_id]=state;self.processes[job_id]={'process':process,'cancel':event,'queue':result,'cancelAt':None,'received':False}
-            self._save(state);return self.get(job_id)
+            scope=ProcessScope();process=None;result=None;event=None
+            try:
+                event=self.context.Event();start=self.context.Event();result=self.context.Queue()
+                process=self.context.Process(target=_scoped_worker,args=(start,event,_worker,(kind,payload,event,result,str(self.root/'cache'))),name='Contentrium-CUT-analysis')
+                process.daemon=True
+                self.assert_admitted(expected_epoch)
+                process.start();scope.assign(process)
+                state['workerPid']=process.pid;self.jobs[job_id]=state
+                self.processes[job_id]={'process':process,'scope':scope,'cancel':event,'queue':result,'cancelAt':None,'received':False}
+                self._save(state);start.set();return self.get(job_id)
+            except BaseException:
+                if event:event.set()
+                scope.close()
+                if process is not None and process.pid is not None:
+                    if process.is_alive():process.terminate()
+                    process.join(timeout=2);process.close()
+                if result:result.close()
+                self.processes.pop(job_id,None)
+                self.jobs.pop(job_id,None)
+                raise
 
     def commit_result(self,job_id,epoch,value,key=None):
         pending=self.root/'cache'/(uuid.uuid4().hex+'.pending.json') if key else None
         try:
-            if pending:atomic_json(pending,value)
+            if pending:
+                with self.lock:state=self.jobs.get(job_id);kind=state.get('kind') if state else None
+                # No cache is staged for jobs that are already absent/stale.
+                if not state:return False
+                atomic_json(pending,envelope(kind,key,value))
             try:
                 with self.admission_guard(epoch) if self.admission_guard else nullcontext(), self.lock:
                     self.assert_admitted(epoch)
                     state=self.jobs.get(job_id)
                     if not state or state['status']!='running':return False
                     if pending:os.replace(pending,self.root/'cache'/(key+'.json'))
-                    state.update(status='completed',result=value,finishedAt=time.time());self._save(state);return True
+                    state.update(status='completed',result=value,cacheKey=key,finishedAt=time.time());self._save(state);return True
             except CutError:return False
         finally:
             if pending:pending.unlink(missing_ok=True)
@@ -129,9 +173,25 @@ class JobManager:
     def cancel(self,job_id):
         with self.lock:
             item=self.processes.get(job_id)
-            if item:item['cancel'].set();item['cancelAt']=item['cancelAt'] or time.monotonic()
+            if item:
+                item['cancel'].set()
+                if item['cancelAt'] is None:
+                    item['cancelAt']=time.monotonic()
+                    # Completion serialization can block the monitor; shutdown's
+                    # deadline must have an independent owner in the controller.
+                    timer=threading.Timer(3,self._force_stop,args=(job_id,item))
+                    timer.daemon=True;item['stopTimer']=timer;timer.start()
             state=self.jobs.get(job_id)
             if state and state['status']=='running':state['status']='canceling';self._save(state)
+
+    def _force_stop(self,job_id,item):
+        # A pinned scope can only refer to this job, even after registry removal.
+        # Its lifetime lock synchronizes with close; jobs.lock may be blocked on
+        # disk and must never be required to enforce the cancellation deadline.
+        try:item['scope'].terminate_if_owned()
+        except CutError as error:
+            self.gate_open=False
+            item['scopeError']={'code':error.code,'message':error.message,'details':error.details}
 
     def stop_all(self,epoch):
         with self.lock:
@@ -162,21 +222,26 @@ class JobManager:
             for job_id,item in owned:
                 try:
                     process=item['process'];state=self.jobs[job_id]
-                    if item['cancelAt'] and process.is_alive() and time.monotonic()-item['cancelAt']>=3:
-                        # Only the verified Process object created by this manager is terminated.
-                        process.terminate()
+                    if item['cancelAt'] and time.monotonic()-item['cancelAt']>=3:
+                        item['scope'].terminate()
                     try:message=item['queue'].get_nowait()
                     except queue.Empty:message=None
                     if message:self._receive(job_id,item,message)
                     if not process.is_alive():
+                        # A worker exiting is not proof that its native descendants exited.
+                        if item['scope'].active_count():
+                            item['scope'].terminate()
+                            continue
                         process.join(timeout=0)
                         if not item['received']:
                             try:self._receive(job_id,item,item['queue'].get(timeout=.1))
                             except queue.Empty:pass
                         if not item['received']:
                             state.update(status='canceled' if item['cancel'].is_set() else 'failed',error={'code':'CANCELED' if item['cancel'].is_set() else 'WORKER_EXITED','message':'Local worker exited.'},finishedAt=time.time());self._save(state)
-                        item['queue'].close();process.close()
-                        with self.lock:self.processes.pop(job_id,None)
+                        with self.lock:
+                            if item.get('stopTimer'):item['stopTimer'].cancel()
+                            item['scope'].close();item['queue'].close();process.close()
+                            self.processes.pop(job_id,None)
                 except Exception:
                     item['cancel'].set();item['cancelAt']=item['cancelAt'] or time.monotonic()
                     with self.lock:
@@ -184,6 +249,7 @@ class JobManager:
 
     def close(self):
         self.stop_all(self.epoch+1)
-        deadline=time.monotonic()+4
+        deadline=time.monotonic()+5
         while not self.quiescent() and time.monotonic()<deadline:time.sleep(.05)
+        if not self.quiescent():raise CutError('PROCESS_SCOPE_FAILED','Owned workers have not drained; work remains stopped.')
         self.closed.set();self.monitor.join(timeout=1)

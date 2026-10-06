@@ -3,4 +3,4 @@ import multiprocessing
 if __name__=='__main__':
     multiprocessing.freeze_support()
     from contentrium_cut.launcher import main
-    main()
+    raise SystemExit(main())

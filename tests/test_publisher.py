@@ -140,5 +140,36 @@ class PublisherTests(unittest.TestCase):
         self.assertTrue(self.release['draft'])
         self.assertFalse(any(call[:2]==('release','edit') for call in self.calls))
 
+    def test_new_draft_visibility_delay_retries_without_duplicate_creation(self):
+        original=self.gh; absent=[True,True,True]; created=[]
+        def delayed(*args,capture=False):
+            if args==('api','repos/contentriumkorea/contentrium-cut/releases') and absent:
+                absent.pop();return b'[]'
+            if args[:2]==('release','create'):
+                created.append(args);return None
+            return original(*args,capture=capture)
+        self.gh=delayed;self.interrupt=False
+        with patch('time.sleep') as sleep:
+            self.run_publisher()
+        self.assertEqual(len(created),1)
+        self.assertEqual(sleep.call_count,2)
+        self.assertEqual(len(self.remote),5)
+        self.assertFalse(self.release['draft'])
+
+    def test_missing_created_draft_stops_bounded_before_upload_or_signing(self):
+        calls=[]
+        def invisible(*args,capture=False):
+            calls.append(args)
+            if args==('api','repos/contentriumkorea/contentrium-cut/releases'):return b'[]'
+            if args[:2]==('release','create'):return None
+            self.fail('Must not upload or publish an unobserved draft.')
+        self.gh=invisible
+        with patch('time.sleep') as sleep:
+            with self.assertRaisesRegex(RuntimeError,'not yet visible'):
+                self.run_publisher()
+        self.assertEqual(sum(call[:2]==('release','create') for call in calls),1)
+        self.assertEqual(sleep.call_count,5)
+        self.assertFalse((self.output/'update-manifest.json').exists())
+
 
 if __name__=='__main__':unittest.main()

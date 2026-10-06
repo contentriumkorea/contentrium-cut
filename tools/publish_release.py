@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import time
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, load_pem_private_key
 
@@ -34,8 +35,17 @@ def selected_release(tag):
     if len(matches)>1:raise RuntimeError('Ambiguous release identity')
     return matches[0] if matches else None
 
+def required_release(tag):
+    # A freshly created draft can briefly be absent from GitHub's list API.
+    # Read again without recreating the draft or replacing uploaded assets.
+    for attempt in range(6):
+        release=selected_release(tag)
+        if release is not None:return release
+        if attempt<5:time.sleep(min(0.5*2**attempt,2))
+    raise RuntimeError('GitHub release is not yet visible; retry the same publication without replacing its draft.')
+
 def upload_missing(tag,paths):
-    release=selected_release(tag)
+    release=required_release(tag)
     missing=[]
     for path in paths:
         matches=[a for a in release['assets'] if a['name']==path.name]
@@ -44,7 +54,7 @@ def upload_missing(tag,paths):
         if len(matches)!=1 or actual['size']!=path.stat().st_size or actual.get('digest')!='sha256:'+digest(path):
             raise RuntimeError('Existing draft asset differs; refuse replacement: '+path.name)
     if missing:gh('release','upload',tag,'--repo',REPO,*missing)
-    verified=selected_release(tag)
+    verified=required_release(tag)
     if not verified or verified['id']!=release['id'] or not verified['draft']:
         raise RuntimeError('Draft identity changed during upload')
     for path in paths:
@@ -120,7 +130,7 @@ def main():
         gh('release','create',tag,'--repo',REPO,'--draft','--title','Contentrium CUT',
            '--target',args.target,'--notes-file',str(Path(args.notes).resolve()))
     upload_missing(tag,[output/name for _,name in files])
-    release=selected_release(tag)
+    release=required_release(tag)
     assets = []
     for role, name in files:
         actual = next(a for a in release['assets'] if a['name'] == name)
@@ -146,7 +156,7 @@ def main():
     if verified['name']!='Contentrium CUT' or verified['target_commitish']!=args.target:
         raise RuntimeError('Reviewed draft target changed before publication')
     gh('release', 'edit', tag, '--repo', REPO, '--draft=false', '--latest')
-    print('Published ' + selected_release(tag)['html_url'])
+    print('Published ' + required_release(tag)['html_url'])
 
 if __name__ == '__main__':
     main()

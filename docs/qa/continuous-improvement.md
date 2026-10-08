@@ -616,3 +616,22 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - [고정 복구 조회](migration-pinned-0.1.1-after-0.1.26-proof.json): latest 0.1.26에서도 서명된 정확한 v0.1.1 / release `404226839` / commit `268d27e6665c8b1f0753a634f8021dfa86935b37` AVAILABLE. 실제 설치 전환은 하지 않았다.
 - 현재 단계: 기획 → 설계 → 구현 → 검증 → 0.1.26 공개 및 공개 재검증 완료. 다음 회차는 양쪽 녹음 모드에서 재현한 업데이트 뒤 늦은 자동 시퀀스 /project 등록 응답/트랙 안내 수락을 차단한다. followSequence/readProject의 host/project/settings await 이후 현재 갱신·update/epoch·연결 identity를 검증하고 기존 안내·연결/행/분석·설정/저장 상태를 보존하도록 먼저 설계한다. 정상 자동 갱신·수동 재조회·초기 연결·작업 복구·모드/설정 저장·업데이트 즉시성을 RED·독립 검수·전체 회귀·패키지/공개 검증 뒤 배포한다. 버전만 올리지 않는다.
 - PC 활성 설치는 계속 0.1.0이며 active/journal/first-install 3개 해시는 배포 전후 동일함을 읽기 전용 확인했다. 서명 키 존재·보존과 기존 ACTIVE/15분 자동화를 확인했다. 기존 공개 파일·설정·실패 증거를 보존했고 컴퓨터유즈·Premiere 조작·재설치·제공자 접근을 하지 않았다. 실제 UXP/Premiere 편집·설치 전환·Community-1 품질은 미검증이다. 이전 범위/싱크 readiness·메모리/취소 간헐 시험 실패의 원인도 미확정이다.
+
+
+## 26회차 / 2026-10-09 / 업데이트 뒤 늦은 자동 시퀀스 반영 차단
+
+- 시작 commit 842d756e48c6c6057e8f470f4db1fce93aa38c2e, 공개 0.1.26. 앞 회차 두 모드에서 /project 대기 중 업데이트 즉시 시작 뒤 늦은 시퀀스/안내 반영을 재현했다.
+- 설계: 자동 추적과 시퀀스 조회에 현재 연결 객체/hash·mode·분석 identity·epoch·credential과 중단/update/gate/호환/복구 검사를 둔다. host/heartbeat/project/저장 설정 조회 await 이후 다시 검사한다. 새 시퀀스 설정을 화면 반영 전에 읽고, 마지막 검사 통과 뒤 연결/행/분석/설정을 동기적으로 반영한다. 중단된 성공/실패는 기존 연결·안내·행·분석·저장 timer를 보존한다. 조회 token으로 이전 finally가 새 binding을 해제하지 못하도록 한다. 정상 동일 시퀀스 raw 설정/예약 autosave·초기 연결·수동 재조회·현재 host 오류 처리와 복구 제약을 유지한다.
+- 수용: 두 모드 × host/heartbeat/project/storage 대기 × 성공/실패 중 update 즉시 호출 및 이전 상태 보존, epoch/연결/mode/분석/gate 변경과 concurrent read/새 binding 보존, 정상 자동/수동/초기 연결·저장 복원/동일 시퀀스 autosave를 검증한다. 독립 리뷰·전체 회귀·패키지 실행·공개 서명/실제 다운로드 해시·고정 v0.1.1 검증 뒤 0.1.27 배포. 컴퓨터유즈/Premiere/재설치는 금지하며 실제 설치/호스트/Community-1 품질은 미검증이다.
+
+- 최초 새 수용 RED: 기존 234 통과/신규 1 실패 (4,608.914 ms). 구현 뒤 235/235 통과. 확장 최초 236 pass/3 fail (5,662.226 ms): concurrent fixture가 기존 connected 객체를 fresh snapshot으로 재사용해 자기 scope를 변경하는 오류 1개를 고유 host snapshot/독립 두 응답으로 수정했다. 기존 microphone/sync callback 간헐 실패 2개는 격리 및 다음 전체 실행에서 재현되지 않아 원인 미확정이며 모든 로그·기준을 보존했다. 최종 확장 239/239 (5,422.328 ms), 최초 전체 Node 348/348 (18,780.420 ms).
+- 독립 리뷰 Important 2개: readProject의 heartbeat 내부가 scope 검사 전에 stopped/plan을 변경함; 현재 /project AUTH_REQUIRED에서 자체 reset 뒤 followSequence가 연결 변경을 stale로 오인해 pollError로 오류를 전달하지 않음. heartbeat에 현재 scope callback을 넘겨 내부 변경 전에 검사하며, 현재 read 오류와 snapshot stale 오류의 처리를 구분했다. 현재 SEQUENCE_REQUIRED의 안내도 자체 reset 후 유지한다. 실제 유효한 새 plan과 closed receipt/인증 복구/시퀀스 종료 회귀를 추가했다. 최초 새 plan fixture가 planInputsHash 없는 임의 plan을 사용해 toggle이 정당하게 무효화한 오류는 실제 분석/편집안과 현재 hash를 사용해 수정하고 로그를 보존했다. 관련 241/241 (5,421.244 ms) 통과 후 마지막 안내 회귀를 더해 전체/독립 최종 검수로 진행한다.
+- Python 전체 493/493 (92.134초; wrapper 92.169초), 실패/오류/skip/제외 0. 소유 한국어 SAPI/Silero 192 speech frames/7 intervals 확인. Python 모듈은 이번 변경 대상이 아니다. 활성 설치 0.1.0 및 해시, 서명 키 존재, 기존 ACTIVE/15분 자동화를 읽기 전용 확인했다. 실제 UXP/Premiere/설치 전환/Community-1 품질은 미검증이다.
+
+- 최종 전체 Node 351/351 (18,292.139 ms), 실패/취소/skip 0. 독립 최종 승인 C/I/M 0/0/0: 별도 actual-main 13/13, 172 fixtures 포함 baseline 2개 (760.848 ms), 독립 패널 242/242 (5,454.932 ms). 현재 AUTH_REQUIRED는 timer의 pollError 연결 복구까지, 현재 시퀀스 닫힘 안내와 stale closed heartbeat의 유효한 새 plan 보존까지 확인했다. SHA-256 `08908f401edc01de3aba859c8d8361435b9397f5cb80469eef6d53664d5341b5`. 증거 `%LOCALAPPDATA%/Temp/contentrium-cut-cycle26-independent-review`. 독립 최초 확대 fixture의 변경된 mode/분석에 상속된 invalid plan hash 오류를 현재 planInputsHash와 toggle 후 캡처로 수정하고 이전 실패 증거를 보존했다. 제품 기준은 유지한다.
+- 다음 후보: requireCurrent를 호출한 편집안 생성이 /project 등록을 기다리는 중 update를 누르면, 시퀀스 갱신 자체는 폐기되고 이전 연결이 보존되지만 requireCurrent의 후속 타임라인 변경 오류가 업데이트 시작 안내를 덮는다. 두 모드 actual-main `cycle26-next-inspect.js/.log`, 업데이트 즉시 /updates/start 1회, native 변이 0. 이번 automatic follow/readProject 수정과 구분한다. 다음 회차는 편집 동작 사전 타임라인 확인의 host/read await 뒤 current action/update scope를 검사하고 중단된 후속 오류/작업 시작을 차단하도록 설계한다.
+
+- 제품 입력 52개 고정·공개 파일 579개 비공개 키/토큰 패턴 검사·신뢰 키 보존 통과. 엔진/CCX와 Setup 빌드 성공. 고정 소스 재검사 뒤 별도 owned 폴더에서 패키지 실행/소스 일치 검증을 진행한다. 활성 설치·기존 공개 파일·서명 키·설정·실패 증거를 보존한다.
+
+- [0.1.27 패키지 증거](package-0.1.27-proof.json): ZIP/CCX CRC·경로·크기·비공개 자료 제외, CCX 최종 소스·Silero 해시, frozen 엔진 29개/설치기 26개 제품 모듈·두 진입점이 검증 소스와 일치했다. 추출 엔진 probe runtimeReady=true/0.1.27과 Setup help exit 0, 55.156초. 기존 선택적 모듈/torchcodec 경고를 보존하며 Community-1 실제 품질 판정으로 확대하지 않는다.
+- 현재 단계: 기획·설계·구현·독립 재검수·전체 회귀·패키지 실행 완료. 0.1.27 공개 및 익명 발견/서명/실제 다운로드 해시·고정 v0.1.1 검증으로 진행한다. 실제 UXP/Premiere/설치 전환/Community-1 품질은 미검증이다. 다음 후보는 requireCurrent를 호출한 동작의 중단 후 후속 타임라인 변경 안내 수락 차단이다.

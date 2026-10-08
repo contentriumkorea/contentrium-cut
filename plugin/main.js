@@ -12,7 +12,7 @@ const workflow=require('./workflow.js').create({api:(...args)=>api(...args),stor
 let credentials=null,state=null,connected=null,mode='separate',job=null,analysisJob=null,analysis=null,plan=null,syncResult=null,syncJob=null,planCameraRefs=[],applying=false,batchRunning=false,stopped=false,applyId=null,polling=false,pending=false;
 const microphoneRows=[],cameraRows=[],speakerRows=[],calibrationRows=[],overrideRows=[],syncRows=[];
 let microphoneSelectionCustomized=false;
-let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;
+let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;let projectRead=null;
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
 let analysisState=null;
 let planInputHash=null,planInvalidated=false;
@@ -182,7 +182,7 @@ function actionGuidance(){
   if(step==='review')return plan?'전체 편집안을 검토한 뒤 Premiere에 적용하세요.':'컷 편집 단계에서 편집안을 먼저 만드세요.';
   return step==='settings'?'모델·분석 자원·업데이트 설정을 확인하세요.':'카메라와 마이크를 지정한 뒤 화자 단계로 이동하세요.';
 }
-function inputLocked(){return pending||applying||!!job||validationCount>0||stopped||!credentials||!state?.gateOpen;}
+function inputLocked(){return binding||pending||applying||!!job||validationCount>0||stopped||!credentials||!state?.gateOpen;}
 function workLocked(){return inputLocked()||state?.compatible===false||!!updateIntent||localEditPending||!!state?.applyRecovery?.blocked;}
 function toggle(){
   if(syncJob&&syncResult&&!syncResultMatches())invalidateSyncResult();
@@ -545,12 +545,16 @@ function planInputsHash(){try{return connected&&analysisState&&analysisJob?Conte
 function planMatches(){return !!planInputHash&&planInputHash===planInputsHash();}
 function rejectStalePlan(){clearPolicyPlan();planInvalidated=true;throw Object.assign(new Error(messages.PLAN_INPUT_CHANGED),{code:'PLAN_INPUT_CHANGED'});}
 function requireReviewedPlan(reviewed,inputHash){if(plan!==reviewed||planInputHash!==inputHash||!planMatches())rejectStalePlan();}
+function projectScope(){return {connection:connected,snapshotHash:connected?.snapshot.snapshotHash,hostSnapshotHash:connected?.snapshot.hostSnapshotHash,mode,analysisState,revision:analysisState?.revision,epoch:state?.epoch,credentials};}
+function projectScopeCurrent(scope){return !!credentials&&credentials===scope.credentials&&!!state?.gateOpen&&!stopped&&!updateIntent&&state?.compatible!==false&&!panelContextConflict&&!applying&&!job&&!validationCount&&!localEditPending&&!state?.applyRecovery?.blocked&&(state?.stopEpoch===null||state?.stopEpoch===undefined)&&state?.epoch===scope.epoch&&connected===scope.connection&&connected?.snapshot.snapshotHash===scope.snapshotHash&&connected?.snapshot.hostSnapshotHash===scope.hostSnapshotHash&&mode===scope.mode&&analysisState===scope.analysisState&&analysisState?.revision===scope.revision;}
 async function readProject({fresh=null,automatic=false}={}){
   if(applying||job)throw new Error('현재 작업을 마친 뒤 시퀀스를 변경하세요.');
-  const settingsQueued=!!settingsTimer;binding=true;if(settingsTimer){clearTimeout(settingsTimer);settingsTimer=null;}
-  const prior=connected,settings=prior?captureSettings():null;let preserveSettings=false;
+  const scope=projectScope();if(!projectScopeCurrent(scope))return false;
+  const token={};projectRead=token;binding=true;toggle();
+  const settingsQueued=!!settingsTimer,prior=connected,settings=prior?captureSettings():null;let preserveSettings=false,committed=false;
+  const current=()=>projectRead===token&&projectScopeCurrent(scope);
   try{
-    const next=fresh||await ContentriumHost.snapshot(),s=next.snapshot;
+    const next=fresh||await ContentriumHost.snapshot();if(!current())return false;const s=next.snapshot;
     next.fullRangeEnd=s.range.endFrame;
     const same=prior&&prior.snapshot.projectRef===s.projectRef&&prior.snapshot.sequenceRef===s.sequenceRef;
     s.hostSnapshotHash=s.snapshotHash;
@@ -563,27 +567,37 @@ async function readProject({fresh=null,automatic=false}={}){
       if(start>=end){start=0;end=s.range.endFrame;}
     }
     s.range={startFrame:start,endFrame:end};delete s.snapshotHash;s.snapshotHash=ContentriumHost.hash(s);
-    await heartbeat();await api('/project',{snapshot:s,hostIdentity:null,epoch:state.epoch});connected=next;rangeDirty=false;
+    await heartbeat(current);if(!current())return false;
+    await api('/project',{snapshot:s,hostIdentity:null,epoch:scope.epoch});if(!current())return false;
+    let saved;
+    if(!same){
+      try{const raw=await uxp.storage.secureStorage.getItem('cut-settings-'+ContentriumHost.hash({projectRef:s.projectRef,sequenceRef:s.sequenceRef}));if(!current())return false;saved=JSON.parse(typeof raw==='string'?raw:new TextDecoder().decode(raw));}catch(e){if(!current())return false;}
+    }
+    if(!current())return false;
+    if(settingsTimer){clearTimeout(settingsTimer);settingsTimer=null;}
+    connected=next;rangeDirty=false;committed=true;
     $('project-name').textContent=s.sequenceName;$('project-name').title=s.projectName+' / '+s.sequenceName;
     $('sequence-info').textContent=frameLabel(s.range.endFrame)+' · '+(s.fps.num/s.fps.den).toFixed(3)+' fps ('+s.fps.num+'/'+s.fps.den+')';
     $('track-count').textContent=s.tracks.filter(t=>t.mediaType==='video').length+' V / '+s.tracks.filter(t=>t.mediaType==='audio').length+' A';
     $('range-start').value=String(start);$('range-end').value=String(end);
     clearAnalysis();clearSyncResult();savedSpeakerMappings={};overrideRows.length=0;overrideErrorsOnly=false;overrideVisibleRows.clear();$('overrides').innerHTML='';
-    renderSources();if(same&&settings)restoreSettings(settings);else await restoreSavedSettings(true);
-    toggle();say('트랙을 확인하고 분석할 마이크와 카메라를 지정하세요.');
-  }catch(e){if(e.code==='RANGE_INPUT_INVALID')preserveSettings=true;else resetSequence();throw e;}
-  finally{binding=false;if(preserveSettings||settingsQueued&&connected&&prior&&connected.snapshot.projectRef===prior.snapshot.projectRef&&connected.snapshot.sequenceRef===prior.snapshot.sequenceRef)scheduleSettings();}
+    renderSources();if(same&&settings)restoreSettings(settings);else if(saved){try{restoreSettings(saved);}catch(_){/* An invalid optional saved preset must not prevent connecting. */}}
+    toggle();say('트랙을 확인하고 분석할 마이크와 카메라를 지정하세요.');return true;
+  }catch(e){if(!committed&&!current())return false;if(e.code==='RANGE_INPUT_INVALID')preserveSettings=true;else resetSequence();throw e;}
+  finally{if(projectRead===token){projectRead=null;binding=false;toggle();if(preserveSettings||committed&&settingsQueued&&connected&&prior&&connected.snapshot.projectRef===prior.snapshot.projectRef&&connected.snapshot.sequenceRef===prior.snapshot.sequenceRef)scheduleSettings();}}
 }
 function frameLabel(frame){const rate=connected?connected.snapshot.fps.num/connected.snapshot.fps.den:30,seconds=Math.max(0,Math.floor(frame/rate));return [Math.floor(seconds/3600),Math.floor(seconds/60)%60,seconds%60].map(n=>String(n).padStart(2,'0')).join(':');}
 function segmentTiming(segment){const fps=connected?.snapshot.fps||{num:30,den:1},frames=segment.endFrame-segment.startFrame;return segment.startFrame+'–'+segment.endFrame+' 프레임 · '+frames+'프레임 / '+(frames*fps.den/fps.num).toFixed(3)+'초';}
 function clearAnalysis(){planInputHash=null;planInvalidated=false;reviewPage=0;reviewWindow=null;$('review-search').value='';options($('review-camera'),[],'모든 카메라');$('review-page-info').textContent='편집안을 만들어 주세요';if(mode==='mixed'||speakerRowsScope?.mode==='mixed'||savedSpeakerMappingScope?.mode==='mixed')clearMixedMappings();analysisJob=analysis=plan=null;analysisState=null;if(mode==='mixed'){$('speaker-mapping').innerHTML='';speakerRows.length=0;}$('cut-count').textContent=$('review-count').textContent='—';for(const id of ['timeline','segments','reviews','speaker-corrections','correction-history'])$(id).innerHTML='';$('segments').appendChild(element('p','화자를 분석하고 편집안을 만들어 주세요.','hint'));}
 function resetSequence(){connected=null;clearAnalysis();clearSyncResult();$('project-name').textContent='시퀀스를 열어 주세요';$('sequence-info').textContent='Premiere 타임라인을 자동으로 읽습니다.';$('track-count').textContent='TIMELINE';for(const id of ['microphones','cameras','calibration','speaker-mapping','sync-sources'])$(id).innerHTML='';microphoneRows.length=cameraRows.length=calibrationRows.length=speakerRows.length=syncRows.length=0;toggle();}
 async function followSequence(){
+  if(binding)return;const scope=projectScope();if(!projectScopeCurrent(scope))return;let reading=false;
   try{
-    const fresh=await ContentriumHost.snapshot();
-    if(!connected||fresh.snapshot.snapshotHash!==connected.snapshot.hostSnapshotHash)await readProject({fresh,automatic:true});
+    const fresh=await ContentriumHost.snapshot();if(!projectScopeCurrent(scope)||binding)return;
+    if(!connected||fresh.snapshot.snapshotHash!==connected.snapshot.hostSnapshotHash){reading=true;await readProject({fresh,automatic:true});}
   }catch(e){
-    if(/PROJECT_REQUIRED|SEQUENCE_REQUIRED/.test(String(e))){if(connected){resetSequence();say('Premiere에서 편집할 시퀀스를 열어 주세요.');}}
+    if(!reading&&(!projectScopeCurrent(scope)||binding))return;
+    if(/PROJECT_REQUIRED|SEQUENCE_REQUIRED/.test(String(e))){if(connected)resetSequence();say('Premiere에서 편집할 시퀀스를 열어 주세요.');}
     else throw e;
   }
 }
@@ -677,7 +691,7 @@ async function refresh(){
   $('cache-maintenance-text').textContent=state.maintenance?.canRelease?'정리 작업이 종료됐습니다. 편집을 계속할 수 있습니다.':'캐시 정리 작업이 종료되는 것을 기다리고 있습니다.';
   toggle();if(!state.gateOpen&&!state.maintenance&&!applying&&!batchRunning&&!previewPlaying){await api('/updates/ack',{epoch:state.epoch,quiescent:true,batchRunning:false}).catch(()=>{});}
 }
-async function heartbeat(){if(!credentials||!state)return;const receipt=await api('/heartbeat',{hostIdentity:null,epoch:state.epoch,batchRunning,quiescent:!applying&&!previewPlaying,panelVersion:bundle.appVersion,bundleId:bundle.bundleId,protocolVersion:bundle.protocolVersion});if(!receipt.gateOpen||receipt.stopEpoch!==null&&receipt.stopEpoch!==undefined){stopped=true;plan=null;toggle();}}
+async function heartbeat(current=()=>true){if(!credentials||!state)return;const receipt=await api('/heartbeat',{hostIdentity:null,epoch:state.epoch,batchRunning,quiescent:!applying&&!previewPlaying,panelVersion:bundle.appVersion,bundleId:bundle.bundleId,protocolVersion:bundle.protocolVersion});if(!current())return;if(!receipt.gateOpen||receipt.stopEpoch!==null&&receipt.stopEpoch!==undefined){stopped=true;plan=null;toggle();}}
 function periodicHeartbeat(){
   if(!heartbeatRequest){const next=heartbeat();heartbeatRequest=next;const clear=()=>{if(heartbeatRequest===next)heartbeatRequest=null;};next.then(clear,clear);}
   return heartbeatRequest;

@@ -2,7 +2,7 @@
 
 Premiere Pro 패널에서 트랙을 설정하고, 오디오를 로컬로 분석해 말하는 화자에 맞춰 카메라를 전환하는 플러그인입니다. 자동 싱크와 컷 편집 결과는 Premiere에서 계속 수정할 수 있는 새 시퀀스로 만듭니다.
 
-**[0.1.1을 공개했습니다](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.1).** 공개 파일을 다시 다운로드해 서명·해시를 검증했으며 결과는 [최신 검수 기록](docs/qa/2026-10-06-update-responsiveness.md)에 있습니다. 실제 설치된 새 패널의 Premiere 검증과 0.1.0 설치의 전환은 아직 완료하지 않았으며, 공개 배포와 구분합니다.
+**[0.1.2를 공개했습니다](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.2).** 컷 검토의 페이지 이동·카메라/선택 이유 검색과 좁은 패널 간격을 개선했습니다. 공개 파일을 다시 다운로드해 서명·해시를 검증했으며 결과와 다음 회차 계획은 [반복 개선 기록](docs/qa/continuous-improvement.md)에 있습니다. 실제 설치된 새 패널의 Premiere 검증과 0.1.0 설치의 전환은 아직 완료하지 않았으며, 공개 배포와 구분합니다.
 
 ## 단일 패널 사용 흐름
 

@@ -369,6 +369,34 @@ function renderReviewCuts(){
   $('review-page-info').textContent=reviewWindow.total?reviewWindow.first+'–'+reviewWindow.last+' / '+reviewWindow.total+' 컷':'0 컷';toggle();
 }
 function addOverride(){if(!connected)return;const row=element('div',undefined,'override-row'),fields=element('div',undefined,'row'),first=number(connected.snapshot.range.startFrame),last=number(connected.snapshot.range.endFrame),camera=element('select');options(camera,cameraValues());fields.appendChild(label('시작',first));fields.appendChild(label('종료',last));row.appendChild(fields);row.appendChild(label('고정 카메라',camera));const remove=element('button','삭제');row.appendChild(remove);const value={first,last,camera};for(const field of [first,last,camera])field.onchange=()=>{plan=null;toggle();};overrideRows.push(value);remove.onclick=()=>{overrideRows.splice(overrideRows.indexOf(value),1);row.remove();plan=null;toggle();};$('overrides').appendChild(row);plan=null;toggle();}
+function updateGuidance(update){
+  const phase=update.updateState,code=update.error?.code;
+  const suffix=typeof code==='string'&&/^[A-Z][A-Z0-9_]{0,63}$/.test(code)?' ('+code+')':'';
+  const remaining=Number.isFinite(update.retryAt)?Math.max(0,Math.ceil(update.retryAt-Date.now()/1000)):0;
+  const retry=remaining?'최소 '+remaining+'초 후 업데이트 확인을 다시 누르세요.':'업데이트 확인을 다시 누르세요.';
+  if(updateIntent&&['IDLE','COMPLETE','CANCELED','FAILED_BEFORE_REPLACE','ROLLED_BACK','UNAVAILABLE'].includes(phase))return '업데이트 시작 요청을 확인하고 있습니다.';
+  const phases={STOP_REQUESTED:'작업 중단을 요청했습니다.',
+    QUIESCING:previewPlaying?'미리보기 종료를 기다리고 있습니다. 지연되면 프로젝트를 저장하고 Premiere를 정상 종료하세요.':'진행 중인 작업을 안전하게 종료하고 있습니다.',
+    DOWNLOADING:'업데이트 파일을 다운로드하고 있습니다.',VERIFYING_PACKAGE:'다운로드한 파일을 검증하고 있습니다.',
+    WAITING_HOST_EXIT:code==='UPDATE_RATE_LIMIT'?'서버 요청 제한으로 설치를 기다리고 있습니다. '+(remaining?'최소 '+remaining+'초 후 자동으로 다시 시도합니다. ':'')+'프로젝트를 저장하고 Premiere를 정상 종료하세요.':'프로젝트를 저장하고 Premiere를 정상 종료하면 설치를 계속합니다.',
+    INSTALLING:'업데이트 파일을 교체하고 있습니다.',PENDING_ACTIVATION:'새 플러그인의 실행을 확인하고 있습니다.',
+    VERIFYING_INSTALL:'설치 결과를 검증하고 있습니다.',ROLLING_BACK:'이전 버전으로 복구하고 있습니다.',
+    RECOVERY_REQUIRED:'업데이트를 계속하려면 설치 복구를 누르세요.',FAILED:'업데이트를 계속하려면 설치 복구를 누르세요.',
+    CANCELED:'업데이트를 중단했습니다. '+retry,
+    FAILED_BEFORE_REPLACE:'파일 교체 전에 업데이트가 실패했습니다. '+retry+suffix,
+    ROLLED_BACK:'이전 버전으로 복구했습니다. '+retry};
+  if(!['IDLE','COMPLETE','UNAVAILABLE'].includes(phase))return phases[phase]||'업데이트 상태를 확인하지 못했습니다. 설정에서 설치 상태를 확인하세요.';
+  if(updateIntent)return '업데이트 시작 요청을 확인하고 있습니다.';
+  if(phase==='UNAVAILABLE'||update.checkState==='UNAVAILABLE')return '자동 업데이트 연결을 사용할 수 없습니다. Contentrium CUT Setup으로 설치를 복구하세요.';
+  if(update.checkState==='INCOMPATIBLE')return '새 버전 '+(update.candidate?.appVersion||'')+'은 현재 설치 환경과 호환되지 않습니다. Premiere 버전과 설치 환경을 확인하세요.';
+  if(update.candidate&&['AVAILABLE','CHECKING'].includes(update.checkState))return '새 버전 '+update.candidate.appVersion;
+  if(update.checkState==='CHECK_FAILED'){
+    if(code==='UPDATE_RATE_LIMIT')return '서버 요청 제한으로 업데이트를 확인하지 못했습니다. '+retry+suffix;
+    if(['UPDATE_SIGNATURE','UPDATE_HASH','UPDATE_MANIFEST','UPDATE_ASSET','UPDATE_URL'].includes(code))return '업데이트 파일 검증에 실패했습니다. '+retry+suffix;
+    return '업데이트를 확인하지 못했습니다. 네트워크 연결을 확인하고 '+retry+suffix;
+  }
+  return {CURRENT:'최신 버전입니다.',NO_RELEASE:'게시된 업데이트가 없습니다.',CHECKING:'업데이트 확인 중'}[update.checkState]||'업데이트 상태를 확인하지 못했습니다. 업데이트 확인을 다시 누르세요.';
+}
 async function refresh(){
   if(!credentials)return;state=await api('/state');
   if(updateIntent&&state.gateOpen&&state.update.updateEpoch>updateIntent.epoch&&['COMPLETE','CANCELED','FAILED_BEFORE_REPLACE','ROLLED_BACK'].includes(state.update.updateState))updateIntent=null;
@@ -384,7 +412,7 @@ async function refresh(){
   const update=state.update,candidate=update.candidate;
   $('update-banner').className=!updateIntent&&candidate&&['AVAILABLE','CHECKING'].includes(update.checkState)&&candidate.candidateId!==dismissedCandidate?'':'hidden';
   $('update-banner-text').textContent=candidate?'Contentrium CUT '+candidate.appVersion+' 업데이트':'';
-  $('update-info').textContent=['IDLE','COMPLETE'].includes(update.updateState)?(updateIntent?'업데이트 시작 요청을 확인하고 있습니다.':candidate?'새 버전 '+candidate.appVersion:({CURRENT:'최신 버전입니다.',NO_RELEASE:'게시된 업데이트가 없습니다.',CHECK_FAILED:'업데이트를 확인하지 못했습니다.'}[update.checkState]||'업데이트 확인 중')):({STOP_REQUESTED:'작업 중단을 요청했습니다.',QUIESCING:previewPlaying?'미리보기 종료를 기다리고 있습니다. 지연되면 프로젝트를 저장하고 Premiere를 정상 종료하세요.':'진행 중인 작업을 안전하게 종료하고 있습니다.',DOWNLOADING:'업데이트 파일을 다운로드하고 있습니다.',VERIFYING_PACKAGE:'다운로드한 파일을 검증하고 있습니다.',WAITING_HOST_EXIT:'프로젝트를 저장하고 Premiere를 정상 종료하면 설치를 계속합니다.',PENDING_ACTIVATION:'새 플러그인의 실행을 확인하고 있습니다.',RECOVERY_REQUIRED:'설치 복구가 필요합니다.',CANCELED:'업데이트를 중단했습니다.',FAILED_BEFORE_REPLACE:'설치 전에 업데이트가 실패했습니다. 다시 확인해 주세요.',ROLLED_BACK:'이전 버전으로 복구했습니다.'}[update.updateState]||update.updateState);
+  $('update-info').textContent=updateGuidance(update);
   $('release-notes').textContent=candidate?.releaseNotes||'';$('recover-update').disabled=!['RECOVERY_REQUIRED','FAILED'].includes(update.updateState);
   const recovery=state.applyRecovery;
   $('apply-recovery').className=localEditPending||recovery?.blocked?'notice recovery-notice':'hidden';

@@ -57,7 +57,8 @@ Object.assign(messages,{
   VALIDATION_UNAVAILABLE:'원본 파일 확인을 실행할 수 없습니다. 편집 연결 상태를 확인한 뒤 다시 분석하세요.',
   VALIDATION_SCOPE:'원본 파일 확인 대상이 유효하지 않습니다. 소스를 다시 읽고 분석하세요.'
 });
-function error(e){say(messages[e.code]||((e.code||'작업 오류')+' · '+(e.message||String(e))));}
+const currentCheckDiscarded=new Error('Discarded superseded timeline check');
+function error(e){if(e===currentCheckDiscarded)return;say(messages[e.code]||((e.code||'작업 오류')+' · '+(e.message||String(e))));}
 function isIntentReadError(e){return ['EDIT_INTENT_STORAGE_UNAVAILABLE','EDIT_INTENT_CORRUPT'].includes(e.code);}
 function contextConflict(){panelContextConflict=true;credentials=null;stopped=true;plan=null;setConnection(false,'다른 CUT 패널이 제어 중');$('boot-status').className='notice';$('boot-status').querySelector('p').textContent=messages.PANEL_CONTEXT_CONFLICT;say(messages.PANEL_CONTEXT_CONFLICT);toggle();}
 function element(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;}
@@ -582,7 +583,7 @@ async function readProject({fresh=null,automatic=false}={}){
     $('range-start').value=String(start);$('range-end').value=String(end);
     clearAnalysis();clearSyncResult();savedSpeakerMappings={};overrideRows.length=0;overrideErrorsOnly=false;overrideVisibleRows.clear();$('overrides').innerHTML='';
     renderSources();if(same&&settings)restoreSettings(settings);else if(saved){try{restoreSettings(saved);}catch(_){/* An invalid optional saved preset must not prevent connecting. */}}
-    toggle();say('트랙을 확인하고 분석할 마이크와 카메라를 지정하세요.');return true;
+    toggle();say('트랙을 확인하고 분석할 마이크와 카메라를 지정하세요.');return projectScope();
   }catch(e){if(!committed&&!current())return false;if(e.code==='RANGE_INPUT_INVALID')preserveSettings=true;else resetSequence();throw e;}
   finally{if(projectRead===token){projectRead=null;binding=false;toggle();if(preserveSettings||committed&&settingsQueued&&connected&&prior&&connected.snapshot.projectRef===prior.snapshot.projectRef&&connected.snapshot.sequenceRef===prior.snapshot.sequenceRef)scheduleSettings();}}
 }
@@ -601,7 +602,25 @@ async function followSequence(){
     else throw e;
   }
 }
-async function requireCurrent(){admitted();const fresh=await ContentriumHost.snapshot();if(fresh.snapshot.snapshotHash!==connected.snapshot.hostSnapshotHash){await readProject({fresh,automatic:true});throw new Error('타임라인이 변경됐습니다. 갱신된 트랙 설정을 확인하세요.');}const issue=rangeFeedback();if(issue)throw Object.assign(new Error(issue),{code:'RANGE_INPUT_INVALID'});if(rangeDirty)await readProject({fresh});}
+async function requireCurrent(){
+  admitted();const scope=projectScope(),read=projectRead;
+  const current=()=>!binding&&projectRead===read&&projectScopeCurrent(scope);
+  if(!current())throw currentCheckDiscarded;
+  let fresh;
+  try{fresh=await ContentriumHost.snapshot();}catch(e){if(!current())throw currentCheckDiscarded;throw e;}
+  if(!current())throw currentCheckDiscarded;
+  const changed=fresh.snapshot.snapshotHash!==scope.hostSnapshotHash;
+  if(changed){
+    const receipt=await readProject({fresh,automatic:true});
+    if(!receipt||binding||projectRead||!projectScopeCurrent(receipt))throw currentCheckDiscarded;
+    throw new Error('타임라인이 변경됐습니다. 갱신된 트랙 설정을 확인하세요.');
+  }
+  const issue=rangeFeedback();if(issue)throw Object.assign(new Error(issue),{code:'RANGE_INPUT_INVALID'});
+  if(rangeDirty){
+    const receipt=await readProject({fresh});
+    if(!receipt||binding||projectRead||!projectScopeCurrent(receipt))throw currentCheckDiscarded;
+  }
+}
 async function seekFrame(frame){await requireCurrent();await stopPreview();await connected.sequence.setPlayerPosition(ContentriumHost.time(String(BigInt(frame)*BigInt(connected.perFrame))));}
 const cutReasons={START_CAMERA:'시작 카메라',START_SPEAKER:'첫 발화 화자',SPEAKER_TURN:'화자 전환',speech:'발화',speaker:'화자',MANUAL_OVERRIDE:'수동 카메라 지정',OVERRIDE_END:'수동 지정 종료',OVERLAP_SUSTAINED:'지속된 동시 발화',OVERLAP_HOLD:'동시 발화 중 카메라 유지',MIN_SHOT_HOLD:'최소 샷 길이 유지',VIDEO_GAP_FALLBACK:'영상 공백으로 대체 카메라',MIN_SHOT_EXCEPTION_OVERRIDE:'수동 지정으로 최소 샷 길이 예외',MIN_SHOT_EXCEPTION_OVERRIDE_END:'수동 지정 종료로 최소 샷 길이 예외',MIN_SHOT_EXCEPTION_OVERLAP:'동시 발화로 최소 샷 길이 예외',MIN_SHOT_EXCEPTION_COVERAGE:'영상 공백으로 최소 샷 길이 예외',RANGE_END_SHORT:'분석 범위 끝의 짧은 샷'};
 Object.assign(cutReasons,{HOLD:'카메라 유지',UNKNOWN_HOLD:'화자 불확실로 카메라 유지'});

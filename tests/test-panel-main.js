@@ -1516,3 +1516,49 @@ test('current automatic registration errors propagate to connection recovery',as
 test('current closed sequence registration keeps explicit sequence guidance',async()=>{
  const f=await panel();f.native=nativeSnapshot('closed-during-register');const request=f.evaluate('connection.request');f.evaluate('connection').request=async(...args)=>{if(args[0]==='/project')throw Object.assign(new Error('SEQUENCE_REQUIRED'),{code:'SEQUENCE_REQUIRED'});return request(...args);};await f.evaluate('followSequence()');assert.equal(f.evaluate('connected'),null);assert.match(f.get('status').textContent,/시퀀스를 열어/);assert.equal(f.evaluate('credentials'),true);
 });
+
+async function heldCurrentCheck(mode,stage,action='plan'){
+ const f=await updatePanel();if(mode==='mixed')await f.click('mode-mixed');await f.click('analyze');await f.tick();f.evaluate('speakerRows[0].select.value="video:0";cameraRows[0].covered.value="A"');await f.click('plan');
+ const native=nativeSnapshot(stage==='host'?'sequence-1':'current-check-new-sequence');f.native=native;let resume,reject;const promise=new Promise((a,b)=>{resume=a;reject=b;});
+ const snapshot=f.host.snapshot;f.host.snapshot=()=>stage==='host'?promise:snapshot();const saved=f.saved.getItem;f.saved.getItem=key=>stage==='storage'?promise:saved(key);
+ const request=f.evaluate('connection.request');f.evaluate('connection').request=(...args)=>args[0]===(stage==='heartbeat'?'/heartbeat':'/project')&&['heartbeat','project'].includes(stage)?promise:request(...args);
+ const run=action==='correct'?f.evaluate('runAction(()=>correct({type:"name",speakerId:"A",name:"진행자"}))'):action==='sample'?f.evaluate('runAction(()=>listenExample({exampleId:"owned-example"}))'):action==='seek'?f.evaluate('runAction(()=>seekFrame(30))'):f.click(action);
+ for(let i=0;i<60;i++)await Promise.resolve();return {f,run,resume:value=>resume(value===undefined?(stage==='host'?{snapshot:structuredClone(native.snapshot),perFrame:native.perFrame,sequence:native.sequence}:stage==='heartbeat'?{gateOpen:true,stopEpoch:null}:stage==='storage'?undefined:{}):value),reject};
+}
+test('update during current timeline check preserves its status and never starts a followup operation',async()=>{
+ for(const mode of ['separate','mixed'])for(const stage of ['host','project','heartbeat','storage'])for(const outcome of ['success','error']){
+  const {f,run,resume,reject}=await heldCurrentCheck(mode,stage);await f.click('update');const status=f.get('status').textContent,before=resultState(f),connection=f.evaluate('connected'),timer=f.evaluate('settingsTimer'),calls=f.calls.length;
+  if(outcome==='success')resume();else reject(Object.assign(new Error('Owned late current check'),{code:'OWNED_LATE_CHECK'}));await run;
+  assert.equal(f.get('status').textContent,status,mode+stage+outcome);assert.equal(resultState(f),before);assert.equal(f.evaluate('connected'),connection);assert.equal(f.evaluate('settingsTimer'),timer);assert.equal(f.calls.slice(calls).some(c=>c.path==='/plan'||c.path==='/jobs'||c.path.endsWith('/correct')||['/apply/begin','/sync/begin'].includes(c.path)),false);assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);
+ }
+});
+
+test('all editing actions discard superseded timeline checks without later requests or native calls',async()=>{
+ for(const action of ['analyze','sync','plan','apply','apply-sync','correct','sample','seek'])for(const mode of ['separate','mixed'])for(const stage of ['host','project'])for(const outcome of ['success','error']){
+  const {f,run,resume,reject}=await heldCurrentCheck(mode,stage,action);let nativeCalls=0;f.host.apply=f.host.applySync=async()=>{nativeCalls++;};f.native.sequence.setPlayerPosition=async()=>{nativeCalls++;};f.host.ppro.SourceMonitor.play=async()=>{nativeCalls++;};await f.click('update');const status=f.get('status').textContent,before=resultState(f),calls=f.calls.length;
+  if(outcome==='success')resume();else reject(Object.assign(new Error('Owned obsolete check'),{code:'OWNED_OBSOLETE_CHECK'}));await run;assert.equal(f.get('status').textContent,status,action+mode+stage+outcome);assert.equal(resultState(f),before);assert.equal(nativeCalls,0);assert.equal(f.calls.slice(calls).some(c=>c.path==='/plan'||c.path==='/jobs'||c.path.endsWith('/correct')||c.path.endsWith('/example')||['/apply/begin','/sync/begin','/sync-plan'].includes(c.path)),false);
+ }
+});
+test('superseded current checks preserve newer connection scope and queued save',async()=>{
+ const changes=['state.epoch++','state.gateOpen=false','state.stopEpoch=1','stopped=true','credentials=null','state.compatible=false','panelContextConflict=true','localEditPending=true','state.applyRecovery.blocked=true','validationCount=1','job={jobId:"new-job",kind:"analysis"}','applying=true','mode=mode=== "mixed"?"separate":"mixed"','analysisState={...analysisState,revision:analysisState.revision+1}','connected={...connected}','connected=null','connected.snapshot.snapshotHash="new-hash"','connected.snapshot.hostSnapshotHash="new-host-hash"','projectRead={owned:"new-read"};binding=true'];
+ for(const mode of ['separate','mixed'])for(const stage of ['host','project','storage'])for(const change of changes)for(const outcome of ['success','error']){
+  const {f,run,resume,reject}=await heldCurrentCheck(mode,stage);f.evaluate(change+';toggle();say("Owned newer current scope")');const before=resultState(f),connection=f.evaluate('connected'),timer=f.evaluate('settingsTimer'),calls=f.calls.length;
+  if(outcome==='success')resume();else reject(Object.assign(new Error('Owned obsolete read'),{code:'OWNED_OBSOLETE_READ'}));await run;assert.equal(f.get('status').textContent,'Owned newer current scope',mode+stage+change);assert.equal(resultState(f),before);assert.equal(f.evaluate('connected'),connection);assert.equal(f.evaluate('settingsTimer'),timer);assert.equal(f.calls.slice(calls).some(c=>c.path==='/plan'||c.path==='/jobs'),false);
+ }
+});
+test('completed current read receipt is checked before followup action',async()=>{
+ for(const change of ['state.epoch++','updateIntent={accepted:true};stopped=true','connected={...connected}','connected=null','connected.snapshot.snapshotHash="new-hash"','mode="mixed"','analysisState={revision:1}','projectRead={};binding=true']){
+  const f=await analyzedPanel();f.native=nativeSnapshot('receipt-new-sequence');const original=f.evaluate('readProject');let before,connection,status;f.evaluate('readProject=async options=>{const receipt=await globalThis.readForTest(options);globalThis.mutateForTest();return receipt;}');f.evaluate('globalThis').readForTest=original;f.evaluate('globalThis').mutateForTest=()=>{f.evaluate(change+';toggle();say("Owned newer receipt")');before=resultState(f);connection=f.evaluate('connected');status=f.get('status').textContent;};const calls=f.calls.filter(c=>c.path==='/plan').length;await f.click('plan');assert.equal(f.get('status').textContent,status,change);assert.equal(resultState(f),before);assert.equal(f.evaluate('connected'),connection);assert.equal(f.calls.filter(c=>c.path==='/plan').length,calls);
+ }
+});
+test('current timeline failures and malformed range retain normal validation guidance',async()=>{
+ const f=await analyzedPanel();f.host.snapshot=async()=>{throw Object.assign(new Error('Owned current host'),{code:'OWNED_CURRENT_HOST'});};await assert.rejects(f.evaluate('requireCurrent()'),{code:'OWNED_CURRENT_HOST'});await f.click('plan');assert.match(f.get('status').textContent,/OWNED_CURRENT_HOST/);assert.ok(f.evaluate('connected'));
+ const g=await analyzedPanel();g.native=nativeSnapshot('auth-failure-sequence');const request=g.evaluate('connection.request');g.evaluate('connection').request=(...args)=>args[0]==='/project'?Promise.reject(Object.assign(new Error('Owned current auth'),{code:'AUTH_REQUIRED'})):request(...args);await assert.rejects(g.evaluate('requireCurrent()'),{code:'AUTH_REQUIRED'});assert.equal(g.evaluate('connected'),null);
+ const h=await analyzedPanel();h.get('range-start').value='';h.get('range-start').oninput();await assert.rejects(h.evaluate('requireCurrent()'),{code:'RANGE_INPUT_INVALID'});assert.ok(h.evaluate('connected'));assert.equal(h.get('range-start').value,'');
+ // Matching text or API code never impersonates the local discard identity.
+ h.evaluate('error({code:"OWNED_CHECK",message:"Discarded superseded timeline check"})');assert.match(h.get('status').textContent,/OWNED_CHECK/);
+});
+test('normal timeline refresh has explicit guidance and valid range refresh continues analysis',async()=>{
+ for(const mode of ['separate','mixed']){const f=await analyzedPanel();if(mode==='mixed')await f.click('mode-mixed');f.native=nativeSnapshot('normal-new-sequence');await f.click('plan');assert.equal(f.evaluate('connected.snapshot.sequenceRef'),'normal-new-sequence');assert.match(f.get('status').textContent,/타임라인이 변경/);assert.equal(f.calls.some(c=>c.path==='/plan'),false);assert.equal(f.evaluate('analysisState'),null);}
+ const g=await panel();g.get('range-start').value='30';g.get('range-end').value='240';g.get('range-end').oninput();await g.click('analyze');assert.equal(g.evaluate('connected.snapshot.range.startFrame'),30);assert.equal(g.evaluate('connected.snapshot.range.endFrame'),240);assert.equal(g.calls.filter(c=>c.path==='/jobs').length,1);await g.tick();assert.ok(g.evaluate('analysisState'));await g.click('plan');assert.ok(g.evaluate('plan'));
+});

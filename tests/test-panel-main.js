@@ -76,6 +76,75 @@ function mic(f,index=0){return f.evaluate('microphoneRows['+index+']');}
 function micError(f,index=0){return f.get('microphones').children[index]?.children.find(n=>n.className.includes('input-error'))?.textContent||'';}
 function syncRow(f,index=0){return f.evaluate('syncRows['+index+']');}
 
+async function completedSync(extra={}){
+  const f=await panel({request:async(path,body,fixture)=>{
+    if(extra.request){const value=await extra.request(path,body,fixture);if(value!==undefined)return value;}
+    if(path==='/jobs/job-1')return {jobId:'job-1',kind:'sync',status:fixture.jobStatus,result:{sources:{camera:{status:'accepted'},mic:{status:'accepted'}},offsets:{camera:0,mic:0}}};
+    if(path==='/sync-plan')throw Object.assign(new Error('Owned fixture stops before native mutation'),{code:'OWNED_FIXTURE_STOP'});
+  }});
+  if(extra.method){f.get('sync-method').value=extra.method;f.get('sync-method').onchange();}
+  if(extra.method==='manual'){syncRow(f,1).confirmed.checked=true;syncRow(f,1).confirmed.onchange();}
+  if(extra.method==='timecode')for(const index of [0,1]){const row=syncRow(f,index);row.clockConfirmed.checked=true;row.clockId.value='owned clock';row.date.value='2026-10-09';row.clockId.onchange();}
+  await f.click('sync');if(extra.beforeComplete)await extra.beforeComplete(f);await f.tick();return f;
+}
+
+test('completed sync cannot apply after valid silent channel or reference changes',async()=>{
+  for(const change of [f=>{syncRow(f).channel.value='2';},f=>{f.get('sync-reference').value='mic';}]){
+    const f=await completedSync();assert.equal(f.get('apply-sync').disabled,false);change(f);await f.click('apply-sync');
+    assert.equal(f.calls.some(c=>c.path==='/sync-plan'),false);assert.equal(f.get('apply-sync').disabled,true);assert.equal(f.get('sync-result').textContent,'');assert.match(f.get('status').textContent,/입력.*다시.*분석/);assert.equal(f.get('project-name').textContent,'sequence-1');
+  }
+});
+
+test('sync completion discards a result when input changed during analysis',async()=>{
+  const f=await completedSync({beforeComplete:f=>{syncRow(f).stream.value='2';}});
+  assert.equal(f.get('apply-sync').disabled,true);assert.equal(f.get('sync-result').textContent,'');assert.match(f.get('status').textContent,/입력.*다시.*분석/);assert.equal(f.get('analyze').disabled,false);
+  syncRow(f).stream.value='1';f.evaluate('toggle()');assert.equal(f.get('apply-sync').disabled,true);
+});
+
+test('manual and timecode effective confirmation changes invalidate completed sync without events',async()=>{
+  for(const [method,field,value] of [['manual','offset','1.25'],['manual','confirmed',false],['timecode','clockId','other clock'],['timecode','date','2026-10-10'],['timecode','fps','25/1'],['timecode','drop',true],['timecode','clockConfirmed',false]]){
+    const f=await completedSync({method}),row=syncRow(f,1);if(typeof value==='boolean')row[field].checked=value;else row[field].value=value;
+    await f.click('apply-sync');assert.equal(f.calls.some(c=>c.path==='/sync-plan'),false);assert.match(f.get('status').textContent,/입력.*다시.*분석/);
+  }
+});
+
+test('unused sync values and equivalent numeric indices do not reject a current result',async()=>{
+  for(const method of ['audio','manual','timecode']){
+    const f=await completedSync({method});syncRow(f).stream.value='01';
+    if(method!=='manual')syncRow(f,1).offset.value='1.25';else syncRow(f).offset.value='1.25';
+    if(method!=='timecode')syncRow(f,1).clockId.value='unused clock';
+    await f.click('apply-sync');assert.equal(f.calls.filter(c=>c.path==='/sync-plan').length,1);
+  }
+});
+
+test('sync input is rechecked after approval response before beginning native work',async()=>{
+  const f=await completedSync({request:(path,body,fixture)=>{if(path==='/sync-plan'){syncRow(fixture).channel.value='2';return {planHash:'p'.repeat(64)};}}});
+  await f.click('apply-sync');assert.equal(f.calls.filter(c=>c.path==='/sync-plan').length,1);assert.equal(f.calls.some(c=>c.path==='/apply/begin'),false);assert.match(f.get('status').textContent,/입력.*다시.*분석/);assert.equal(f.get('apply-sync').disabled,true);
+});
+
+test('sync results without captured input identity are never sent for approval',async()=>{
+  const f=await panel();f.evaluate("syncJob='job-1';syncResult={};toggle();");await f.click('apply-sync');assert.equal(f.calls.some(c=>c.path==='/sync-plan'),false);assert.equal(f.get('apply-sync').disabled,true);assert.match(f.get('status').textContent,/다시.*분석/);
+});
+
+test('sync input is rechecked after native permit before reaching the mutation entry point',async()=>{
+  const f=await completedSync({request:(path,body,fixture)=>{
+    if(path==='/sync-plan')return {planHash:'p'.repeat(64)};
+    if(path==='/apply/begin'){syncRow(fixture).channel.value='2';return {applyId:'owned-review',epoch:0,execute:true,plan:{planHash:'p'.repeat(64)}};}
+  }});let nativeCalls=0;f.host.applySync=async()=>{nativeCalls++;throw Object.assign(new Error('Owned fixture stops native mutation'),{code:'OWNED_FIXTURE_STOP'});};
+  await f.click('apply-sync');assert.equal(nativeCalls,0);assert.match(f.get('status').textContent,/입력.*다시.*분석/);
+  assert.equal(f.calls.filter(c=>c.path==='/apply/end').at(-1)?.body.status,'failed');assert.equal(f.get('apply-sync').disabled,true);
+});
+
+test('periodic detection clears stale sync offsets and displays reanalysis guidance',async()=>{
+  const f=await completedSync();assert.match(f.get('sync-result').textContent,/camera.mov/);syncRow(f).channel.value='2';await f.tick();
+  assert.equal(f.get('apply-sync').disabled,true);assert.equal(f.get('sync-result').textContent,'');assert.match(f.get('status').textContent,/입력.*다시.*분석/);assert.match(f.get('action-readiness').textContent,/다시.*분석/);
+});
+
+test('update priority survives periodic detection of a stale sync result',async()=>{
+  const f=await completedSync();syncRow(f).channel.value='2';f.state.update={updateState:'WAITING_HOST_EXIT',checkState:'CURRENT',candidate:null};await f.tick();
+  assert.match(f.get('action-readiness').textContent,/Premiere.*종료/);assert.equal(f.get('apply-sync').disabled,true);
+});
+
 test('sync source malformed indices are rejected before submitting a job',async()=>{
   for(const [field,value] of [['channel',''],['channel','0'],['channel','-1'],['stream','1.5'],['stream','invalid'],['stream','9007199254740992']]){
     const f=await panel(),row=syncRow(f);row[field].value=value;row[field].onchange();await f.click('sync');
@@ -111,7 +180,7 @@ test('sync settings preserve raw invalid and unchecked input without breaking le
 });
 
 test('typing sync input clears stale results without blocking unrelated analysis or immediate update',async()=>{
-  const f=await updatePanel();f.evaluate("syncJob='job-1';syncResult={};");f.get('sync-result').textContent='old result';f.evaluate('toggle()');assert.equal(f.get('apply-sync').disabled,false);
+  const f=await completedSync();f.state.update={updateState:'IDLE',checkState:'AVAILABLE',candidate:{candidateId:'release:hash',manifestDigest:'a'.repeat(64),appVersion:'0.1.1'}};await f.tick();assert.equal(f.get('apply-sync').disabled,false);
   const row=syncRow(f);assert.equal(typeof row.channel.oninput,'function');row.channel.value='';row.channel.oninput();assert.equal(f.get('apply-sync').disabled,true);assert.equal(f.get('sync-result').textContent,'');assert.equal(f.get('analyze').disabled,false);
   await f.click('update');assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.match(f.get('action-readiness').textContent,/업데이트/);
 });

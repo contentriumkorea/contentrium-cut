@@ -21,6 +21,15 @@ let validationCount=0,heartbeatRequest=null,updateIntent=null;
 let reviewPage=0,reviewWindow=null;
 let microphoneIssue='',rangeIssue='',syncIssue='',policyIssue='',syncResultInputHash=null,syncInvalidated=false;
 const selectedRows=[];
+function selectedSourceMedia(row){return Array.isArray(inputCapability?.assets)?inputCapability.assets.find(media=>media.assetId===row.source.assetId):null;}
+function selectedSourceEditable(row){return !workLocked()&&!!projectSelection&&selectedRows.includes(row)&&!!selectedSourceMedia(row);}
+function selectedSourceFeedback(row,locked=workLocked()){
+  const media=selectedSourceMedia(row),ready=!!projectSelection&&!!media,excluded=row.role.value==='exclude';
+  row.role.disabled=locked||!ready;row.audio.disabled=locked||!ready||excluded||media.hasAudio!==true;
+  const text=!ready?'미디어 확인 중 · 확인이 끝나면 설정할 수 있습니다.':excluded?'이 소스는 제외됩니다 · 출력 오디오 선택은 다시 포함하면 적용됩니다.':media.hasAudio!==true?'오디오 스트림 없음 · 출력 오디오를 사용할 수 없습니다.':'';
+  if(row.selectionHint.textContent!==text)row.selectionHint.textContent=text;row.selectionHint.className='hint'+(text?'':' hidden');
+}
+function inputSourceChoices(){return selectedRows.map(row=>({assetId:row.source.assetId,role:row.role.value,outputAudio:row.role.value!=='exclude'&&selectedSourceMedia(row)?.hasAudio===true&&row.audio.checked}));}
 function say(value){$('status').textContent=value;}
 function setConnection(ready,text){$('connection').textContent=text;$('connection-dot').className=ready?'connected':'disconnected';$('host-status').textContent=ready?'PREMIERE 로컬 연결됨':'PREMIERE 연결 대기';}
 function invalidateAnalysis(){clearAnalysis();renderSpeakers(mode==='mixed'?[]:[...new Set(microphoneRows.filter(r=>r.check.checked).map(r=>r.speaker.value.trim()))]);scheduleSettings();say('음성 입력이 바뀌었습니다. 화자 분석을 다시 실행하세요.');toggle();}
@@ -192,6 +201,7 @@ function toggle(){
   for(const id of ['range-start','range-end','min-shot','short-turn','overlap'])$(id).disabled=locked||!connected;
   for(const id of ['sync-method','sync-reference'])$(id).disabled=locked||!connected;
   for(const row of syncRows)for(const field of [row.check,row.stream,row.channel,row.offset,row.confirmed,row.clockId,row.date,row.fps,row.drop,row.clockConfirmed])field.disabled=locked||!connected;
+  for(const row of selectedRows)selectedSourceFeedback(row,locked);
   $('speaker-count').disabled=workLocked()||mode!=='mixed';$('vad-threshold').disabled=workLocked()||mode!=='separate';
   for(const row of calibrationRows)for(const field of [row.first,row.last])field.disabled=workLocked()||!calibrationActive(row);
   for(const id of ['analyze','sync','plan','apply-sync','apply','save-settings','load-settings'])$(id).disabled=locked||!connected||(id==='plan'&&!analysisState)||(id==='apply'&&!plan)||(id==='apply-sync'&&!syncResult);
@@ -783,14 +793,16 @@ handler('read-selection',async()=>{
   projectSelection={...selection,...bound};
   for(const source of selection.sources){
     const row=element('div',undefined,'source-row'),role=element('select'),audio=checkbox(),info=element('p','스트림 확인 중','hint');
-    options(role,[['camera','카메라 영상'],['audio','독립 오디오'],['exclude','제외']]);role.onchange=()=>{if(role.value==='exclude')audio.checked=false;};
-    row.appendChild(element('div',source.name,'source-title'));row.appendChild(info);row.appendChild(label('소스 역할',role));row.appendChild(label('이 파일의 오디오를 결과에 출력',audio));$('selected-sources').appendChild(row);selectedRows.push({source,role,audio,info});
+    options(role,[['camera','카메라 영상'],['audio','독립 오디오'],['exclude','제외']]);
+    const selectionHint=element('p','', 'hint');selectionHint.id='selected-source-hint-'+selectedRows.length;selectionHint.setAttribute('role','status');selectionHint.setAttribute('aria-live','polite');for(const field of [role,audio])field.setAttribute('aria-describedby',selectionHint.id);
+    const value={source,role,audio,info,selectionHint};role.oninput=role.onchange=()=>{if(selectedSourceEditable(value))toggle();};audio.oninput=audio.onchange=()=>{if(selectedSourceEditable(value)&&selectedSourceMedia(value).hasAudio===true&&role.value!=='exclude')toggle();};
+    row.appendChild(element('div',source.name,'source-title'));row.appendChild(info);row.appendChild(label('소스 역할',role));row.appendChild(label('이 파일의 오디오를 결과에 출력',audio));row.appendChild(selectionHint);selectedRows.push(value);selectedSourceFeedback(value);$('selected-sources').appendChild(row);
   }
   job={...await api('/input/capabilities',{selectionId:bound.selectionId,epoch:state.epoch}),selectionId:bound.selectionId};say('선택한 소스의 미디어 구성을 확인합니다.');
 });
 handler('create-input',async()=>{
   if(!state?.gateOpen||stopped||!projectSelection||!inputCapability)throw new Error('선택 소스 확인을 먼저 마쳐 주세요.');
-  const selection=projectSelection,capability=inputCapability,choices=selectedRows.map(r=>({assetId:r.source.assetId,role:r.role.value,outputAudio:r.role.value!=='exclude'&&r.audio.checked}));
+  const selection=projectSelection,capability=inputCapability,choices=inputSourceChoices();
   await heartbeat();
   await performNative('input',{capabilityId:capability.capabilityId,choices,epoch:state.epoch},(approved,control)=>ContentriumHost.createSelectedInput(selection,choices,control),(approved,result)=>({...result.inputReceipt,planHash:approved.planHash}),'/input/begin');
   projectSelection=inputCapability=null;selectedRows.length=0;$('selected-sources').innerHTML='';connected=null;await readProject();say('입력 시퀀스를 만들었습니다. 트랙 설정에서 싱크와 화자 분석을 시작하세요.');

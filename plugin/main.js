@@ -190,6 +190,8 @@ function toggle(){
   for(const row of speakerRows)row.select.disabled=locked||!connected;
   for(const id of ['start-camera','reserve-camera'])$(id).disabled=locked||!connected;
   for(const id of ['range-start','range-end','min-shot','short-turn','overlap'])$(id).disabled=locked||!connected;
+  for(const id of ['sync-method','sync-reference'])$(id).disabled=locked||!connected;
+  for(const row of syncRows)for(const field of [row.check,row.stream,row.channel,row.offset,row.confirmed,row.clockId,row.date,row.fps,row.drop,row.clockConfirmed])field.disabled=locked||!connected;
   $('speaker-count').disabled=workLocked()||mode!=='mixed';$('vad-threshold').disabled=workLocked()||mode!=='separate';
   for(const row of calibrationRows)for(const field of [row.first,row.last])field.disabled=workLocked()||!calibrationActive(row);
   for(const id of ['analyze','sync','plan','apply-sync','apply','save-settings','load-settings'])$(id).disabled=locked||!connected||(id==='plan'&&!analysisState)||(id==='apply'&&!plan)||(id==='apply-sync'&&!syncResult);
@@ -355,7 +357,7 @@ function renderSyncSources(){
     options(fps,[['24000/1001','23.976'],['24/1','24'],['25/1','25'],['30000/1001','29.97'],['30/1','30'],['50/1','50'],['60000/1001','59.94'],['60/1','60']]);fps.value=connected.snapshot.fps.num+'/'+connected.snapshot.fps.den;
     clock.appendChild(label('공통 시계',clockId));clock.appendChild(label('촬영 날짜',date));clock.appendChild(label('타임코드 FPS',fps));clock.appendChild(label('Drop-frame',drop));clock.appendChild(label('날짜와 시계가 같고 촬영 중 리셋하지 않았습니다',clockConfirmed));row.appendChild(clock);
     $('sync-sources').appendChild(row);syncRows.push({check,source,stream,channel,issue,manual,offset,confirmed,clock,clockId,date,fps,drop,clockConfirmed});
-    for(const field of [check,stream,channel,offset,confirmed,clockId,date,fps,drop,clockConfirmed])field.oninput=field.onchange=syncInputsChanged;
+    for(const field of [check,stream,channel,offset,confirmed,clockId,date,fps,drop,clockConfirmed]){field.disabled=workLocked()||!connected;field.oninput=field.onchange=syncInputEdited;}
     values.push([source.assetId,basename(source.canonicalPath)]);
   }
   options($('sync-reference'),values);syncMethodChanged();
@@ -363,6 +365,8 @@ function renderSyncSources(){
 function clearSyncResult(){syncResult=syncJob=syncResultInputHash=null;syncInvalidated=false;$('sync-result').textContent='';}
 function syncInputsChanged(){clearSyncResult();scheduleSettings();toggle();}
 function syncMethodChanged(){for(const r of syncRows){r.manual.className=$('sync-method').value==='manual'?'':'hidden';r.clock.className=$('sync-method').value==='timecode'?'':'hidden';}syncInputsChanged();}
+function syncInputEdited(){if(!workLocked()&&connected)syncInputsChanged();}
+function syncMethodEdited(){if(!workLocked()&&connected)syncMethodChanged();}
 function syncFeedback(){
   let first='';const selected=syncRows.filter(r=>r.check.checked);
   for(const row of syncRows){
@@ -858,12 +862,12 @@ for(const id of ['range-start','range-end'])$(id).oninput=$(id).onchange=()=>{if
 for(const id of ['min-shot','short-turn','overlap'])$(id).oninput=$(id).onchange=policyInputsChanged;
 for(const id of ['start-camera','reserve-camera'])$(id).onchange=()=>{if(!workLocked()&&connected)invalidatePlan();};
 for(const id of ['speaker-count','vad-threshold'])$(id).oninput=$(id).onchange=()=>analysisOptionChanged(id);
-$('sync-method').onchange=syncMethodChanged;
+$('sync-method').onchange=syncMethodEdited;
 $('review-camera').onchange=$('review-search').oninput=()=>{reviewPage=0;renderReviewCuts();};
 $('review-previous').onclick=()=>{if(plan&&reviewWindow?.previous){reviewPage--;renderReviewCuts();}};
 $('review-next').onclick=()=>{if(plan&&reviewWindow?.next){reviewPage++;renderReviewCuts();}};
 $('review-clear').onclick=()=>{$('review-camera').value='';$('review-search').value='';reviewPage=0;renderReviewCuts();};
-$('sync-reference').onchange=syncInputsChanged;
+$('sync-reference').onchange=syncInputEdited;
 $('version').textContent=bundle.appVersion;
 $('header-version').textContent=bundle.appVersion;
 $('update-banner-button').onclick=()=>$('update').onclick();

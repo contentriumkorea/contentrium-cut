@@ -392,3 +392,12 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 
 - 패키지 검증: [0.1.18 증거](package-0.1.18-proof.json). ZIP/CCX CRC·경로·크기·비공개 자료 제외, CCX 최종 소스·Silero 해시, frozen 엔진 29개/설치기 26개 제품 모듈·두 진입점이 검증 소스와 일치했다. 추출 엔진 probe runtimeReady=true/0.1.18과 Setup help exit 0, 57.844초. 기존 선택적 모듈/torchcodec 경고를 보존하며 Community-1 품질 판정으로 확대하지 않는다.
 - 현재 단계: 기획·설계·구현·독립 검수·전체 회귀·패키지 실행 완료. 0.1.18 공개 및 익명 발견/서명/실제 다운로드 해시·고정 v0.1.1 검증으로 진행한다. 실제 UXP/Premiere/설치 전환/Community-1 품질은 미검증이다. 다음 후보는 복구·호환 대기 중 트랙 설정 입력의 잠금이다.
+
+### 공개 결과
+
+- [v0.1.18](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.18): release `407183880`, 정확한 제목 `Contentrium CUT`, draft/prerelease 아님. 공개 시각 2026-10-09 04:21:44 KST (`2026-10-08T19:21:44Z`), target/tag commit `5d989dca71b1304ccaac3e2c0cded1e1e8268fbc`를 확인했다.
+- [공개 실제 재다운로드](release-0.1.18-proof.json): 익명 제품 경로에서 0.1.17 → 0.1.18 AVAILABLE. 서명과 실제 ZIP/CCX/Setup 3개의 크기·SHA-256이 일치한다. 첫 실행은 PYTHONPATH 누락에 따른 검증 CLI import 실패였으며 최초 로그를 보존하고 명시적 `.;companion`으로 환경을 바로잡아 재실행했다. 제품·파일·기준을 변경하지 않았다.
+- [현재 버전](release-0.1.18-current-proof.json): 별도 빈 상태에서 0.1.18 CURRENT / 후보 없음. 공개 자산 5개 ID·크기·digest와 서명 문서 실제 바이트가 로컬과 일치한다.
+- [고정 복구 조회](migration-pinned-0.1.1-after-0.1.18-proof.json): latest 0.1.18에서도 서명된 정확한 v0.1.1 / release `404226839` / commit `268d27e6665c8b1f0753a634f8021dfa86935b37` AVAILABLE. 실제 설치 전환은 하지 않았다.
+- 현재 단계: 기획 → 설계 → 구현 → 검증 → 0.1.18 공개 및 공개 재검증 완료. 다음 회차는 재현한 복구/호환 대기 상태의 카메라·마이크 입력 잠금 불일치를 개선한다. UI 비활성화와 직접 콜백의 동일 workLocked, 원문·분석·저장 보존, 잠금 해제 뒤 기존 설정의 재검사, 업데이트 즉시 시작을 수용 조건으로 설계하고 RED·독립 검수·전체 회귀·패키지/공개 검증 뒤 배포한다. 버전만 올리지 않는다.
+- PC 활성 설치는 계속 0.1.0이며 active/journal/first-install 3개 해시는 배포 전후 동일함을 읽기 전용 확인했다. 서명 키 존재·보존과 기존 ACTIVE/15분 자동화를 확인했다. 기존 공개 파일·설정·실패 증거를 보존했고 컴퓨터유즈·Premiere 조작·재설치·제공자 접근을 하지 않았다. 실제 UXP/Premiere 편집·설치 전환·Community-1 품질은 미검증이다. 이전 범위 readiness·메모리/취소 간헐 시험 실패의 원인도 미확정이다.

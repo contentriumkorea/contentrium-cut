@@ -683,10 +683,19 @@ function periodicHeartbeat(){
   return heartbeatRequest;
 }
 const canceledJobs=new Set();
+function inputProbeCurrent(active,scope){
+  return job===active&&!canceledJobs.has(active.jobId)&&!stopped&&!updateIntent&&!applying&&!validationCount&&!panelContextConflict&&!!credentials&&!!state?.gateOpen&&state.compatible!==false&&!localEditPending&&!state.applyRecovery?.blocked&&state.stopEpoch==null&&state.epoch===scope.epoch&&!!scope.selection&&projectSelection===scope.selection&&projectSelection.selectionId===active.selectionId&&selectedRows.length===scope.rows.length&&scope.rows.every((row,index)=>selectedRows[index]===row);
+}
+function finishPolledJob(active){
+  if(job===active)job=null;
+  if(!job||job.jobId!==active.jobId)canceledJobs.delete(active.jobId);
+  toggle();
+}
 async function pollJob(){
   if(!job)return;
-  const active=job;let value;
+  const active=job,inputScope=active.kind==='input-probe'?{selection:projectSelection,rows:selectedRows.slice(),epoch:state?.epoch}:null;let value;
   try{value=await api('/jobs/'+active.jobId);}catch(e){
+    if(inputScope&&!inputProbeCurrent(active,inputScope)){finishPolledJob(active);return;}
     if(!['SOURCE_CHANGED','SOURCE_REANALYSIS_REQUIRED','CANCELED','CONTINUATION_EXPIRED','VALIDATION_EXPIRED','VALIDATION_WORKER_EXITED','VALIDATION_STALE','VALIDATION_UNAVAILABLE','VALIDATION_SCOPE'].includes(e.code)&&!canceledJobs.has(active.jobId))throw e;
     if(job===active)job=null;
     if(active.kind==='analysis')clearAnalysis();
@@ -694,6 +703,7 @@ async function pollJob(){
     if(active.kind==='input-probe')inputCapability=null;
     if(active.kind==='model-setup')say(modelInstallResult(['CANCELED','UPDATE_IN_PROGRESS'].includes(e.code)?'canceled':'failed',e.code));else error(e);toggle();return;
   }
+  if(inputScope&&!inputProbeCurrent(active,inputScope)){finishPolledJob(active);return;}
   if(['running','canceling'].includes(value.status)){
     if(active.kind==='model-setup'&&value.status==='canceling')modelInstallResult('canceling');
     const labels={sync:'소스의 싱크를 분석하고 있습니다.',analysis:'로컬에서 화자를 분석하고 있습니다.',example:'단독 발화 샘플을 준비하고 있습니다.','model-setup':'화자 모델을 설치하고 있습니다.','input-probe':'선택 소스의 영상과 오디오를 확인하고 있습니다.'};
@@ -724,14 +734,19 @@ async function pollJob(){
       previewPlaying=true;setTimeout(()=>{previewPlaying=false;toggle();},Math.ceil(Number(sample.durationSeconds)*1000)+250);
       say('Premiere 소스 모니터에서 단독 발화를 재생합니다.');
     }else if(active.kind==='input-probe'){
-      if(!projectSelection||projectSelection.selectionId!==active.selectionId)throw new Error('INPUT_SCOPE');
-      inputCapability=await api('/input/capabilities/result',{jobId:value.jobId,epoch:state.epoch});
-      for(const row of selectedRows){const media=inputCapability.assets.find(a=>a.assetId===row.source.assetId);if(!media)throw new Error('INPUT_SCOPE');row.role.value=media.hasVideo?'camera':media.hasAudio?'audio':'exclude';row.audio.checked=!media.hasVideo&&media.hasAudio;row.info.textContent=media.hasVideo?(media.hasAudio?'영상 · 오디오':'영상만 있음'):(media.hasAudio?'오디오만 있음':'지원하는 스트림 없음');}
-      say('선택 소스를 확인했습니다. 역할과 출력 오디오를 지정하세요.');
+      try{
+        const next=await api('/input/capabilities/result',{jobId:value.jobId,epoch:inputScope.epoch});
+        if(!inputProbeCurrent(active,inputScope))return;
+        const mediaRows=inputScope.rows.map(row=>Array.isArray(next?.assets)?next.assets.find(media=>media.assetId===row.source.assetId):null);
+        if(mediaRows.some(media=>!media))throw Object.assign(new Error('INPUT_SCOPE'),{code:'INPUT_SCOPE'});
+        inputCapability=next;
+        inputScope.rows.forEach((row,index)=>{const media=mediaRows[index];row.role.value=media.hasVideo?'camera':media.hasAudio?'audio':'exclude';row.audio.checked=!media.hasVideo&&media.hasAudio;row.info.textContent=media.hasVideo?(media.hasAudio?'영상 · 오디오':'영상만 있음'):(media.hasAudio?'오디오만 있음':'지원하는 스트림 없음');});
+        say('선택 소스를 확인했습니다. 역할과 출력 오디오를 지정하세요.');
+      }catch(e){if(!inputProbeCurrent(active,inputScope))return;error(e);throw e;}
     }else if(active.kind==='model-setup'){
       say(modelInstallResult('completed'));
     }
-  }finally{if(job?.jobId===active.jobId)job=null;canceledJobs.delete(active.jobId);toggle();}
+  }finally{finishPolledJob(active);}
 }
 function handler(id,fn){
   const serial=!['refresh','check-update','update','cancel','recover-update'].includes(id);

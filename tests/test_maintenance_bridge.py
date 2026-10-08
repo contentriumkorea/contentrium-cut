@@ -82,6 +82,7 @@ class MaintenanceTests(PreparationFixture):
             network.release['assets'].append(dict(id=index,name=name,size=len(data),state='uploaded',browser_download_url=prefix+name))
         network.release['target_commitish']=COMMIT
         network.release_by_id[42]=json.loads(json.dumps(network.release))
+        network.documents[updater.API_ROOT+'/releases/tags/v0.1.1']=json.dumps(network.release).encode()
         return signed,paths,network
 
     def leases(self, root, sid):
@@ -157,6 +158,33 @@ class MaintenanceTests(PreparationFixture):
         (self.root/'Contentrium CUT Launcher.exe').write_bytes(b'wrong owner')
         with self.assertRaises(CutError):self.migrate()
         self.assertEqual(len(self.network.calls),before)
+
+    def test_pinned_migration_remains_available_when_latest_is_a_newer_release(self):
+        self.network.release=dict(self.network.release,tag_name='v0.1.2',target_commitish='f'*40)
+        result=self.migrate()
+        self.assertEqual(result['status'],'PENDING_PROVISIONING')
+        self.assertEqual(self.journal()['_attemptCandidate']['manifest']['appVersion'],'0.1.1')
+        self.assertFalse(any(url==updater.LATEST_URL for url,_ in self.network.calls))
+        self.assertTrue(any(url.endswith('/releases/tags/v0.1.1') for url,_ in self.network.calls))
+
+    def test_pinned_lookup_rejects_an_unreviewed_tag_target_before_install(self):
+        tag=updater.API_ROOT+'/releases/tags/v0.1.1'
+        self.network.documents[tag]=json.dumps(dict(self.network.release,target_commitish='f'*40)).encode()
+        before=sum(a[1]=='/install' for a,_ in self.windows.adobe.calls)
+        with self.assertRaises(CutError):self.migrate()
+        self.assertEqual(sum(a[1]=='/install' for a,_ in self.windows.adobe.calls),before)
+
+    def test_migration_tag_does_not_reuse_latest_conditional_metadata(self):
+        entry=importlib.import_module('tools.maintenance_entry')
+        headers=dict(updater.API_HEADERS,**{'If-None-Match':'"latest-0.1.2"'})
+        network=entry._MigrationTransport(self.network)
+        result=network.get(updater.LATEST_URL,headers,15,1024*1024)
+        self.assertEqual(result.status,200)
+        self.assertEqual(self.network.calls[-1][0],updater.API_ROOT+'/releases/tags/v0.1.1')
+        self.assertNotIn('If-None-Match',self.network.calls[-1][1])
+        self.assertEqual(headers['If-None-Match'],'"latest-0.1.2"')
+        network.get(updater.API_ROOT+'/releases/42',headers,15,1024*1024)
+        self.assertEqual(self.network.calls[-1][1],headers)
 
     def test_busy_supervisor_or_runtime_is_diagnostic_and_leaves_journal_untouched(self):
         for name in ['supervisor','runtime']:

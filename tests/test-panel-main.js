@@ -72,6 +72,43 @@ async function updatePanel(extra={}){
   await f.tick();return f;
 }
 
+test('long-form cut review pages and filters without changing the edit plan',async()=>{
+  const f=await panel(),segments=Array.from({length:121},(_,i)=>({startFrame:i*2,endFrame:i*2+2,cameraId:i%2?'video:1':'video:0',reason:i%2?'OVERLAP_HOLD':'SPEAKER_TURN'}));
+  const value={planHash:'p'.repeat(64),segments,reviews:[]},before=JSON.stringify(value);
+  f.evaluate('plan='+before+';renderPlan();');
+  assert.equal(f.get('segments').children.length,50);
+  assert.equal(f.get('review-previous').disabled,true);
+  await f.click('review-next');assert.equal(f.get('segments').children.length,50);
+  await f.click('review-next');assert.equal(f.get('segments').children.length,21);
+  assert.equal(f.get('review-next').disabled,true);
+  f.get('review-camera').value='video:1';f.get('review-camera').onchange();
+  assert.equal(f.get('segments').children.length,50);
+  f.get('review-search').value='화자 전환';f.get('review-search').oninput();
+  assert.match(f.get('segments').children[0].textContent,/일치하는 컷/);
+  assert.equal(f.get('review-next').disabled,true);
+  await f.click('review-clear');assert.equal(f.get('segments').children.length,50);
+  assert.equal(f.evaluate('JSON.stringify(plan)'),before);
+  assert.equal(f.get('cut-count').textContent,'121');
+});
+
+test('a cut on a later review page seeks its original frame and update locks paging',async()=>{
+  const f=await panel();let actual;f.native.sequence.setPlayerPosition=async value=>{actual=value;};
+  f.evaluate('plan={segments:Array.from({length:51},(_,i)=>({startFrame:i*2,endFrame:i*2+2,cameraId:"video:0",reason:"speech"})),reviews:[]};renderPlan();');
+  await f.click('review-next');await f.get('segments').children[0].onclick();
+  assert.equal(actual,String(100n*BigInt(f.native.perFrame)));
+  f.state.gateOpen=false;f.state.update.updateState='QUIESCING';await f.tick();
+  assert.equal(f.get('review-next').disabled,true);assert.equal(f.get('review-previous').disabled,true);
+});
+
+test('clearing analysis resets review filters and page status',async()=>{
+  const f=await panel();f.evaluate('plan={segments:[{startFrame:0,endFrame:2,cameraId:"video:0",reason:"speech"}],reviews:[]};renderPlan();');
+  f.get('review-search').value='발화';f.get('review-search').oninput();
+  f.get('review-camera').value='video:0';f.evaluate('clearAnalysis();toggle();');
+  assert.equal(f.get('review-search').value,'');assert.equal(f.get('review-camera').value,'');
+  assert.match(f.get('review-page-info').textContent,/편집안/);
+  assert.equal(f.get('review-next').disabled,true);
+});
+
 test('update starts while preview stop is held and stale refresh cannot reopen editing',async()=>{
   let release;const held=new Promise(resolve=>{release=resolve;});
   const f=await updatePanel();f.evaluate('previewPlaying=true');f.host.ppro.SourceMonitor.play=()=>held;

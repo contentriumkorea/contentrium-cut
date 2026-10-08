@@ -1,5 +1,6 @@
 /* Native UXP panel; source media and provider credentials never leave this PC. */
 const uxp=require('uxp'),bundle=require('./bundle.json');
+const cutReview=require('./review.js');
 require('./sync.js').install(ContentriumHost);
 require('./selection.js').install(ContentriumHost);
 const $=id=>document.getElementById(id);
@@ -14,6 +15,7 @@ let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEdit
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
 let analysisState=null;
 let validationCount=0,heartbeatRequest=null,updateIntent=null;
+let reviewPage=0,reviewWindow=null;
 const selectedRows=[];
 function say(value){$('status').textContent=value;}
 function setConnection(ready,text){$('connection').textContent=text;$('connection-dot').className=ready?'connected':'disconnected';$('host-status').textContent=ready?'PREMIERE 로컬 연결됨':'PREMIERE 연결 대기';}
@@ -122,6 +124,9 @@ function toggle(){
   const update=state?.update,available=update?.candidate&&['AVAILABLE','CHECKING'].includes(update.checkState);
   $('update').disabled=!credentials||!!updateIntent?.inFlight||!!updateIntent?.accepted||(!updateIntent&&!available)||!!update&& !['IDLE','COMPLETE','CANCELED','FAILED_BEFORE_REPLACE','ROLLED_BACK'].includes(update.updateState);
   $('update-banner-button').disabled=$('update').disabled;
+  $('review-previous').disabled=locked||!plan||!reviewWindow?.previous;
+  $('review-next').disabled=locked||!plan||!reviewWindow?.next;
+  $('review-clear').disabled=locked||!plan;
   $('check-update').disabled=!!updateIntent||update?.checkState==='CHECKING';
   if(!['ready','installed'].includes(state?.models?.[mode==='separate'?'silero':'community-1']?.status))$('analyze').disabled=true;
 }
@@ -299,7 +304,7 @@ async function readProject({fresh=null,automatic=false}={}){
   finally{binding=false;}
 }
 function frameLabel(frame){const rate=connected?connected.snapshot.fps.num/connected.snapshot.fps.den:30,seconds=Math.max(0,Math.floor(frame/rate));return [Math.floor(seconds/3600),Math.floor(seconds/60)%60,seconds%60].map(n=>String(n).padStart(2,'0')).join(':');}
-function clearAnalysis(){if(mode==='mixed'||speakerRowsScope?.mode==='mixed'||savedSpeakerMappingScope?.mode==='mixed')clearMixedMappings();analysisJob=analysis=plan=null;analysisState=null;if(mode==='mixed'){$('speaker-mapping').innerHTML='';speakerRows.length=0;}$('cut-count').textContent=$('review-count').textContent='—';for(const id of ['timeline','segments','reviews','speaker-corrections','correction-history'])$(id).innerHTML='';$('segments').appendChild(element('p','화자를 분석하고 편집안을 만들어 주세요.','hint'));}
+function clearAnalysis(){reviewPage=0;reviewWindow=null;$('review-search').value='';options($('review-camera'),[],'모든 카메라');$('review-page-info').textContent='편집안을 만들어 주세요';if(mode==='mixed'||speakerRowsScope?.mode==='mixed'||savedSpeakerMappingScope?.mode==='mixed')clearMixedMappings();analysisJob=analysis=plan=null;analysisState=null;if(mode==='mixed'){$('speaker-mapping').innerHTML='';speakerRows.length=0;}$('cut-count').textContent=$('review-count').textContent='—';for(const id of ['timeline','segments','reviews','speaker-corrections','correction-history'])$(id).innerHTML='';$('segments').appendChild(element('p','화자를 분석하고 편집안을 만들어 주세요.','hint'));}
 function resetSequence(){connected=null;clearAnalysis();syncResult=syncJob=null;$('sync-result').textContent='';$('project-name').textContent='시퀀스를 열어 주세요';$('sequence-info').textContent='Premiere 타임라인을 자동으로 읽습니다.';$('track-count').textContent='TIMELINE';for(const id of ['microphones','cameras','calibration','speaker-mapping','sync-sources'])$(id).innerHTML='';microphoneRows.length=cameraRows.length=calibrationRows.length=speakerRows.length=syncRows.length=0;toggle();}
 async function followSequence(){
   try{
@@ -318,13 +323,24 @@ function segmentReason(segment){const codes=[...new Set([segment.reason,...(Arra
 function renderPlan(){
   const segments=plan.segments;$('cut-count').textContent=String(segments.length);$('review-count').textContent=String(plan.reviews.length);$('timeline').innerHTML='';
   const bar=element('div',undefined,'timeline');for(const segment of segments){const block=element('div');block.style.flex=String(segment.endFrame-segment.startFrame);bar.appendChild(block);}$('timeline').appendChild(bar);$('segments').innerHTML='';
-  for(const segment of segments){
-    const row=workButton('',()=>seekFrame(segment.startFrame));row.className='segment-row';
-    const camera=cameraRows.find(r=>r.id===segment.cameraId);row.appendChild(element('span',frameLabel(segment.startFrame)+'–'+frameLabel(segment.endFrame),'segment-range'));row.appendChild(element('span',camera?.title||segment.cameraId,'segment-camera'));row.appendChild(element('span',segmentReason(segment),'segment-reasons'));$('segments').appendChild(row);
-  }
+  const selected=$('review-camera').value,ids=[...new Set(segments.map(segment=>segment.cameraId))];
+  options($('review-camera'),ids.map(id=>[id,cameraRows.find(row=>row.id===id)?.title||id]),'모든 카메라');
+  if(ids.includes(selected))$('review-camera').value=selected;
+  reviewPage=0;renderReviewCuts();
   $('reviews').innerHTML='';
   for(const review of plan.reviews){const row=element('div',(review.startFrame===undefined?'전체':frameLabel(review.startFrame)+'–'+frameLabel(review.endFrame))+' · '+(review.message||review.code),'review-row');if(review.startFrame!==undefined)row.appendChild(workButton('구간 확인',()=>seekFrame(review.startFrame)));$('reviews').appendChild(row);}
   if(!plan.reviews.length)$('reviews').appendChild(element('p','확인이 필요한 사항이 없습니다.','hint'));toggle();
+}
+function renderReviewCuts(){
+  reviewWindow=cutReview.window(plan?.segments||[],{cameraId:$('review-camera').value,query:$('review-search').value,page:reviewPage},
+    segment=>(cameraRows.find(row=>row.id===segment.cameraId)?.title||segment.cameraId)+' '+segmentReason(segment)+' '+frameLabel(segment.startFrame));
+  reviewPage=reviewWindow.index;$('segments').innerHTML='';
+  for(const segment of reviewWindow.rows){
+    const row=workButton('',()=>seekFrame(segment.startFrame));row.className='segment-row';
+    const camera=cameraRows.find(r=>r.id===segment.cameraId);row.appendChild(element('span',frameLabel(segment.startFrame)+'–'+frameLabel(segment.endFrame),'segment-range'));row.appendChild(element('span',camera?.title||segment.cameraId,'segment-camera'));row.appendChild(element('span',segmentReason(segment),'segment-reasons'));$('segments').appendChild(row);
+  }
+  if(!reviewWindow.total)$('segments').appendChild(element('p',plan?'일치하는 컷이 없습니다. 검색과 카메라 필터를 확인하세요.':'편집안을 만들어 주세요.','hint'));
+  $('review-page-info').textContent=reviewWindow.total?reviewWindow.first+'–'+reviewWindow.last+' / '+reviewWindow.total+' 컷':'0 컷';toggle();
 }
 function addOverride(){if(!connected)return;const row=element('div',undefined,'override-row'),fields=element('div',undefined,'row'),first=number(connected.snapshot.range.startFrame),last=number(connected.snapshot.range.endFrame),camera=element('select');options(camera,cameraValues());fields.appendChild(label('시작',first));fields.appendChild(label('종료',last));row.appendChild(fields);row.appendChild(label('고정 카메라',camera));const remove=element('button','삭제');row.appendChild(remove);const value={first,last,camera};for(const field of [first,last,camera])field.onchange=()=>{plan=null;toggle();};overrideRows.push(value);remove.onclick=()=>{overrideRows.splice(overrideRows.indexOf(value),1);row.remove();plan=null;toggle();};$('overrides').appendChild(row);plan=null;toggle();}
 async function refresh(){
@@ -520,6 +536,10 @@ for(const id of ['range-start','range-end'])$(id).onchange=()=>{rangeDirty=true;
 for(const id of ['min-shot','short-turn','overlap','start-camera','reserve-camera'])$(id).onchange=invalidatePlan;
 for(const id of ['speaker-count','vad-threshold'])$(id).onchange=invalidateAnalysis;
 $('sync-method').onchange=syncMethodChanged;
+$('review-camera').onchange=$('review-search').oninput=()=>{reviewPage=0;renderReviewCuts();};
+$('review-previous').onclick=()=>{if(plan&&reviewWindow?.previous){reviewPage--;renderReviewCuts();}};
+$('review-next').onclick=()=>{if(plan&&reviewWindow?.next){reviewPage++;renderReviewCuts();}};
+$('review-clear').onclick=()=>{$('review-camera').value='';$('review-search').value='';reviewPage=0;renderReviewCuts();};
 $('sync-reference').onchange=()=>{syncResult=syncJob=null;scheduleSettings();toggle();};
 $('version').textContent=bundle.appVersion;
 $('header-version').textContent=bundle.appVersion;

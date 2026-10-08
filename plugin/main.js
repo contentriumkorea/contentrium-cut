@@ -15,6 +15,7 @@ let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEdit
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
 let analysisState=null;
 let planInputHash=null,planInvalidated=false;
+let overrideSerial=0;
 let validationCount=0,heartbeatRequest=null,updateIntent=null;
 let reviewPage=0,reviewWindow=null;
 let microphoneIssue='',rangeIssue='',syncIssue='',policyIssue='',syncResultInputHash=null,syncInvalidated=false;
@@ -33,6 +34,9 @@ function policyInputsChanged(){invalidatePlan();}
 const messages={SOURCE_REANALYSIS_REQUIRED:'연결된 시퀀스의 모든 원본을 확인하려면 다시 분석하세요.',APPLY_CAPACITY_EXCEEDED:'편집 기록은 최대 8,192개 작업을 지원합니다. 검토 범위를 나누거나 컷 수를 줄여 주세요.',APPLY_RECOVERY_REQUIRED:'이전 편집 기록을 확인해야 합니다. 설정에서 중단 작업을 확인하세요.',APPLY_HOST_EXIT_REQUIRED:'프로젝트를 저장하고 Premiere를 정상 종료한 뒤 다시 열어 중단 작업을 확인하세요.',CORRECTION_REVISION_CONFLICT:'화자 교정 내용이 변경됐습니다. 최신 결과를 다시 불러왔습니다.',SPEAKER_LINK_REQUIRED:'아직 연결하지 않은 목소리가 있습니다. 화자 교정에서 연결하세요.',MODEL_NOT_READY:'설정에서 필요한 로컬 분석 모델을 준비하세요.',SOURCE_CHANGED:'분석한 원본 파일이 변경됐습니다. 소스를 다시 읽어 주세요.',HOST_SUPPORT_REQUIRED:'이 Premiere 버전에서는 적용 검증이 필요합니다.',INPUT_STREAM_UNSUPPORTED:'선택한 파일이 지정한 영상·오디오 역할을 지원하지 않습니다.',AUTH_REQUIRED:'편집 연결을 복구하고 있습니다.',SESSION_EXPIRED:'편집 연결을 복구하고 있습니다.',UPDATE_IN_PROGRESS:'업데이트를 위해 편집 작업이 중단됐습니다.'};
 Object.assign(messages,{PANEL_CONTEXT_CONFLICT:'다른 CUT 패널이 이 설치를 제어하고 있습니다. 제어 중인 패널에서 계속하세요.',EDIT_INTENT_STORAGE_UNAVAILABLE:'이전 편집 기록을 읽지 못했습니다. 설정에서 중단 작업을 확인하세요. (EDIT_INTENT_STORAGE_UNAVAILABLE)',EDIT_INTENT_CORRUPT:'이전 편집 기록이 손상되었습니다. 설정에서 중단 작업을 확인하세요. (EDIT_INTENT_CORRUPT)'});
 Object.assign(messages,{
+  INVALID_OVERRIDE:'수동 고정 구간의 프레임 범위와 카메라를 확인하세요.',
+  OVERRIDE_CONFLICT:'서로 다른 카메라의 수동 고정 구간이 겹칩니다. 구간 또는 카메라를 수정하세요.',
+  OVERRIDE_COVERAGE_GAP:'고정한 카메라의 영상이 수동 구간 전체를 덮지 않습니다. 구간을 줄이거나 카메라를 바꾸세요.',
   PLAN_INPUT_CHANGED:'편집안 입력이 바뀌었거나 입력 출처를 확인할 수 없습니다. 컷 설정과 카메라 연결을 확인하고 편집안을 다시 만드세요.',
   SYNC_INPUT_CHANGED:'싱크 입력이 분석할 때와 달라졌거나 결과의 입력을 확인할 수 없습니다. 싱크를 다시 분석하세요.',
   CANCELED:'작업을 중단했습니다. 필요하면 분석을 다시 시작하세요.',
@@ -60,6 +64,7 @@ function scheduleSettings(){
 }
 function captureSettings(){
   return {schemaVersion:2,projectRef:connected.snapshot.projectRef,sequenceRef:connected.snapshot.sequenceRef,mode,policy:policy(),policyInput:{minShot:$('min-shot').value,shortTurn:$('short-turn').value,overlap:$('overlap').value},
+    overrideInput:overrideRows.map(r=>({first:r.first.value,last:r.last.value,camera:r.camera.value})),
     calibration:calibrationRows.map(r=>({key:r.instanceKey,speaker:r.speaker.value,first:r.first.value,last:r.last.value})),
     microphones:microphoneRows.map(r=>({key:r.clip.instanceKey,checked:r.check.checked,speaker:r.speaker.value,channel:r.channel.value,stream:r.stream?.value??'1'})),
     cameras:cameraRows.map(r=>({id:r.id,assets:connected.snapshot.clips.filter(c=>c.trackRef===r.id).map(c=>c.assetId).sort(),role:r.role.value,covered:r.covered.value})),
@@ -105,8 +110,9 @@ function restoreSettings(settings){
     syncMethodChanged();
   }
   overrideRows.length=0;$('overrides').innerHTML='';
-  for(const v of settings.policy.overrides||[]){if(v.startFrame>=connected.snapshot.range.startFrame&&v.endFrame<=connected.snapshot.range.endFrame&&v.endFrame>v.startFrame&&cameraValues().some(c=>c[0]===v.cameraId)){addOverride();const r=overrideRows[overrideRows.length-1];r.first.value=String(v.startFrame);r.last.value=String(v.endFrame);r.camera.value=v.cameraId;}}
-  plan=null;
+  const restoredOverrides=Array.isArray(settings.overrideInput)?settings.overrideInput:(settings.policy.overrides||[]).map(v=>({first:String(v.startFrame),last:String(v.endFrame),camera:v.cameraId}));
+  for(const v of restoredOverrides){if(v&&typeof v.first==='string'&&typeof v.last==='string'&&typeof v.camera==='string'){addOverride(true);const r=overrideRows[overrideRows.length-1];r.first.value=v.first;r.last.value=v.last;overrideCameraOptions(r.camera,cameraValues(),v.camera);}}
+  clearPolicyPlan();overrideFeedback();
 }
 async function restoreSavedSettings(optional=false){
   try{const raw=await uxp.storage.secureStorage.getItem(settingsKey()),settings=JSON.parse(typeof raw==='string'?raw:new TextDecoder().decode(raw));restoreSettings(settings);return settings;}
@@ -200,7 +206,8 @@ function toggle(){
   const guidance=actionGuidance();if($('action-readiness').textContent!==guidance)$('action-readiness').textContent=guidance;
 }
 function cameraValues(){return cameraRows.filter(r=>r.role.value!=='protected').map(r=>[r.id,r.title]);}
-function mappingInputs(){const values=cameraValues();const old=$('start-camera').value,reserve=$('reserve-camera').value;options($('start-camera'),values);options($('reserve-camera'),values,'지정 안 함');if(values.some(v=>v[0]===old))$('start-camera').value=old;if(values.some(v=>v[0]===reserve))$('reserve-camera').value=reserve;for(const row of speakerRows){const previous=row.select.value;options(row.select,values,'카메라 선택');if(values.some(v=>v[0]===previous))row.select.value=previous;}for(const row of overrideRows){const previous=row.camera.value;options(row.camera,values);if(values.some(v=>v[0]===previous))row.camera.value=previous;}invalidatePlan();}
+function overrideCameraOptions(select,values,previous){options(select,values);if(!values.some(v=>v[0]===previous)){const unavailable=element('option','사용할 수 없는 카메라 · 다시 선택하세요');unavailable.value=previous;select.appendChild(unavailable);}select.value=previous;}
+function mappingInputs(){const values=cameraValues();const old=$('start-camera').value,reserve=$('reserve-camera').value;options($('start-camera'),values);options($('reserve-camera'),values,'지정 안 함');if(values.some(v=>v[0]===old))$('start-camera').value=old;if(values.some(v=>v[0]===reserve))$('reserve-camera').value=reserve;for(const row of speakerRows){const previous=row.select.value;options(row.select,values,'카메라 선택');if(values.some(v=>v[0]===previous))row.select.value=previous;}for(const row of overrideRows)overrideCameraOptions(row.camera,values,row.camera.value);invalidatePlan();}
 function trackTitle(tag,name,count,audio=false){
   const title=element('div',undefined,'track-title');title.appendChild(element('span',tag,'track-badge'+(audio?' audio':'')));title.appendChild(element('span',name,'source-title'));if(count!==undefined)title.appendChild(element('span',count+' CLIP','track-meta'));return title;
 }
@@ -419,9 +426,33 @@ function policyFeedback(){
     input.setAttribute('aria-invalid',text?'true':'false');input.setAttribute('aria-describedby',id+'-error');
     const hint=$(id+'-error');if(hint.textContent!==text)hint.textContent=text;hint.className='hint input-error'+(text?'':' hidden');if(text&&!first)first=text;
   }
-  return first;
+  const manual=overrideFeedback();return first||manual;
 }
 function requirePolicy(){const issue=policyFeedback();if(issue){clearPolicyPlan();throw new Error(issue);}}
+function overrideFeedback(){
+  const bounds=connected?.snapshot.range,available=new Set(cameraValues().map(v=>v[0]));
+  const checks=overrideRows.map((row,index)=>{
+    const first=Number(row.first.value),last=Number(row.last.value),invalidFirst=!!bounds&&(!row.first.value.trim()||!Number.isSafeInteger(first)||first<bounds.startFrame||first>=bounds.endFrame),
+      invalidLast=!!bounds&&(!row.last.value.trim()||!Number.isSafeInteger(last)||last<=bounds.startFrame||last>bounds.endFrame||!invalidFirst&&last<=first),invalidCamera=!!bounds&&!available.has(row.camera.value);
+    const message=invalidFirst?'시작 프레임':invalidLast?'종료 프레임':invalidCamera?'카메라':'';
+    return {row,index,first,last,invalidFirst,invalidLast,invalidCamera,text:message?'수동 구간 '+(index+1)+' · '+message+(message==='카메라'?'를 다시 선택하세요.':'은 '+bounds.startFrame+'–'+bounds.endFrame+' 사이의 정수이며 종료가 시작보다 커야 합니다.'):''};
+  });
+  const valid=checks.filter(c=>!c.text).sort((a,b)=>a.first-b.first||a.last-b.last);let longest=null;
+  if(bounds)for(const current of valid){
+    if(longest&&current.first<longest.last&&current.row.camera.value!==longest.row.camera.value){
+      const text='수동 구간 '+(longest.index+1)+'와 '+(current.index+1)+'에 서로 다른 카메라가 겹칩니다. 구간 또는 카메라를 수정하세요.';
+      longest.text=current.text=text;longest.invalidCamera=current.invalidCamera=true;break;
+    }
+    if(!longest||current.last>longest.last)longest=current;
+  }
+  let first='';for(const c of checks){
+    const title='수동 구간 '+(c.index+1);if(c.row.title.textContent!==title)c.row.title.textContent=title;
+    if(c.row.error.textContent!==c.text)c.row.error.textContent=c.text;c.row.error.className='hint input-error'+(c.text?'':' hidden');
+    for(const [field,invalid] of [[c.row.first,c.invalidFirst],[c.row.last,c.invalidLast],[c.row.camera,c.invalidCamera]])field.setAttribute('aria-invalid',invalid?'true':'false');
+    if(c.text&&!first)first=c.text;
+  }
+  return first;
+}
 function policy(){return {minShot:Number($('min-shot').value),shortTurn:Number($('short-turn').value),suppressShort:true,overlap:Number($('overlap').value),overrides:overrideRows.map(r=>({startFrame:Number(r.first.value),endFrame:Number(r.last.value),cameraId:r.camera.value}))};}
 function planInputs(){return {snapshotHash:connected.snapshot.snapshotHash,analysisId:analysisState.analysisId,analysisRevision:analysisState.revision,jobId:analysisJob,mapping:mapping(),policy:policy(),epoch:state.epoch};}
 function planInputsHash(){try{return connected&&analysisState&&analysisJob?ContentriumHost.hash(planInputs()):null;}catch(_){return null;}}
@@ -497,7 +528,15 @@ function renderReviewCuts(){
   if(!reviewWindow.total)$('segments').appendChild(element('p',plan?'일치하는 컷이 없습니다. 검색과 카메라 필터를 확인하세요.':'편집안을 만들어 주세요.','hint'));
   $('review-page-info').textContent=reviewWindow.total?reviewWindow.first+'–'+reviewWindow.last+' / '+reviewWindow.total+' 컷':'0 컷';toggle();
 }
-function addOverride(){if(!connected)return;const row=element('div',undefined,'override-row'),fields=element('div',undefined,'row'),first=number(connected.snapshot.range.startFrame),last=number(connected.snapshot.range.endFrame),camera=element('select');options(camera,cameraValues());fields.appendChild(label('시작',first));fields.appendChild(label('종료',last));row.appendChild(fields);row.appendChild(label('고정 카메라',camera));const remove=element('button','삭제');row.appendChild(remove);const value={first,last,camera};for(const field of [first,last,camera])field.oninput=field.onchange=invalidatePlan;overrideRows.push(value);remove.onclick=()=>{overrideRows.splice(overrideRows.indexOf(value),1);row.remove();invalidatePlan();};$('overrides').appendChild(row);invalidatePlan();}
+function addOverride(defer=false){
+  if(!connected)return;const row=element('div',undefined,'override-row'),fields=element('div',undefined,'row'),first=number(connected.snapshot.range.startFrame),last=number(connected.snapshot.range.endFrame),camera=element('select');
+  const title=element('b','수동 구간 '+(overrideRows.length+1)),error=element('p','', 'hint input-error hidden'),errorId='override-error-'+(++overrideSerial);
+  error.setAttribute('id',errorId);error.setAttribute('role','status');error.setAttribute('aria-live','polite');row.appendChild(title);
+  options(camera,cameraValues());for(const field of [first,last]){field.setAttribute('min',String(connected.snapshot.range.startFrame));field.setAttribute('max',String(connected.snapshot.range.endFrame));field.setAttribute('step','1');}
+  fields.appendChild(label('시작 · 프레임',first));fields.appendChild(label('종료 · 프레임',last));row.appendChild(fields);row.appendChild(label('고정 카메라',camera));row.appendChild(error);
+  const remove=element('button','삭제');row.appendChild(remove);const value={first,last,camera,error,title};for(const field of [first,last,camera]){field.setAttribute('aria-describedby',errorId);field.oninput=field.onchange=invalidatePlan;}
+  overrideRows.push(value);remove.onclick=()=>{overrideRows.splice(overrideRows.indexOf(value),1);row.remove();invalidatePlan();};$('overrides').appendChild(row);if(!defer)invalidatePlan();
+}
 function updateGuidance(update){
   const phase=update.updateState,code=update.error?.code;
   const suffix=typeof code==='string'&&/^[A-Z][A-Z0-9_]{0,63}$/.test(code)?' ('+code+')':'';

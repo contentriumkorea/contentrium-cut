@@ -80,6 +80,77 @@ function syncRow(f,index=0){return f.evaluate('syncRows['+index+']');}
 async function analyzedPanel(extra={}){const f=await panel(extra);await f.click('analyze');await f.tick();return f;}
 async function overridePanel(extra={}){const f=await analyzedPanel(extra);await f.click('add-override');return f;}
 function overrideRow(f,index=0){return f.evaluate('overrideRows['+index+']');}
+function manualToggle(f){return f.nodes.find(n=>n.attrs['data-disclosure']==='disclosure-6');}
+function manualVisible(f,index){return !f.get('overrides').children[index].className.split(/\s+/).includes('hidden');}
+
+test('collapsed manual summary identifies restored invalid rows without forcing disclosure open',async()=>{
+  const f=await analyzedPanel(),settings=JSON.parse(f.evaluate('JSON.stringify(captureSettings())'));
+  settings.overrideInput=Array.from({length:7},(_,i)=>({first:i===6?'':'0',last:'300',camera:'video:0'}));f.evaluate('restoreSettings('+JSON.stringify(settings)+');toggle()');
+  assert.ok(f.get('override-summary'),'collapsed status exists');assert.match(f.get('override-summary').textContent,/7.*1/);assert.equal(manualToggle(f).getAttribute('aria-expanded'),'false');assert.match(f.get('disclosure-6').className,/hidden/);
+  assert.equal(f.get('override-filter').disabled,false);assert.equal(f.get('plan').disabled,true);
+});
+
+test('manual error-only display opens the section preserves row identities and keeps all policy and settings',async()=>{
+  const f=await overridePanel();await f.click('add-override');await f.click('add-override');overrideRow(f,1).first.value='';overrideRow(f,2).last.value='';overrideRow(f,2).last.oninput();
+  const before=f.evaluate('JSON.stringify(captureSettings())'),id=overrideRow(f,2).error.getAttribute('id');await f.click('override-filter');
+  assert.equal(manualToggle(f).getAttribute('aria-expanded'),'true');assert.doesNotMatch(f.get('disclosure-6').className,/hidden/);assert.equal(manualVisible(f,0),false);assert.equal(manualVisible(f,1),true);assert.equal(manualVisible(f,2),true);assert.match(overrideRow(f,2).title.textContent,/3/);assert.equal(overrideRow(f,2).error.getAttribute('id'),id);
+  assert.match(f.get('override-summary').textContent,/오류 확인 중/);assert.equal(f.evaluate('JSON.stringify(captureSettings())'),before);assert.equal(f.evaluate('policy().overrides.length'),3);assert.equal(f.evaluate('analysisState!==null'),true);
+  await f.click('override-filter');assert.equal(manualVisible(f,0),true);assert.equal(manualToggle(f).getAttribute('aria-expanded'),'true');
+});
+
+test('correcting manual errors recomputes visible rows and returns to full display once resolved',async()=>{
+  const f=await overridePanel();await f.click('add-override');overrideRow(f).first.value='';overrideRow(f,1).last.value='';overrideRow(f,1).last.oninput();await f.click('override-filter');
+  overrideRow(f).first.value='0';overrideRow(f).first.oninput();assert.equal(manualVisible(f,0),true);assert.equal(manualVisible(f,1),true);assert.match(f.get('override-summary').textContent,/2.*1/);
+  overrideRow(f,1).last.value='300';overrideRow(f,1).last.oninput();assert.equal(manualVisible(f,0),true);assert.equal(manualVisible(f,1),true);assert.doesNotMatch(f.get('override-summary').textContent,/오류 확인 중/);assert.match(f.get('override-filter').className,/hidden/);assert.equal(f.get('plan').disabled,false);
+});
+
+test('conflicting camera rows remain visible with original numbers and deletion updates summary',async()=>{
+  const f=await overridePanel({native:twoCameraNative()});await f.click('add-override');await f.click('add-override');overrideRow(f,1).camera.value='video:1';overrideRow(f,1).camera.onchange();await f.click('override-filter');
+  assert.equal(manualVisible(f,0),true);assert.equal(manualVisible(f,1),true);assert.equal(manualVisible(f,2),false);assert.match(f.get('override-summary').textContent,/3.*2/);
+  f.get('overrides').children[1].children.find(n=>n.tag==='button').onclick();assert.equal(f.evaluate('overrideRows.length'),2);assert.equal(manualVisible(f,0),true);assert.equal(manualVisible(f,1),true);assert.match(overrideRow(f,1).title.textContent,/2/);assert.match(f.get('override-summary').textContent,/2/);
+});
+
+test('adding and restoring manual rows leave error-only display so valid new rows are visible',async()=>{
+  const f=await overridePanel();overrideRow(f).first.value='';overrideRow(f).first.oninput();await f.click('override-filter');await f.click('add-override');assert.equal(manualVisible(f,1),true);assert.doesNotMatch(f.get('override-summary').textContent,/오류 확인 중/);
+  await f.click('override-filter');const settings=JSON.parse(f.evaluate('JSON.stringify(captureSettings())'));f.evaluate('restoreSettings('+JSON.stringify(settings)+');toggle()');assert.equal(manualVisible(f,1),true);assert.doesNotMatch(f.get('override-summary').textContent,/오류 확인 중/);
+});
+
+test('manual summary remains stable while polling and respects explicit user collapse',async()=>{
+  const f=await overridePanel();overrideRow(f).first.value='';overrideRow(f).first.oninput();await f.click('override-filter');await manualToggle(f).onclick();let text=f.get('override-summary').textContent,writes=0;
+  Object.defineProperty(f.get('override-summary'),'textContent',{get:()=>text,set:v=>{text=v;writes++;}});await f.tick();await f.tick();assert.equal(writes,0);assert.equal(manualToggle(f).getAttribute('aria-expanded'),'false');assert.match(f.get('disclosure-6').className,/hidden/);
+});
+
+test('manual error display is locked during update and cannot delay immediate update admission',async()=>{
+  const f=await updatePanel();await f.click('add-override');overrideRow(f).first.value='';overrideRow(f).first.oninput();await f.click('update');assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.ok(f.get('override-filter'),'error control exists');assert.equal(f.get('override-filter').disabled,true);
+  await f.click('override-filter');assert.equal(manualToggle(f).getAttribute('aria-expanded'),'false');assert.match(f.get('action-readiness').textContent,/업데이트/);
+});
+
+test('protected cameras update the error-only view without replacing the stored camera',async()=>{
+  const f=await overridePanel({native:twoCameraNative()});await f.click('add-override');overrideRow(f,1).camera.value='video:1';overrideRow(f,1).first.value='';overrideRow(f,1).first.oninput();await f.click('override-filter');
+  f.evaluate("cameraRows[0].role.value='protected';cameraRows[0].role.onchange()");assert.equal(manualVisible(f,0),true);assert.equal(manualVisible(f,1),true);assert.equal(overrideRow(f).camera.value,'video:0');assert.match(f.get('override-summary').textContent,/2.*2/);
+});
+
+test('manual error display locks for validation and recovery without changing collapse choice',async()=>{
+  for(const kind of ['validation','recovery']){const f=await overridePanel();overrideRow(f).first.value='';overrideRow(f).first.oninput();if(kind==='validation')f.validation(1);else {f.state.applyRecovery.blocked=true;await f.tick();}
+    assert.equal(f.get('override-filter').disabled,true);await f.click('override-filter');assert.equal(manualToggle(f).getAttribute('aria-expanded'),'false');assert.match(f.get('action-readiness').textContent,kind==='validation'?/원본/:/중단 작업/);}
+});
+
+test('switching sequences clears temporary manual error display and old rows',async()=>{
+  const f=await overridePanel();overrideRow(f).first.value='';overrideRow(f).first.oninput();await f.click('override-filter');f.native=nativeSnapshot('sequence-2');await f.click('read-project');
+  assert.equal(f.evaluate('overrideRows.length'),0);assert.match(f.get('override-summary').className,/hidden/);assert.match(f.get('override-filter').className,/hidden/);await f.click('add-override');assert.equal(manualVisible(f,0),true);assert.doesNotMatch(f.get('override-summary').textContent,/오류 확인 중/);
+});
+
+test('manual error display keeps a correcting row visible throughout multi-digit input',async()=>{
+  const f=await overridePanel();await f.click('add-override');overrideRow(f).first.value='';overrideRow(f,1).first.value='';overrideRow(f,1).first.oninput();await f.click('override-filter');
+  for(const value of ['1','12','120']){overrideRow(f).first.value=value;overrideRow(f).first.oninput();assert.equal(manualVisible(f,0),true,'editing row remains visible at '+value);assert.equal(manualVisible(f,1),true);}
+  assert.equal(overrideRow(f).first.value,'120');assert.match(f.get('override-summary').textContent,/2.*1/);await f.click('save-settings');assert.equal(JSON.parse([...f.saved.rows.values()].find(v=>v.includes('overrideInput'))).overrideInput[0].first,'120');
+});
+
+test('explicit full manual display reopens a collapsed section while polling never does',async()=>{
+  const f=await overridePanel();await f.click('add-override');overrideRow(f,1).first.value='';overrideRow(f,1).first.oninput();await f.click('override-filter');await manualToggle(f).onclick();await f.tick();assert.equal(manualToggle(f).getAttribute('aria-expanded'),'false');
+  await f.click('override-filter');assert.equal(manualToggle(f).getAttribute('aria-expanded'),'true');assert.doesNotMatch(f.get('disclosure-6').className,/hidden/);assert.equal(manualVisible(f,0),true);assert.equal(manualVisible(f,1),true);
+});
+
 test('manual frame errors identify the row and field and block only plan and apply',async()=>{
   for(const [field,value] of [['first',''],['first',' '],['first','-1'],['first','0.5'],['first','bad'],['first','1e309'],['first','9007199254740992'],['first','300'],['last','0'],['last','301'],['last','']]){
     const f=await overridePanel(),row=overrideRow(f);row[field].value=value;row[field].oninput();await f.click('plan');assert.equal(f.calls.some(c=>c.path==='/plan'),false,field+value);

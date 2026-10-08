@@ -15,7 +15,7 @@ let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEdit
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
 let analysisState=null;
 let planInputHash=null,planInvalidated=false;
-let overrideSerial=0;
+let overrideSerial=0,overrideErrorsOnly=false,overrideVisibleRows=new Set();
 let validationCount=0,heartbeatRequest=null,updateIntent=null;
 let reviewPage=0,reviewWindow=null;
 let microphoneIssue='',rangeIssue='',syncIssue='',policyIssue='',syncResultInputHash=null,syncInvalidated=false;
@@ -109,7 +109,7 @@ function restoreSettings(settings){
     for(const r of syncRows){const input=settings.syncInput?.find(v=>v.assetId===r.source.assetId);if(input&&typeof input.stream==='string'&&typeof input.channel==='string'){r.stream.value=input.stream;r.channel.value=input.channel;}}
     syncMethodChanged();
   }
-  overrideRows.length=0;$('overrides').innerHTML='';
+  overrideRows.length=0;overrideErrorsOnly=false;overrideVisibleRows.clear();$('overrides').innerHTML='';
   const restoredOverrides=Array.isArray(settings.overrideInput)?settings.overrideInput:(settings.policy.overrides||[]).map(v=>({first:String(v.startFrame),last:String(v.endFrame),camera:v.cameraId}));
   for(const v of restoredOverrides){if(v&&typeof v.first==='string'&&typeof v.last==='string'&&typeof v.camera==='string'){addOverride(true);const r=overrideRows[overrideRows.length-1];r.first.value=v.first;r.last.value=v.last;overrideCameraOptions(r.camera,cameraValues(),v.camera);}}
   clearPolicyPlan();overrideFeedback();
@@ -185,6 +185,7 @@ function toggle(){
   for(const id of ['analyze','sync','plan','apply-sync','apply','save-settings','load-settings'])$(id).disabled=locked||!connected||(id==='plan'&&!analysisState)||(id==='apply'&&!plan)||(id==='apply-sync'&&!syncResult);
   for(const id of ['read-project','read-selection','install-model','save-resources','prune-cache'])$(id).disabled=locked;
   for(const el of document.querySelectorAll('[data-work]'))el.disabled=locked;
+  $('override-filter').disabled=locked||!overrideRows.some(r=>r.error.textContent);
   $('create-input').disabled=locked||!projectSelection||!inputCapability;$('cancel').disabled=!job&&!applying&&!previewPlaying&&!validationCount;
   $('undo-correction').disabled=locked||!analysisState||activeCorrections().length===0;
   $('recover-apply').disabled=busy||!credentials||!(localEditPending||state?.applyRecovery?.blocked);
@@ -445,12 +446,21 @@ function overrideFeedback(){
     }
     if(!longest||current.last>longest.last)longest=current;
   }
+  const count=checks.filter(c=>c.text).length;if(!count){overrideErrorsOnly=false;overrideVisibleRows.clear();}
   let first='';for(const c of checks){
     const title='수동 구간 '+(c.index+1);if(c.row.title.textContent!==title)c.row.title.textContent=title;
     if(c.row.error.textContent!==c.text)c.row.error.textContent=c.text;c.row.error.className='hint input-error'+(c.text?'':' hidden');
     for(const [field,invalid] of [[c.row.first,c.invalidFirst],[c.row.last,c.invalidLast],[c.row.camera,c.invalidCamera]])field.setAttribute('aria-invalid',invalid?'true':'false');
+    if(overrideErrorsOnly&&c.text)overrideVisibleRows.add(c.row);
+    c.row.row.className='override-row'+(overrideErrorsOnly&&!overrideVisibleRows.has(c.row)?' hidden':'');
     if(c.text&&!first)first=c.text;
   }
+  const summary=checks.length?'수동 구간 '+checks.length+'개'+(count?' · 확인 필요 '+count+'개':' · 입력 형식 확인 완료')+(overrideErrorsOnly?' · 오류 확인 중':''):'';
+  if($('override-summary').textContent!==summary)$('override-summary').textContent=summary;
+  $('override-summary').className='hint'+(count?' input-error':'')+(checks.length?'':' hidden');
+  const caption=overrideErrorsOnly?'전체 '+checks.length+'개 보기':'오류 구간만 보기';
+  if($('override-filter').textContent!==caption)$('override-filter').textContent=caption;
+  $('override-filter').className='full'+(count?'':' hidden');
   return first;
 }
 function policy(){return {minShot:Number($('min-shot').value),shortTurn:Number($('short-turn').value),suppressShort:true,overlap:Number($('overlap').value),overrides:overrideRows.map(r=>({startFrame:Number(r.first.value),endFrame:Number(r.last.value),cameraId:r.camera.value}))};}
@@ -482,7 +492,7 @@ async function readProject({fresh=null,automatic=false}={}){
     $('sequence-info').textContent=frameLabel(s.range.endFrame)+' · '+(s.fps.num/s.fps.den).toFixed(3)+' fps ('+s.fps.num+'/'+s.fps.den+')';
     $('track-count').textContent=s.tracks.filter(t=>t.mediaType==='video').length+' V / '+s.tracks.filter(t=>t.mediaType==='audio').length+' A';
     $('range-start').value=String(start);$('range-end').value=String(end);
-    clearAnalysis();clearSyncResult();savedSpeakerMappings={};overrideRows.length=0;$('overrides').innerHTML='';
+    clearAnalysis();clearSyncResult();savedSpeakerMappings={};overrideRows.length=0;overrideErrorsOnly=false;overrideVisibleRows.clear();$('overrides').innerHTML='';
     renderSources();if(same&&settings)restoreSettings(settings);else await restoreSavedSettings(true);
     toggle();say('트랙을 확인하고 분석할 마이크와 카메라를 지정하세요.');
   }catch(e){if(e.code==='RANGE_INPUT_INVALID')preserveSettings=true;else resetSequence();throw e;}
@@ -529,13 +539,14 @@ function renderReviewCuts(){
   $('review-page-info').textContent=reviewWindow.total?reviewWindow.first+'–'+reviewWindow.last+' / '+reviewWindow.total+' 컷':'0 컷';toggle();
 }
 function addOverride(defer=false){
+  if(!defer){overrideErrorsOnly=false;overrideVisibleRows.clear();}
   if(!connected)return;const row=element('div',undefined,'override-row'),fields=element('div',undefined,'row'),first=number(connected.snapshot.range.startFrame),last=number(connected.snapshot.range.endFrame),camera=element('select');
   const title=element('b','수동 구간 '+(overrideRows.length+1)),error=element('p','', 'hint input-error hidden'),errorId='override-error-'+(++overrideSerial);
   error.setAttribute('id',errorId);error.setAttribute('role','status');error.setAttribute('aria-live','polite');row.appendChild(title);
   options(camera,cameraValues());for(const field of [first,last]){field.setAttribute('min',String(connected.snapshot.range.startFrame));field.setAttribute('max',String(connected.snapshot.range.endFrame));field.setAttribute('step','1');}
   fields.appendChild(label('시작 · 프레임',first));fields.appendChild(label('종료 · 프레임',last));row.appendChild(fields);row.appendChild(label('고정 카메라',camera));row.appendChild(error);
-  const remove=element('button','삭제');row.appendChild(remove);const value={first,last,camera,error,title};for(const field of [first,last,camera]){field.setAttribute('aria-describedby',errorId);field.oninput=field.onchange=invalidatePlan;}
-  overrideRows.push(value);remove.onclick=()=>{overrideRows.splice(overrideRows.indexOf(value),1);row.remove();invalidatePlan();};$('overrides').appendChild(row);if(!defer)invalidatePlan();
+  const remove=element('button','삭제');row.appendChild(remove);const value={first,last,camera,error,title,row};for(const field of [first,last,camera]){field.setAttribute('aria-describedby',errorId);field.oninput=field.onchange=invalidatePlan;}
+  overrideRows.push(value);remove.onclick=()=>{overrideRows.splice(overrideRows.indexOf(value),1);overrideVisibleRows.delete(value);row.remove();invalidatePlan();};$('overrides').appendChild(row);if(!defer)invalidatePlan();
 }
 function updateGuidance(update){
   const phase=update.updateState,code=update.error?.code;
@@ -720,6 +731,7 @@ handler('create-input',async()=>{
 handler('save-settings',async()=>{admitted();await uxp.storage.secureStorage.setItem(settingsKey(),JSON.stringify(captureSettings()));say('현재 시퀀스의 설정을 저장했습니다.');});
 handler('load-settings',async()=>{admitted();await stopPreview();if(settingsTimer){clearTimeout(settingsTimer);settingsTimer=null;}let settings;binding=true;try{settings=await restoreSavedSettings();clearAnalysis();renderSpeakers(mode==='mixed'?[]:[...new Set(microphoneRows.filter(r=>r.check.checked).map(r=>r.speaker.value))]);}finally{binding=false;}const restored=await restoreSavedAnalysis(settings);say(restored?'저장한 분석과 화자 교정을 불러왔습니다. 편집안을 다시 만들어 주세요.':'저장한 설정을 불러왔습니다. 음성 입력을 다시 분석하세요.');});
 handler('add-override',()=>{addOverride();scheduleSettings();});
+$('override-filter').onclick=()=>{if($('override-filter').disabled||!overrideRows.some(r=>r.error.textContent))return;overrideErrorsOnly=!overrideErrorsOnly;overrideVisibleRows.clear();view.show('cut');view.openDisclosure('disclosure-6');overrideFeedback();};
 handler('undo-correction',()=>correct({type:'undo'}));
 handler('cancel',async()=>{
   if(job?.kind==='model-setup')modelInstallResult('canceling');

@@ -19,3 +19,5 @@ body{padding:6px}.studio-shell{padding:0 10px;border-radius:9px}.studio-header{h
 .segment-row>span.segment-timing{flex-basis:100%;margin:3px 0 0;text-align:left;color:#b7c4ce;font-size:12px;word-break:break-word;font-family:Consolas,"Segoe UI",sans-serif}
 #action-readiness{margin:8px 0 0;padding:7px 9px;background:#202428;border:1px solid #343b41;border-radius:5px;color:#c1ccd4;font-size:12px;line-height:1.6;max-height:72px;overflow-y:auto;word-break:break-word}
 .input-error{border-left:2px solid #87949f;padding-left:8px;color:#d0d8de;font-weight:500}
+
+.cut-duration-row{align-items:flex-start}.cut-duration-row .input-error{display:block}.cut-duration-row .input-error.hidden{display:none}

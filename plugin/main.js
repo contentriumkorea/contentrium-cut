@@ -11,6 +11,7 @@ const workflow=require('./workflow.js').create({api:(...args)=>api(...args),stor
   stopped:()=>stopped,onBatch:value=>{batchRunning=value;},onResult:()=>say('결과 시퀀스에 편집을 적용하고 있습니다.')});
 let credentials=null,state=null,connected=null,mode='separate',job=null,analysisJob=null,analysis=null,plan=null,syncResult=null,syncJob=null,planCameraRefs=[],applying=false,batchRunning=false,stopped=false,applyId=null,polling=false,pending=false;
 const microphoneRows=[],cameraRows=[],speakerRows=[],calibrationRows=[],overrideRows=[],syncRows=[];
+let microphoneSelectionCustomized=false;
 let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
 let analysisState=null;
@@ -76,7 +77,7 @@ function captureSettings(){
 function restoreSettings(settings){
   if(settings.schemaVersion!==2||settings.projectRef!==connected.snapshot.projectRef||settings.sequenceRef!==connected.snapshot.sequenceRef)throw new Error('현재 시퀀스의 설정이 아닙니다.');
   if(mode!==settings.mode){mode=settings.mode;for(const value of ['separate','mixed'])$('mode-'+value).className='mode'+(mode===value?' active':'');renderSources();}
-  for(const r of microphoneRows){const v=settings.microphones.find(v=>v.key===r.clip.instanceKey);if(v){r.check.checked=v.checked;r.speaker.value=v.speaker;r.channel.value=v.channel;if(r.stream)r.stream.value=v.stream;}}
+  for(const r of microphoneRows){const v=settings.microphones.find(v=>v.key===r.clip.instanceKey);if(v){r.check.checked=v.checked;if(typeof v.checked==='boolean')microphoneSelectionCustomized=true;r.speaker.value=v.speaker;r.channel.value=v.channel;if(r.stream)r.stream.value=v.stream;}}
   const mappingScope=currentSpeakerMappingScope(),restoreMappings=sameSpeakerMappingScope(settings.speakerMappingScope,mappingScope);
   for(const r of cameraRows){const assets=connected.snapshot.clips.filter(c=>c.trackRef===r.id).map(c=>c.assetId).sort();const v=settings.cameras.find(v=>v.id===r.id&&ContentriumHost.hash(v.assets)===ContentriumHost.hash(assets));if(v){r.role.value=v.role;r.covered.value=mode==='mixed'&&!restoreMappings?'':v.covered;}}
   for(const r of calibrationRows){const v=settings.calibration?.find(v=>v.key===r.instanceKey);if(v){r.first.value=v.first;r.last.value=v.last;}}
@@ -183,6 +184,7 @@ function toggle(){
   if(plan&&!planMatches()){clearPolicyPlan();planInvalidated=true;}
   const busy=pending||applying||!!job||validationCount>0,locked=workLocked();
   for(const el of document.querySelectorAll('input,select,button.mode'))el.disabled=inputLocked();
+  for(const value of ['separate','mixed'])$('mode-'+value).disabled=locked;
   $('speaker-count').disabled=workLocked()||mode!=='mixed';$('vad-threshold').disabled=workLocked()||mode!=='separate';
   for(const row of calibrationRows)for(const field of [row.first,row.last])field.disabled=workLocked()||!calibrationActive(row);
   for(const id of ['analyze','sync','plan','apply-sync','apply','save-settings','load-settings'])$(id).disabled=locked||!connected||(id==='plan'&&!analysisState)||(id==='apply'&&!plan)||(id==='apply-sync'&&!syncResult);
@@ -297,7 +299,7 @@ function microphoneFeedback(){
 }
 function renderSources(){
   for(const id of ['microphones','cameras','calibration','speaker-mapping','sync-sources'])$(id).innerHTML='';
-  microphoneRows.length=cameraRows.length=calibrationRows.length=speakerRows.length=syncRows.length=0;
+  microphoneRows.length=cameraRows.length=calibrationRows.length=speakerRows.length=syncRows.length=0;microphoneSelectionCustomized=false;
   const s=connected.snapshot,assets=new Map(s.sources.map(a=>[a.assetId,a]));
   const audioTracks=s.tracks.filter(t=>t.mediaType==='audio'&&s.clips.some(c=>c.trackRef===t.trackRef));
   for(const clip of s.clips.filter(c=>c.mediaType==='audio')){
@@ -310,8 +312,8 @@ function renderSources(){
     fields.appendChild(label('화자 ID',speaker));fields.appendChild(label('채널',channel));row.appendChild(fields);row.appendChild(label('오디오 스트림',stream));
     const issue=element('p','','hint input-error hidden');issue.id='microphone-error-'+microphoneRows.length;issue.setAttribute('role','status');issue.setAttribute('aria-live','polite');row.appendChild(issue);
     for(const field of [speaker,channel,stream])field.setAttribute('aria-describedby',issue.id);
-    $('microphones').appendChild(row);microphoneRows.push({clip,check,speaker,channel,stream,issue,title:'A'+(track.index+1)+' · '+track.name});
-    for(const field of [check,speaker,channel,stream])field.onchange=()=>{invalidateAnalysis();renderSpeakers(mode==='mixed'?[]:[...new Set(microphoneRows.filter(r=>r.check.checked).map(r=>r.speaker.value.trim()))]);};
+    $('microphones').appendChild(row);microphoneRows.push({clip,check,speaker,channel,stream,issue,defaultChecked:{separate:order<2,mixed:order<1},title:'A'+(track.index+1)+' · '+track.name});
+    for(const field of [check,speaker,channel,stream])field.onchange=()=>{if(field===check)microphoneSelectionCustomized=true;invalidateAnalysis();renderSpeakers(mode==='mixed'?[]:[...new Set(microphoneRows.filter(r=>r.check.checked).map(r=>r.speaker.value.trim()))]);};
     for(const field of [speaker,channel,stream])field.oninput=field.onchange;
     const calibration=element('div',undefined,'source-row'),bounds=element('div',undefined,'row'),first=number(0),last=number(0);
     calibration.appendChild(element('div','A'+(track.index+1)+' · '+basename(assets.get(clip.assetId).canonicalPath),'source-title'));
@@ -832,7 +834,16 @@ handler('prune-cache',async()=>{const value=await api('/resources/prune',{epoch:
 handler('release-cache',async()=>{await api('/resources/prune',{epoch:state.epoch,action:'release'});await refresh();say('정리를 종료했습니다. 편집을 계속할 수 있습니다.');});
 const showSettings=$('open-settings').onclick;
 $('open-settings').onclick=()=>{showSettings();if(credentials&&!resourceLoaded)loadResources().catch(error);};
-for(const value of ['separate','mixed'])handler('mode-'+value,async()=>{const calibrationInput=new Map(calibrationRows.map(r=>[r.instanceKey,{first:r.first.value,last:r.last.value}]));mode=value;for(const other of ['separate','mixed'])$('mode-'+other).className='mode'+(mode===other?' active':'');clearAnalysis();if(connected){renderSources();for(const row of calibrationRows){const raw=calibrationInput.get(row.instanceKey);if(raw){row.first.value=raw.first;row.last.value=raw.last;}}}scheduleSettings();await refresh();});
+function changeRecordingMode(value){
+  if(workLocked()||mode===value)return;
+  const defaults=!microphoneSelectionCustomized&&microphoneRows.every(r=>r.check.checked===r.defaultChecked[mode]);
+  mode=value;for(const other of ['separate','mixed'])$('mode-'+other).className='mode'+(mode===other?' active':'');
+  clearAnalysis();clearMixedMappings();
+  if(defaults)for(const row of microphoneRows)row.check.checked=row.defaultChecked[mode];else if(microphoneRows.length)microphoneSelectionCustomized=true;
+  if(connected){renderSpeakers(mode==='mixed'?[]:[...new Set(microphoneRows.filter(r=>r.check.checked).map(r=>r.speaker.value.trim()))]);mappingInputs();}
+  scheduleSettings();toggle();say('녹음 방식을 변경했습니다. 트랙 설정을 확인하고 새로 분석하세요.');return true;
+}
+for(const value of ['separate','mixed'])$('mode-'+value).onclick=async()=>{let changing=false;try{if(!changeRecordingMode(value))return;changing=pending=true;toggle();await refresh();}catch(e){error(e);toggle();}finally{if(changing){pending=false;toggle();}}};
 for(const id of ['range-start','range-end'])$(id).oninput=$(id).onchange=()=>{rangeDirty=true;invalidateAnalysis();say(rangeIssue||'분석할 범위를 변경했습니다. 다음 분석에 적용됩니다.');};
 for(const id of ['min-shot','short-turn','overlap'])$(id).oninput=$(id).onchange=policyInputsChanged;
 for(const id of ['start-camera','reserve-camera'])$(id).onchange=invalidatePlan;

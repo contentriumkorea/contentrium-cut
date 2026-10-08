@@ -1,0 +1,46 @@
+{
+  "releaseId": 407098111,
+  "releaseTitle": "Contentrium CUT",
+  "tag": "v0.1.14",
+  "targetCommit": "5f184cbcf02e920ac5f7bb6a3364952a35cfc98e",
+  "publishedAt": "2026-10-08T17:34:45Z",
+  "url": "https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.14",
+  "currentVersion": "0.1.14",
+  "anonymousCheckState": "CURRENT",
+  "updateCandidate": null,
+  "signatureVerified": true,
+  "publishedAssetsMatchLocal": true,
+  "assets": [
+    {
+      "name": "Contentrium-CUT-Setup.exe",
+      "assetId": 622523555,
+      "size": 93423092,
+      "sha256": "a96f217a799358a806d6e689c9f0aa971eb32692a1fdc641e3ec240af0538e18"
+    },
+    {
+      "name": "Contentrium-CUT-Windows-x64.zip",
+      "assetId": 622523554,
+      "size": 332264802,
+      "sha256": "1cb42785bbda96ae1980f2dfcd94c3b6fb54daaef00fe5310bc915e4c90a3e8f"
+    },
+    {
+      "name": "Contentrium-CUT.ccx",
+      "assetId": 622523556,
+      "size": 62091,
+      "sha256": "462941a44a0449c7706091d26e9fefa20ea6b18f53fe9d26438865406de2ab40"
+    },
+    {
+      "name": "update-manifest.json",
+      "assetId": 622524790,
+      "size": 2267,
+      "sha256": "8bb410e977f24b06d818b1d686b91a369c6aaf266a958ed6643c23d691b79ce0"
+    },
+    {
+      "name": "update-manifest.sig",
+      "assetId": 622524792,
+      "size": 165,
+      "sha256": "d217ef573235d1a7632f56380a56d5bcd755ba78fe9a735d77d86b151fad4bd3"
+    }
+  ],
+  "liveInstallationChanged": false
+}

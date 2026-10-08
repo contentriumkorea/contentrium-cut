@@ -173,6 +173,8 @@ function actionGuidance(){
   if(step==='review')return plan?'전체 편집안을 검토한 뒤 Premiere에 적용하세요.':'컷 편집 단계에서 편집안을 먼저 만드세요.';
   return step==='settings'?'모델·분석 자원·업데이트 설정을 확인하세요.':'카메라와 마이크를 지정한 뒤 화자 단계로 이동하세요.';
 }
+function inputLocked(){return pending||applying||!!job||validationCount>0||stopped||!credentials||!state?.gateOpen;}
+function workLocked(){return inputLocked()||state?.compatible===false||!!updateIntent||localEditPending||!!state?.applyRecovery?.blocked;}
 function toggle(){
   if(syncJob&&syncResult&&!syncResultMatches())invalidateSyncResult();
   microphoneIssue=microphoneFeedback();
@@ -180,11 +182,12 @@ function toggle(){
   syncIssue=syncFeedback();
   policyIssue=policyFeedback();if(policyIssue&&plan)clearPolicyPlan();
   if(plan&&!planMatches()){clearPolicyPlan();planInvalidated=true;}
-  const busy=pending||applying||!!job||validationCount>0,locked=!credentials||!state?.gateOpen||state.compatible===false||stopped||busy||localEditPending||state?.applyRecovery?.blocked;
-  for(const el of document.querySelectorAll('input,select,button.mode'))el.disabled=busy||stopped||!credentials||!state?.gateOpen;
+  const busy=pending||applying||!!job||validationCount>0,locked=workLocked();
+  for(const el of document.querySelectorAll('input,select,button.mode'))el.disabled=inputLocked();
   for(const id of ['analyze','sync','plan','apply-sync','apply','save-settings','load-settings'])$(id).disabled=locked||!connected||(id==='plan'&&!analysisState)||(id==='apply'&&!plan)||(id==='apply-sync'&&!syncResult);
   for(const id of ['read-project','read-selection','install-model','save-resources','prune-cache'])$(id).disabled=locked;
   for(const el of document.querySelectorAll('[data-work]'))el.disabled=locked;
+  $('add-override').disabled=locked||!connected;for(const row of overrideRows)row.remove.disabled=locked||!connected;
   $('override-filter').disabled=locked||!overrideRows.some(r=>r.error.textContent);
   $('create-input').disabled=locked||!projectSelection||!inputCapability;$('cancel').disabled=!job&&!applying&&!previewPlaying&&!validationCount;
   $('undo-correction').disabled=locked||!analysisState||activeCorrections().length===0;
@@ -538,6 +541,7 @@ function renderReviewCuts(){
   if(!reviewWindow.total)$('segments').appendChild(element('p',plan?'일치하는 컷이 없습니다. 검색과 카메라 필터를 확인하세요.':'편집안을 만들어 주세요.','hint'));
   $('review-page-info').textContent=reviewWindow.total?reviewWindow.first+'–'+reviewWindow.last+' / '+reviewWindow.total+' 컷':'0 컷';toggle();
 }
+function editOverrides(change){if(workLocked()||!connected)return;try{change();}catch(e){error(e);}}
 function addOverride(defer=false){
   if(!defer){overrideErrorsOnly=false;overrideVisibleRows.clear();}
   if(!connected)return;const row=element('div',undefined,'override-row'),fields=element('div',undefined,'row'),first=number(connected.snapshot.range.startFrame),last=number(connected.snapshot.range.endFrame),camera=element('select');
@@ -545,8 +549,8 @@ function addOverride(defer=false){
   error.setAttribute('id',errorId);error.setAttribute('role','status');error.setAttribute('aria-live','polite');row.appendChild(title);
   options(camera,cameraValues());for(const field of [first,last]){field.setAttribute('min',String(connected.snapshot.range.startFrame));field.setAttribute('max',String(connected.snapshot.range.endFrame));field.setAttribute('step','1');}
   fields.appendChild(label('시작 · 프레임',first));fields.appendChild(label('종료 · 프레임',last));row.appendChild(fields);row.appendChild(label('고정 카메라',camera));row.appendChild(error);
-  const remove=element('button','삭제');row.appendChild(remove);const value={first,last,camera,error,title,row};for(const field of [first,last,camera]){field.setAttribute('aria-describedby',errorId);field.oninput=field.onchange=invalidatePlan;}
-  overrideRows.push(value);remove.onclick=()=>{overrideRows.splice(overrideRows.indexOf(value),1);overrideVisibleRows.delete(value);row.remove();invalidatePlan();};$('overrides').appendChild(row);if(!defer)invalidatePlan();
+  const remove=element('button','삭제');remove.setAttribute('data-work','true');remove.disabled=workLocked()||!connected;row.appendChild(remove);const value={first,last,camera,error,title,row,remove};for(const field of [first,last,camera]){field.disabled=inputLocked();field.setAttribute('aria-describedby',errorId);field.oninput=field.onchange=invalidatePlan;}
+  overrideRows.push(value);remove.onclick=()=>editOverrides(()=>{const index=overrideRows.indexOf(value);if(index<0)return;overrideRows.splice(index,1);overrideVisibleRows.delete(value);row.remove();invalidatePlan();});$('overrides').appendChild(row);if(!defer)invalidatePlan();
 }
 function updateGuidance(update){
   const phase=update.updateState,code=update.error?.code;
@@ -730,7 +734,7 @@ handler('create-input',async()=>{
 });
 handler('save-settings',async()=>{admitted();await uxp.storage.secureStorage.setItem(settingsKey(),JSON.stringify(captureSettings()));say('현재 시퀀스의 설정을 저장했습니다.');});
 handler('load-settings',async()=>{admitted();await stopPreview();if(settingsTimer){clearTimeout(settingsTimer);settingsTimer=null;}let settings;binding=true;try{settings=await restoreSavedSettings();clearAnalysis();renderSpeakers(mode==='mixed'?[]:[...new Set(microphoneRows.filter(r=>r.check.checked).map(r=>r.speaker.value))]);}finally{binding=false;}const restored=await restoreSavedAnalysis(settings);say(restored?'저장한 분석과 화자 교정을 불러왔습니다. 편집안을 다시 만들어 주세요.':'저장한 설정을 불러왔습니다. 음성 입력을 다시 분석하세요.');});
-handler('add-override',()=>{addOverride();scheduleSettings();});
+$('add-override').onclick=()=>editOverrides(()=>addOverride());
 $('override-filter').onclick=()=>{if($('override-filter').disabled||!overrideRows.some(r=>r.error.textContent))return;overrideErrorsOnly=!overrideErrorsOnly;overrideVisibleRows.clear();view.show('cut');view.openDisclosure('disclosure-6');overrideFeedback();};
 handler('undo-correction',()=>correct({type:'undo'}));
 handler('cancel',async()=>{

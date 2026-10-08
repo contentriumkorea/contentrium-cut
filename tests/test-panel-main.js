@@ -76,6 +76,87 @@ function mic(f,index=0){return f.evaluate('microphoneRows['+index+']');}
 function micError(f,index=0){return f.get('microphones').children[index]?.children.find(n=>n.className.includes('input-error'))?.textContent||'';}
 function syncRow(f,index=0){return f.evaluate('syncRows['+index+']');}
 
+async function analyzedPanel(extra={}){const f=await panel(extra);await f.click('analyze');await f.tick();return f;}
+
+test('malformed cut duration identifies its field and prevents planning without losing analysis',async()=>{
+  for(const [id,value,label] of [['min-shot','','최소 샷'],['min-shot','-1','최소 샷'],['short-turn','bad','짧은 발화'],['overlap','1e309','동시 발화']]){
+    const f=await analyzedPanel();f.get(id).value=value;f.get(id).onchange();await f.click('plan');
+    assert.equal(f.calls.some(c=>c.path==='/plan'),false);assert.equal(f.get('plan').disabled,true);assert.equal(f.get('analyze').disabled,false);
+    assert.match(f.get(id+'-error').textContent,new RegExp(label));assert.equal(f.get(id).getAttribute('aria-invalid'),'true');
+    f.get(id).value='0.125';f.get(id).onchange();assert.equal(f.get(id+'-error').textContent,'');assert.equal(f.get('plan').disabled,false);await f.click('plan');assert.equal(f.calls.filter(c=>c.path==='/plan').length,1);
+  }
+});
+
+test('zero and decimal cut durations preserve the policy payload',async()=>{
+  const f=await analyzedPanel();f.get('min-shot').value='0';f.get('short-turn').value='0.125';f.get('overlap').value='1.25';f.get('overlap').onchange();await f.click('plan');
+  const policy=f.calls.find(c=>c.path==='/plan').body.policy;assert.equal(policy.minShot,0);assert.equal(policy.shortTurn,0.125);assert.equal(policy.overlap,1.25);
+});
+
+test('typing cut settings invalidates a previous plan while retaining completed analysis',async()=>{
+  const f=await analyzedPanel();await f.click('plan');assert.equal(f.get('apply').disabled,false);
+  assert.equal(typeof f.get('short-turn').oninput,'function');f.get('short-turn').value='0.75';f.get('short-turn').oninput();
+  assert.equal(f.get('apply').disabled,true);assert.equal(f.get('plan').disabled,false);assert.equal(f.evaluate('analysisState!==null'),true);
+  f.get('short-turn').value='';f.get('short-turn').oninput();assert.equal(f.get('plan').disabled,true);assert.match(f.get('short-turn-error').textContent,/짧은 발화/);
+});
+
+test('cut settings save raw input and still restore legacy numeric policy',async()=>{
+  const f=await analyzedPanel();f.get('min-shot').value='';f.get('short-turn').value='bad';f.get('short-turn').onchange();await f.click('save-settings');
+  f.get('min-shot').value='2';f.get('short-turn').value='0.6';await f.click('load-settings');assert.equal(f.get('min-shot').value,'');assert.equal(f.get('short-turn').value,'bad');assert.equal(f.get('plan').disabled,true);assert.equal(f.evaluate('analysisState!==null'),true);
+  const settings=JSON.parse(f.evaluate('JSON.stringify(captureSettings())'));delete settings.policyInput;settings.policy.minShot=0;settings.policy.shortTurn=0.25;
+  f.evaluate('restoreSettings('+JSON.stringify(settings)+');toggle()');assert.equal(f.get('min-shot').value,'0');assert.equal(f.get('short-turn').value,'0.25');assert.equal(f.get('plan').disabled,false);
+});
+
+test('direct apply rejects a malformed cut duration before requesting native authorization',async()=>{
+  const f=await analyzedPanel();await f.click('plan');f.get('overlap').value='-1';await f.click('apply');
+  assert.equal(f.calls.some(c=>c.path==='/apply/begin'),false);assert.match(f.get('status').textContent,/동시 발화/);assert.equal(f.get('project-name').textContent,'sequence-1');
+});
+
+test('invalid cut duration in a plan response cannot promote the returned plan',async()=>{
+  const f=await analyzedPanel({request:(path,body,fixture)=>{if(path==='/plan'){fixture.get('min-shot').value='';return {planHash:'p'.repeat(64),segments:[],reviews:[]};}}});
+  await f.click('plan');assert.equal(f.get('apply').disabled,true);assert.match(f.get('status').textContent,/최소 샷/);assert.equal(f.evaluate('analysisState!==null'),true);
+});
+
+test('native permit wait rechecks cut duration before reaching the editing entry point',async()=>{
+  const f=await analyzedPanel({request:(path,body,fixture)=>{if(path==='/apply/begin'){fixture.get('overlap').value='';return {applyId:'owned-cut-review',epoch:0,execute:true,plan:{planHash:'p'.repeat(64)}};}}});let nativeCalls=0;f.host.apply=async()=>{nativeCalls++;throw Object.assign(new Error('Owned fixture stops native mutation'),{code:'OWNED_FIXTURE_STOP'});};
+  await f.click('plan');await f.click('apply');assert.equal(nativeCalls,0);assert.match(f.get('status').textContent,/동시 발화/);assert.equal(f.calls.filter(c=>c.path==='/apply/end').at(-1)?.body.status,'failed');
+});
+
+test('invalid cut settings do not prevent immediate update and update guidance takes priority',async()=>{
+  const f=await updatePanel();f.get('overlap').value='';f.get('overlap').onchange();await f.nodes.find(n=>n.attrs['data-step']==='cut').onclick();await f.click('update');
+  assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.match(f.get('action-readiness').textContent,/업데이트/);
+});
+
+test('cut duration raw input survives autosave and same-sequence refresh',async()=>{
+  const f=await analyzedPanel();f.get('short-turn').value=' ';f.get('short-turn').oninput();await f.click('read-project');
+  assert.equal(f.get('short-turn').value,' ');
+  for(let i=0;i<f.timeouts.length;i++){const fn=f.timeouts[i];f.timeouts[i]=null;if(fn)await fn();}
+  const key=[...f.saved.rows.keys()].find(k=>k.startsWith('cut-settings-'));assert.equal(JSON.parse(f.saved.rows.get(key)).policyInput.shortTurn,' ');
+  f.get('short-turn').value='0.6';await f.click('load-settings');assert.equal(f.get('short-turn').value,' ');assert.equal(f.get('plan').disabled,true);
+});
+
+test('periodic cut duration check blocks a silently invalidated plan and connects accessible guidance',async()=>{
+  const f=await analyzedPanel();await f.click('plan');f.get('min-shot').value='';await f.tick();
+  assert.equal(f.get('apply').disabled,true);assert.equal(f.get('plan').disabled,true);assert.equal(f.evaluate('analysisState!==null'),true);
+  assert.equal(f.get('min-shot').getAttribute('aria-describedby'),'min-shot-error');assert.match(f.get('action-readiness').textContent,/최소 샷/);
+  f.get('min-shot').value='0';await f.tick();assert.equal(f.get('min-shot').getAttribute('aria-invalid'),'false');assert.equal(f.get('plan').disabled,false);assert.equal(f.get('apply').disabled,true);
+});
+
+test('cut input invalidation clears the old visible preview while preserving the analysis',async()=>{
+  for(const event of ['input','periodic']){
+    const f=await analyzedPanel();await f.click('plan');assert.equal(f.get('cut-count').textContent,'1');
+    f.get('overlap').value=event==='input'?'0.75':'';if(event==='input')f.get('overlap').oninput();else await f.tick();
+    assert.equal(f.get('cut-count').textContent,'—');assert.equal(f.get('review-count').textContent,'—');assert.equal(f.get('timeline').children.length,0);
+    assert.equal(f.get('segments').children.some(n=>n.tag==='button'),false);assert.equal(f.get('reviews').children.length,0);assert.match(f.get('review-page-info').textContent,/편집안/);
+    assert.equal(f.evaluate('analysisState!==null'),true);
+  }
+});
+
+test('unchanged cut duration errors do not repeatedly rewrite live-region text',async()=>{
+  const f=await analyzedPanel();f.get('overlap').value='';f.get('overlap').oninput();const hint=f.get('overlap-error');let text=hint.textContent,writes=0;
+  Object.defineProperty(hint,'textContent',{get:()=>text,set:value=>{text=value;writes++;}});
+  await f.tick();await f.tick();assert.equal(writes,0);f.get('overlap').value='0';f.get('overlap').oninput();assert.equal(writes,1);assert.equal(text,'');
+});
+
 async function completedSync(extra={}){
   const f=await panel({request:async(path,body,fixture)=>{
     if(extra.request){const value=await extra.request(path,body,fixture);if(value!==undefined)return value;}

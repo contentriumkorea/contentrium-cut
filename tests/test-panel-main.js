@@ -1460,3 +1460,59 @@ test('job authentication failure retains connection recovery and never promotes 
   assert.equal(f.get('apply').disabled,true);assert.equal(f.calls.some(c=>c.path==='/analyses/register'),false);assert.match(f.get('connection').textContent,/복구/);
   assert.match(f.get('action-readiness').textContent,/연결/);
 });
+
+async function heldProject(mode,stage,automatic=true,withPlan=false){
+ const f=await updatePanel();if(mode==='mixed')await f.click('mode-mixed');
+ if(withPlan){await f.click('analyze');await f.tick();f.evaluate('speakerRows[0].select.value="video:0";cameraRows[0].covered.value="A"');await f.click('plan');assert.ok(f.evaluate('plan'));}
+ const native=nativeSnapshot('new-automatic-sequence');f.native=native;let resolve,reject,hold=true;
+ const promise=new Promise((a,b)=>{resolve=a;reject=b;});
+ const snapshot=f.host.snapshot;f.host.snapshot=async()=>stage==='host'&&hold?promise:snapshot();
+ const original=f.saved.getItem;f.saved.getItem=async key=>stage==='storage'&&hold?promise:original(key);
+ const request=f.evaluate('connection.request');f.evaluate('connection').request=async(...args)=>{if(hold&&args[0]===(stage==='heartbeat'?'/heartbeat':'/project')&&['heartbeat','project'].includes(stage))return promise;return request(...args);};
+ f.resolveHeld=resolve;const run=automatic?f.evaluate('followSequence()'):f.click('read-project');for(let i=0;i<50;i++)await Promise.resolve();
+ return {f,run,resume:()=>{hold=false;resolve(stage==='host'?{snapshot:structuredClone(native.snapshot),perFrame:native.perFrame,sequence:native.sequence}:stage==='heartbeat'?{gateOpen:true,stopEpoch:null}:stage==='storage'?undefined:{snapshotHash:native.snapshot.snapshotHash});},reject:e=>{hold=false;reject(e);}};
+}
+test('late automatic project replies preserve update status connection settings and analysis',async()=>{
+ for(const mode of ['separate','mixed'])for(const stage of ['host','heartbeat','project','storage'])for(const outcome of ['success','error']){
+  const {f,run,resume,reject}=await heldProject(mode,stage);await f.click('update');const connection=f.evaluate('connected'),before=resultState(f),timer=f.evaluate('settingsTimer'),status=f.get('status').textContent,rows=f.evaluate('microphoneRows.slice()');
+  assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);if(outcome==='success')resume();else reject(Object.assign(new Error('Owned late read'),{code:'OWNED_LATE_READ'}));await run;
+  assert.equal(f.evaluate('connected'),connection,mode+stage+outcome);assert.equal(resultState(f),before);assert.equal(f.get('status').textContent,status);assert.equal(f.evaluate('settingsTimer'),timer);assert.deepEqual(f.evaluate('microphoneRows.slice()'),rows);assert.equal(f.evaluate('workLocked()'),true);
+ }
+});
+
+test('stale automatic project success and failure preserve replaced scope and queued save',async()=>{
+ const changes=['state.epoch++','state.gateOpen=false','state.stopEpoch=1','stopped=true','credentials=null','state.compatible=false','panelContextConflict=true','localEditPending=true','state.applyRecovery.blocked=true','validationCount=1','job={jobId:"new-job",kind:"analysis"}','applying=true','mode=mode=== "mixed"?"separate":"mixed"','analysisState={revision:1}','connected={...connected}','connected.snapshot.snapshotHash="new-hash"','connected.snapshot.hostSnapshotHash="new-host-hash"'];
+ for(const mode of ['separate','mixed'])for(const stage of ['host','project','storage'])for(const change of changes)for(const outcome of ['success','error']){
+  const {f,run,resume,reject}=await heldProject(mode,stage);f.evaluate(change+';say("Owned new sequence scope")');const connection=f.evaluate('connected'),before=resultState(f),timer=f.evaluate('settingsTimer'),rows=f.evaluate('microphoneRows.slice()');
+  if(outcome==='success')resume();else reject(Object.assign(new Error('SEQUENCE_REQUIRED'),{code:'SEQUENCE_REQUIRED'}));await run;assert.equal(f.evaluate('connected'),connection,mode+stage+change);assert.equal(resultState(f),before);assert.equal(f.get('status').textContent,'Owned new sequence scope');assert.equal(f.evaluate('settingsTimer'),timer);assert.deepEqual(f.evaluate('microphoneRows.slice()'),rows);
+ }
+});
+test('manual delayed read and queued autosave survive update without a late reset',async()=>{
+ for(const stage of ['host','heartbeat','project','storage']){const {f,run,resume}=await heldProject('separate',stage,false);const connection=f.evaluate('connected');await f.click('update');const status=f.get('status').textContent;resume();await run;assert.equal(f.evaluate('connected'),connection);assert.equal(f.get('status').textContent,status);assert.equal(f.evaluate('binding'),false);}
+ const f=await updatePanel();f.get('min-shot').value='1.25';f.get('min-shot').oninput();const timer=f.evaluate('settingsTimer'),read=f.evaluate('connection.request');let resume;f.evaluate('connection').request=(...args)=>args[0]==='/project'?new Promise(resolve=>{resume=resolve;}):read(...args);f.native=nativeSnapshot('queued-new-sequence');const run=f.evaluate('followSequence()');for(let i=0;i<30;i++)await Promise.resolve();assert.equal(f.evaluate('settingsTimer'),timer);await f.click('update');resume({});await run;assert.equal(f.evaluate('settingsTimer'),timer);await f.timeouts[timer-1]();const saved=JSON.parse(f.saved.rows.get(f.evaluate('settingsKey()')));assert.equal(saved.sequenceRef,'sequence-1');assert.equal(saved.policyInput.minShot,'1.25');
+});
+test('newer read owns binding and automatic tracking skips all blocked states',async()=>{
+ const {f,run,resume}=await heldProject('separate','project');let releaseNew;const priorRequest=f.evaluate('connection.request');f.evaluate('connection').request=(...args)=>args[0]==='/project'?new Promise(resolve=>{releaseNew=resolve;}):priorRequest(...args);const newer=f.evaluate('readProject()');for(let i=0;i<30;i++)await Promise.resolve();const token=f.evaluate('projectRead');resume();await run;assert.equal(f.evaluate('projectRead'),token);assert.equal(f.evaluate('binding'),true);releaseNew({});await newer;assert.equal(f.evaluate('binding'),false);
+ for(const change of ['updateIntent={}','state.gateOpen=false','state.compatible=false','state.stopEpoch=1','stopped=true','credentials=null','binding=true','job={}','applying=true','validationCount=1','panelContextConflict=true','localEditPending=true','state.applyRecovery.blocked=true']){const g=await panel();let reads=0;g.host.snapshot=async()=>{reads++;return g.native;};g.evaluate(change);await g.evaluate('followSequence()');assert.equal(reads,0,change);}
+});
+test('automatic fresh sequence restores saved preset atomically and current failures remain visible',async()=>{
+ for(const mode of ['separate','mixed']){const f=await panel();const preset=JSON.parse(f.evaluate('JSON.stringify(captureSettings())'));preset.mode=mode;preset.sequenceRef='restored-sequence';preset.policyInput.minShot=' 1.25 ';preset.microphones[0].speaker='진행자';const key='cut-settings-'+hash({projectRef:preset.projectRef,sequenceRef:preset.sequenceRef});f.saved.rows.set(key,JSON.stringify(preset));f.native=nativeSnapshot(preset.sequenceRef);await f.evaluate('followSequence()');assert.equal(f.evaluate('connected.snapshot.sequenceRef'),preset.sequenceRef);assert.equal(f.evaluate('mode'),mode);assert.equal(f.get('min-shot').value,' 1.25 ');assert.equal(mic(f).speaker.value,'진행자');assert.equal(f.evaluate('binding'),false);assert.match(f.get('status').textContent,/트랙을 확인/);}
+ const f=await panel();f.snapshotError='SEQUENCE_REQUIRED';await f.evaluate('followSequence()');assert.equal(f.evaluate('connected'),null);assert.match(f.get('status').textContent,/시퀀스를 열어/);
+ const g=await panel();g.host.snapshot=async()=>{throw Object.assign(new Error('Owned current failure'),{code:'OWNED_CURRENT_FAILURE'});};await assert.rejects(g.evaluate('followSequence()'),/Owned current failure/);assert.ok(g.evaluate('connected'));
+});
+
+test('stale closed read heartbeat cannot stop or clear a newer plan',async()=>{
+ for(const mode of ['separate','mixed'])for(const change of ['state.epoch++','connected={...connected}','analysisState={...analysisState,revision:analysisState.revision+1}','mode=mode=== "mixed"?"separate":"mixed"']){
+  const {f,run}=await heldProject(mode,'heartbeat',true,true);f.evaluate(change+';planInputHash=planInputsHash();say("Owned new plan")');const before=resultState(f),connection=f.evaluate('connected');
+  // Resolve the actual held heartbeat directly with a closed receipt.
+    // heldProject exposes its deferred receipt resolver below.
+  f.resolveHeld({gateOpen:false,stopEpoch:0});await run;assert.equal(resultState(f),before);assert.equal(f.evaluate('connected'),connection);assert.equal(f.evaluate('stopped'),false);assert.equal(f.get('status').textContent,'Owned new plan');
+ }
+});
+test('current automatic registration errors propagate to connection recovery',async()=>{
+ for(const mode of ['separate','mixed']){const f=await panel();if(mode==='mixed')await f.click('mode-mixed');f.native=nativeSnapshot('current-auth-sequence');const request=f.evaluate('connection.request');f.evaluate('connection').request=async(...args)=>{if(args[0]==='/project')throw Object.assign(new Error('Owned auth expired'),{code:'AUTH_REQUIRED'});return request(...args);};f.evaluate('sequencePollAt=0');await f.tick();assert.equal(f.evaluate('connected'),null);assert.equal(f.evaluate('credentials'),null);assert.equal(f.resetCalls,1);assert.equal(f.get('analyze').disabled,true);}
+});
+
+test('current closed sequence registration keeps explicit sequence guidance',async()=>{
+ const f=await panel();f.native=nativeSnapshot('closed-during-register');const request=f.evaluate('connection.request');f.evaluate('connection').request=async(...args)=>{if(args[0]==='/project')throw Object.assign(new Error('SEQUENCE_REQUIRED'),{code:'SEQUENCE_REQUIRED'});return request(...args);};await f.evaluate('followSequence()');assert.equal(f.evaluate('connected'),null);assert.match(f.get('status').textContent,/시퀀스를 열어/);assert.equal(f.evaluate('credentials'),true);
+});

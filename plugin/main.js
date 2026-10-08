@@ -285,6 +285,9 @@ function microphoneFeedback(){
   let first='',selected=0;
   for(const row of microphoneRows){
     const active=row.check.checked;selected+=active?1:0;
+    const selectionText=active?'':'분석에서 제외됨 · 설정은 저장되며 다시 선택하면 적용됩니다.';
+    if(row.selectionHint.textContent!==selectionText)row.selectionHint.textContent=selectionText;
+    row.selectionHint.className='hint'+(selectionText?'':' hidden');
     const invalidChannel=active&&(!Number.isSafeInteger(Number(row.channel.value))||Number(row.channel.value)<1||Number(row.channel.value)>64);
     const invalidStream=active&&(!Number.isSafeInteger(Number(row.stream.value))||Number(row.stream.value)<1||Number(row.stream.value)>256);
     const invalidSpeaker=active&&mode==='separate'&&!row.speaker.value.trim();
@@ -315,9 +318,10 @@ function renderSources(){
     channel.min=stream.min='1';channel.max='64';stream.max='256';
     fields.appendChild(label('화자 ID',speaker));fields.appendChild(label('채널',channel));row.appendChild(fields);row.appendChild(label('오디오 스트림',stream));
     const issue=element('p','','hint input-error hidden');issue.id='microphone-error-'+microphoneRows.length;issue.setAttribute('role','status');issue.setAttribute('aria-live','polite');row.appendChild(issue);
-    for(const field of [speaker,channel,stream])field.setAttribute('aria-describedby',issue.id);
-    $('microphones').appendChild(row);microphoneRows.push({clip,check,speaker,channel,stream,issue,defaultChecked:{separate:order<2,mixed:order<1},title:'A'+(track.index+1)+' · '+track.name});
-    for(const field of [check,speaker,channel,stream]){field.disabled=workLocked()||!connected;field.onchange=()=>{if(workLocked()||!connected)return;if(field===check)microphoneSelectionCustomized=true;invalidateAnalysis();renderSpeakers(mode==='mixed'?[]:[...new Set(microphoneRows.filter(r=>r.check.checked).map(r=>r.speaker.value.trim()))]);};}
+    const selectionHint=element('p','','hint hidden');selectionHint.id='microphone-selection-'+microphoneRows.length;selectionHint.setAttribute('role','status');selectionHint.setAttribute('aria-live','polite');row.appendChild(selectionHint);
+    for(const field of [speaker,channel,stream])field.setAttribute('aria-describedby',issue.id+' '+selectionHint.id);check.setAttribute('aria-describedby',selectionHint.id);
+    $('microphones').appendChild(row);microphoneRows.push({clip,check,speaker,channel,stream,issue,selectionHint,defaultChecked:{separate:order<2,mixed:order<1},title:'A'+(track.index+1)+' · '+track.name});
+    for(const field of [check,speaker,channel,stream]){field.disabled=workLocked()||!connected;field.onchange=()=>{if(workLocked()||!connected)return;if(field!==check&&!check.checked){scheduleSettings();toggle();return;}if(field===check)microphoneSelectionCustomized=true;invalidateAnalysis();renderSpeakers(mode==='mixed'?[]:[...new Set(microphoneRows.filter(r=>r.check.checked).map(r=>r.speaker.value.trim()))]);};}
     for(const field of [speaker,channel,stream])field.oninput=field.onchange;
     const calibration=element('div',undefined,'source-row'),bounds=element('div',undefined,'row'),first=number(0),last=number(0);
     calibration.appendChild(element('div','A'+(track.index+1)+' · '+basename(assets.get(clip.assetId).canonicalPath),'source-title'));

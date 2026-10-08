@@ -20,18 +20,19 @@
     }
     for(const button of document.querySelectorAll('[data-step]'))button.onclick=()=>show(button.getAttribute('data-step'));
     for(const button of document.querySelectorAll('[data-next]'))button.onclick=()=>show(button.getAttribute('data-next'));
-    for(const button of document.querySelectorAll('[data-disclosure]'))button.onclick=()=>{
+    function setDisclosure(button,open){
       const body=get(button.getAttribute('data-disclosure'));
-      const open=body.className.split(/\s+/).includes('hidden');
       button.setAttribute('data-open',String(open));
       button.setAttribute('aria-expanded',String(open));
       body.className='disclosure-content'+(open?'':' hidden');
-    };
+    }
+    function openDisclosure(id){for(const button of document.querySelectorAll('[data-disclosure]'))if(button.getAttribute('data-disclosure')===id)setDisclosure(button,true);}
+    for(const button of document.querySelectorAll('[data-disclosure]'))button.onclick=()=>setDisclosure(button,get(button.getAttribute('data-disclosure')).className.split(/\s+/).includes('hidden'));
     get('next-step').onclick=()=>show('speakers');
     get('back-step').onclick=()=>show(current==='settings'?previous:steps[Math.max(0,steps.indexOf(current)-1)]);
     get('open-settings').onclick=()=>show(current==='settings'?previous:'settings');
     get('close-settings').onclick=()=>show(previous);
-    show('tracks');return {show,current:()=>current,onChange:listener=>{changed=listener;}};
+    show('tracks');return {show,openDisclosure,current:()=>current,onChange:listener=>{changed=listener;}};
   }
   if(typeof module!=='undefined'&&module.exports)module.exports={install};
   else root.ContentriumView={install};

@@ -21,3 +21,4 @@ body{padding:6px}.studio-shell{padding:0 10px;border-radius:9px}.studio-header{h
 .input-error{border-left:2px solid #87949f;padding-left:8px;color:#d0d8de;font-weight:500}
 
 .cut-duration-row{align-items:flex-start}.cut-duration-row .input-error{display:block}.cut-duration-row .input-error.hidden{display:none}
+.override-status{padding:0 12px}.override-status .hint{margin:0 0 8px}.override-status button{margin:0 0 10px}

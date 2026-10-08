@@ -185,6 +185,10 @@ function toggle(){
   const busy=pending||applying||!!job||validationCount>0,locked=workLocked();
   for(const el of document.querySelectorAll('input,select,button.mode'))el.disabled=inputLocked();
   for(const value of ['separate','mixed'])$('mode-'+value).disabled=locked;
+  for(const row of microphoneRows)for(const field of [row.check,row.speaker,row.channel,row.stream])field.disabled=locked||!connected;
+  for(const row of cameraRows)for(const field of [row.role,row.covered])field.disabled=locked||!connected;
+  for(const row of speakerRows)row.select.disabled=locked||!connected;
+  for(const id of ['start-camera','reserve-camera'])$(id).disabled=locked||!connected;
   $('speaker-count').disabled=workLocked()||mode!=='mixed';$('vad-threshold').disabled=workLocked()||mode!=='separate';
   for(const row of calibrationRows)for(const field of [row.first,row.last])field.disabled=workLocked()||!calibrationActive(row);
   for(const id of ['analyze','sync','plan','apply-sync','apply','save-settings','load-settings'])$(id).disabled=locked||!connected||(id==='plan'&&!analysisState)||(id==='apply'&&!plan)||(id==='apply-sync'&&!syncResult);
@@ -313,7 +317,7 @@ function renderSources(){
     const issue=element('p','','hint input-error hidden');issue.id='microphone-error-'+microphoneRows.length;issue.setAttribute('role','status');issue.setAttribute('aria-live','polite');row.appendChild(issue);
     for(const field of [speaker,channel,stream])field.setAttribute('aria-describedby',issue.id);
     $('microphones').appendChild(row);microphoneRows.push({clip,check,speaker,channel,stream,issue,defaultChecked:{separate:order<2,mixed:order<1},title:'A'+(track.index+1)+' · '+track.name});
-    for(const field of [check,speaker,channel,stream])field.onchange=()=>{if(field===check)microphoneSelectionCustomized=true;invalidateAnalysis();renderSpeakers(mode==='mixed'?[]:[...new Set(microphoneRows.filter(r=>r.check.checked).map(r=>r.speaker.value.trim()))]);};
+    for(const field of [check,speaker,channel,stream]){field.disabled=workLocked()||!connected;field.onchange=()=>{if(workLocked()||!connected)return;if(field===check)microphoneSelectionCustomized=true;invalidateAnalysis();renderSpeakers(mode==='mixed'?[]:[...new Set(microphoneRows.filter(r=>r.check.checked).map(r=>r.speaker.value.trim()))]);};}
     for(const field of [speaker,channel,stream])field.oninput=field.onchange;
     const calibration=element('div',undefined,'source-row'),bounds=element('div',undefined,'row'),first=number(0),last=number(0);
     calibration.appendChild(element('div','A'+(track.index+1)+' · '+basename(assets.get(clip.assetId).canonicalPath),'source-title'));
@@ -328,7 +332,8 @@ function renderSources(){
     const fields=element('div',undefined,'row'),role=element('select'),covered=element('input');
     options(role,[['speaker','화자 카메라'],['wide','전체샷'],['two-shot','투샷'],['reserve','예비'],['protected','보호 트랙']]);covered.placeholder='A, B';role.value=track.muted?'protected':'speaker';
     fields.appendChild(label('트랙 역할',role));fields.appendChild(label('보이는 화자',covered));row.appendChild(fields);$('cameras').appendChild(row);
-    cameraRows.push({id:track.trackRef,track,title,role,covered});role.onchange=mappingInputs;covered.oninput=covered.onchange=invalidatePlan;
+    cameraRows.push({id:track.trackRef,track,title,role,covered});for(const field of [role,covered])field.disabled=workLocked()||!connected;
+    role.onchange=()=>{if(!workLocked()&&connected)mappingInputs();};covered.oninput=covered.onchange=()=>{if(!workLocked()&&connected)invalidatePlan();};
   }
   renderSyncSources();renderSpeakers(mode==='mixed'?[]:[...new Set(microphoneRows.filter(r=>r.check.checked).map(r=>r.speaker.value))]);
   if(mode==='mixed')$('speaker-mapping').appendChild(element('p','화자를 분석하면 감지한 목소리를 카메라에 연결할 수 있습니다.','hint'));mappingInputs();
@@ -420,7 +425,7 @@ function renderSpeakers(ids){
       addExamples(row,id);
     }
     row.appendChild(label('연결 카메라',select));$('speaker-mapping').appendChild(row);speakerRows.push({id,select});
-    select.onchange=()=>{if(!sameSpeakerMappingScope(savedSpeakerMappingScope,scope))savedSpeakerMappings={};savedSpeakerMappingScope=scope;savedSpeakerMappings[id]=select.value;invalidatePlan();};
+    select.disabled=workLocked()||!connected;select.onchange=()=>{if(workLocked()||!connected)return;if(!sameSpeakerMappingScope(savedSpeakerMappingScope,scope))savedSpeakerMappings={};savedSpeakerMappingScope=scope;savedSpeakerMappings[id]=select.value;invalidatePlan();};
   }
   if(!ids.length)$('speaker-mapping').appendChild(element('p',analysisState?'아래에서 감지한 목소리를 화자에 연결하세요.':'분석할 마이크를 지정하면 화자를 연결할 수 있습니다.','hint'));
   renderCorrections();
@@ -846,7 +851,7 @@ function changeRecordingMode(value){
 for(const value of ['separate','mixed'])$('mode-'+value).onclick=async()=>{let changing=false;try{if(!changeRecordingMode(value))return;changing=pending=true;toggle();await refresh();}catch(e){error(e);toggle();}finally{if(changing){pending=false;toggle();}}};
 for(const id of ['range-start','range-end'])$(id).oninput=$(id).onchange=()=>{rangeDirty=true;invalidateAnalysis();say(rangeIssue||'분석할 범위를 변경했습니다. 다음 분석에 적용됩니다.');};
 for(const id of ['min-shot','short-turn','overlap'])$(id).oninput=$(id).onchange=policyInputsChanged;
-for(const id of ['start-camera','reserve-camera'])$(id).onchange=invalidatePlan;
+for(const id of ['start-camera','reserve-camera'])$(id).onchange=()=>{if(!workLocked()&&connected)invalidatePlan();};
 for(const id of ['speaker-count','vad-threshold'])$(id).oninput=$(id).onchange=()=>analysisOptionChanged(id);
 $('sync-method').onchange=syncMethodChanged;
 $('review-camera').onchange=$('review-search').oninput=()=>{reviewPage=0;renderReviewCuts();};

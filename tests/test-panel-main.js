@@ -72,6 +72,73 @@ async function updatePanel(extra={}){
   await f.tick();return f;
 }
 
+function mic(f,index=0){return f.evaluate('microphoneRows['+index+']');}
+function micError(f,index=0){return f.get('microphones').children[index]?.children.find(n=>n.className.includes('input-error'))?.textContent||'';}
+
+test('invalid microphone channel inputs identify the row and block analysis before any job',async()=>{
+  for(const value of ['', '0','1.5','invalid','65']){
+    const f=await panel(),row=mic(f);row.channel.value=value;row.channel.onchange();
+    assert.match(micError(f),/A1.*채널.*1.*64.*정수/);assert.equal(row.channel.getAttribute('aria-invalid'),'true');assert.equal(f.get('analyze').disabled,true);
+    await f.click('analyze');assert.equal(f.calls.some(c=>c.path==='/jobs'),false);assert.match(f.get('status').textContent,/A1.*채널/);
+    row.channel.value='2';row.channel.onchange();assert.equal(micError(f),'');assert.equal(row.channel.getAttribute('aria-invalid'),'false');assert.equal(f.get('analyze').disabled,false);
+  }
+});
+
+test('invalid microphone streams and empty speaker IDs can be corrected in their source row',async()=>{
+  const f=await panel(),row=mic(f);row.stream.value='257';row.speaker.value='  ';row.stream.onchange();
+  assert.match(micError(f),/스트림.*256/);assert.match(micError(f),/화자 ID/);assert.equal(f.get('analyze').disabled,true);
+  row.stream.value='1';row.stream.onchange();assert.doesNotMatch(micError(f),/스트림/);assert.match(micError(f),/화자 ID/);
+  row.speaker.value='진행자';row.speaker.onchange();assert.equal(micError(f),'');assert.equal(f.get('analyze').disabled,false);
+  await f.click('analyze');const call=f.calls.find(c=>c.path==='/jobs');assert.equal(call.body.options.microphones[0].speakerId,'진행자');
+});
+
+test('empty microphone selection gives a visible next action and cannot submit analysis',async()=>{
+  const f=await panel(),row=mic(f);row.check.checked=false;row.check.onchange();
+  assert.equal(f.get('analyze').disabled,true);assert.match(f.get('action-readiness').textContent,/마이크.*하나.*선택/);
+  await f.click('analyze');assert.equal(f.calls.some(c=>c.path==='/jobs'),false);assert.match(f.get('status').textContent,/마이크.*선택/);
+});
+
+test('mixed recording accepts an empty speaker ID but still rejects malformed channel selection',async()=>{
+  const f=await panel();await f.click('mode-mixed');const row=mic(f);row.speaker.value='';row.speaker.onchange();
+  assert.equal(micError(f),'');assert.equal(f.get('analyze').disabled,false);
+  row.channel.value='0';row.channel.onchange();assert.match(micError(f),/채널/);assert.equal(f.get('analyze').disabled,true);
+});
+
+test('unselected malformed microphones are ignored and valid indices retain their zero-based payload',async()=>{
+  const native=nativeSnapshot();native.snapshot.tracks.push({trackRef:'audio:1',mediaType:'audio',index:1,name:'Second mic',muted:false});
+  native.snapshot.clips.push({...native.snapshot.clips[1],instanceKey:'mic-clip-2',trackRef:'audio:1'});delete native.snapshot.snapshotHash;native.snapshot.snapshotHash=hash(native.snapshot);
+  const f=await panel({native}),first=mic(f),second=mic(f,1);second.speaker.value='';second.channel.value='bad';second.check.checked=false;second.check.onchange();
+  assert.equal(micError(f,1),'');assert.equal(f.get('analyze').disabled,false);
+  first.channel.value='64';first.stream.value='256';first.stream.onchange();await f.click('analyze');
+  const microphones=f.calls.find(c=>c.path==='/jobs').body.options.microphones;assert.equal(microphones.length,1);assert.equal(microphones[0].streamIndex,255);assert.equal(microphones[0].channelIndex,63);
+});
+
+test('restoring malformed microphone settings retains their values and exposes correction guidance',async()=>{
+  const f=await panel(),settings=JSON.parse(f.evaluate('JSON.stringify(captureSettings())'));settings.microphones[0].channel='';
+  f.evaluate('restoreSettings('+JSON.stringify(settings)+');toggle()');
+  assert.equal(mic(f).channel.value,'');assert.match(micError(f),/채널/);assert.equal(f.get('analyze').disabled,true);
+  mic(f).channel.value='1';mic(f).channel.onchange();assert.equal(micError(f),'');assert.equal(f.get('analyze').disabled,false);
+});
+
+test('saving and restoring an empty audio stream preserves the invalid raw input',async()=>{
+  const f=await panel(),row=mic(f);row.stream.value='';row.stream.oninput();
+  const settings=JSON.parse(f.evaluate('JSON.stringify(captureSettings())'));assert.equal(settings.microphones[0].stream,'');
+  f.evaluate('restoreSettings('+JSON.stringify(settings)+');toggle()');
+  assert.equal(mic(f).stream.value,'');assert.match(micError(f),/스트림/);assert.equal(f.get('analyze').disabled,true);
+});
+
+test('update guidance takes precedence over invalid microphone input and starts immediately',async()=>{
+  const f=await updatePanel(),row=mic(f);row.channel.value='0';row.channel.onchange();await f.click('update');
+  assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.match(f.get('action-readiness').textContent,/업데이트/);assert.equal(f.get('analyze').disabled,true);assert.equal(f.calls.some(c=>c.path==='/jobs'),false);
+});
+
+test('microphone feedback reacts while typing and invalidates an older plan without requiring blur',async()=>{
+  const f=await panel();await f.click('analyze');await f.tick();await f.click('plan');assert.equal(f.get('apply').disabled,false);
+  const row=mic(f);assert.equal(typeof row.channel.oninput,'function');row.channel.value='0';row.channel.oninput();
+  assert.match(micError(f),/채널/);assert.equal(f.get('analyze').disabled,true);assert.equal(f.get('apply').disabled,true);
+  row.channel.value='1';row.channel.oninput();assert.equal(micError(f),'');assert.equal(f.get('analyze').disabled,false);assert.equal(f.get('apply').disabled,true);
+});
+
 async function modelPanel(extra={}){
   return panel({request:async(path,body,f)=>{
     if(extra.request){const value=await extra.request(path,body,f);if(value!==undefined)return value;}

@@ -72,6 +72,65 @@ async function updatePanel(extra={}){
   await f.tick();return f;
 }
 
+test('action guidance follows step navigation and missing analysis or plan without data calls',async()=>{
+  const f=await panel(),before=f.calls.length;
+  await f.nodes.find(n=>n.attrs['data-step']==='cut').onclick();
+  assert.match(f.get('action-readiness')?.textContent||'',/화자.*분석/);assert.equal(f.get('plan').disabled,true);
+  await f.nodes.find(n=>n.attrs['data-step']==='review').onclick();
+  assert.match(f.get('action-readiness')?.textContent||'',/컷 편집.*편집안/);assert.equal(f.get('apply').disabled,true);
+  assert.equal(f.calls.length,before);
+  await f.click('analyze');await f.tick();await f.click('plan');
+  assert.equal(f.get('apply').disabled,false);assert.match(f.get('action-readiness').textContent,/전체 편집안.*적용/);
+});
+
+test('action guidance names missing models and clears them after readiness changes',async()=>{
+  const f=await panel();f.state.models.silero.status='missing';await f.tick();await f.click('next-step');
+  assert.match(f.get('action-readiness')?.textContent||'',/발화 모델.*Setup.*복구/);assert.equal(f.get('analyze').disabled,true);
+  assert.match(f.get('model-status').textContent,/발화 모델.*Setup.*복구/);
+  f.state.models.silero.status='installed';await f.tick();
+  assert.equal(f.get('analyze').disabled,false);assert.match(f.get('action-readiness').textContent,/무결성.*확인/);
+  assert.doesNotMatch(f.get('action-readiness').textContent,/모델.*준비하세요/);
+  f.state.models['community-1'].status='missing';await f.click('mode-mixed');
+  assert.match(f.get('action-readiness').textContent,/설정.*혼합 녹음.*모델/);assert.equal(f.get('analyze').disabled,true);
+});
+
+test('action guidance prioritizes update over missing model and analysis',async()=>{
+  const f=await updatePanel();f.state.models.silero.status='missing';f.evaluate('view.show("cut")');
+  await f.click('update');
+  assert.match(f.get('action-readiness')?.textContent||'',/업데이트/);assert.equal(f.get('plan').disabled,true);
+  assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.equal(f.calls.some(c=>c.path==='/jobs'),false);
+});
+
+test('action guidance distinguishes heartbeat compatibility from a real component mismatch',async()=>{
+  const f=await panel();f.state.compatible=false;f.state.admissionError={code:'HEARTBEAT_REQUIRED'};await f.tick();
+  assert.match(f.get('action-readiness').textContent,/연결/);assert.doesNotMatch(f.get('action-readiness').textContent,/버전/);
+  assert.equal(f.get('analyze').disabled,true);
+  f.state.admissionError={code:'COMPONENT_MISMATCH'};await f.tick();
+  assert.match(f.get('action-readiness').textContent,/버전/);assert.equal(f.get('analyze').disabled,true);
+  f.state.compatible=true;f.state.admissionError=null;f.state.appVersion='different';await f.tick();
+  assert.match(f.get('action-readiness').textContent,/버전/);assert.equal(f.get('analyze').disabled,true);
+});
+
+test('action guidance does not claim an update is running when the updater is unavailable',async()=>{
+  const f=await panel();f.state.update={updateState:'UNAVAILABLE',checkState:'UNAVAILABLE'};await f.tick();
+  await f.nodes.find(n=>n.attrs['data-step']==='cut').onclick();
+  assert.match(f.get('action-readiness').textContent,/화자.*분석/);assert.doesNotMatch(f.get('action-readiness').textContent,/업데이트를 진행/);
+  assert.equal(f.get('analyze').disabled,false);
+});
+
+test('action guidance reports source validation then restored step prerequisites',async()=>{
+  const f=await panel();f.evaluate('view.show("cut")');f.validation(1);
+  assert.match(f.get('action-readiness')?.textContent||'',/원본 파일.*확인/);assert.equal(f.get('plan').disabled,true);
+  f.validation(0);assert.match(f.get('action-readiness').textContent,/화자.*분석/);
+});
+
+test('action guidance identifies missing sequence and explicit edit recovery',async()=>{
+  const f=await panel();f.evaluate('resetSequence()');
+  assert.match(f.get('action-readiness')?.textContent||'',/Premiere.*시퀀스/);assert.equal(f.get('analyze').disabled,true);
+  f.state.applyRecovery.blocked=true;await f.tick();
+  assert.match(f.get('action-readiness').textContent,/설정.*중단 작업/);assert.equal(f.get('analyze').disabled,true);
+});
+
 test('review distinguishes adjacent subsecond cuts by original frame bounds and duration',async()=>{
   const f=await panel();let actual;f.native.sequence.setPlayerPosition=async value=>{actual=value;};
   f.evaluate('plan={segments:[{startFrame:1,endFrame:2,cameraId:"video:0",reason:"speech"},{startFrame:2,endFrame:3,cameraId:"video:0",reason:"speech"}],reviews:[]};renderPlan();');
@@ -402,4 +461,5 @@ test('job authentication failure retains connection recovery and never promotes 
   const f=await panel({request:async path=>{if(path==='/jobs/job-1')throw Object.assign(new Error('auth'),{code:'AUTH_REQUIRED'});}});
   await f.click('analyze');await f.tick();assert.equal(f.resetCalls,1);assert.equal(f.get('analyze').disabled,true);
   assert.equal(f.get('apply').disabled,true);assert.equal(f.calls.some(c=>c.path==='/analyses/register'),false);assert.match(f.get('connection').textContent,/복구/);
+  assert.match(f.get('action-readiness').textContent,/연결/);
 });

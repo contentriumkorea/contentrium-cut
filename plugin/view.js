@@ -2,7 +2,7 @@
 (function(root){
   function install(document){
     const get=id=>document.getElementById(id),steps=['tracks','speakers','cut','review'];
-    let current='tracks',previous='tracks';
+    let current='tracks',previous='tracks',changed=null;
     function show(next){
       if(!steps.includes(next)&&next!=='settings')return;
       if(next==='settings'&&current!=='settings')previous=current;
@@ -16,6 +16,7 @@
       for(const id of ['next-step','analyze','plan','apply','close-settings'])get(id).className='primary'+(id===action?'':' hidden');
       get('back-step').disabled=next==='tracks';get('open-settings').setAttribute('aria-expanded',String(next==='settings'));
       get('workspace').scrollTop=0;
+      if(changed)changed();
     }
     for(const button of document.querySelectorAll('[data-step]'))button.onclick=()=>show(button.getAttribute('data-step'));
     for(const button of document.querySelectorAll('[data-next]'))button.onclick=()=>show(button.getAttribute('data-next'));
@@ -30,7 +31,7 @@
     get('back-step').onclick=()=>show(current==='settings'?previous:steps[Math.max(0,steps.indexOf(current)-1)]);
     get('open-settings').onclick=()=>show(current==='settings'?previous:'settings');
     get('close-settings').onclick=()=>show(previous);
-    show('tracks');return {show,current:()=>current};
+    show('tracks');return {show,current:()=>current,onChange:listener=>{changed=listener;}};
   }
   if(typeof module!=='undefined'&&module.exports)module.exports={install};
   else root.ContentriumView={install};

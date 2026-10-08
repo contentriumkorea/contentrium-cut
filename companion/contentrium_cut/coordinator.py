@@ -94,7 +94,20 @@ class Coordinator:
             if mode=='separate':channels.append({'assetId':key,'instanceKey':clip['instanceKey'],'inputKey':input_key,'speakerId':selected.get('speakerId'),'streamIndex':stream,'channelIndex':channel})
         for key in ambiguous:offsets.pop(key,None)
         if mode=='separate':check_assignments(channels,sources)
-        settings=dict(self.resource_settings(include_status=False)['settings'],fps=snap['fps'],range=snap['range'],offsets=offsets,channels=channels,calibration=options.get('calibration',[]),modelRoot=str(self.root/'models'),speakerCount=int(count) if count is not None else None,vadThreshold=float(threshold),bleedTolerance=float(options.get('bleedTolerance',1.8)))
+        calibration=[]
+        if mode=='separate':
+            examples=options.get('calibration',[])
+            if not isinstance(examples,list):raise CutError('INVALID_AUDIO_INPUT','Solo calibration must be a list of frame ranges.')
+            for example in examples:
+                if not isinstance(example,dict) or type(example.get('startFrame')) is not int or type(example.get('endFrame')) is not int or not 0<=example['startFrame']<example['endFrame']<=9007199254740991:
+                    raise CutError('INVALID_AUDIO_INPUT','Solo calibration requires ordered nonnegative integer frames.')
+                key=example.get('inputKey');sid=example.get('speakerId')
+                if not isinstance(sid,str) or not sid.strip() or 'inputKey' in example and (not isinstance(key,str) or not key):raise CutError('INVALID_AUDIO_INPUT','Solo calibration requires a selected speaker and recording input.')
+                first=tick_int(frame_ticks(example['startFrame'],snap['fps']));last=tick_int(frame_ticks(example['endFrame'],snap['fps']))
+                matches=[channel for channel,source in zip(channels,sources) if channel['speakerId']==sid and ('inputKey' not in example or channel['inputKey']==key) and tick_int(clips[source['instanceKey']]['startTicks'])<=first and last<=tick_int(clips[source['instanceKey']]['endTicks'])]
+                if len(matches)!=1:raise CutError('INVALID_AUDIO_INPUT','Solo calibration must fit exactly one selected microphone clip.')
+                calibration.append(dict(example,inputKey=matches[0]['inputKey']))
+        settings=dict(self.resource_settings(include_status=False)['settings'],fps=snap['fps'],range=snap['range'],offsets=offsets,channels=channels,calibration=calibration,modelRoot=str(self.root/'models'),speakerCount=int(count) if count is not None else None,vadThreshold=float(threshold),bleedTolerance=float(options.get('bleedTolerance',1.8)))
         settings['instanceOffsets']=instance_offsets
         ffmpeg=self.root/'app'/'ffmpeg'/'ffmpeg.exe'
         if ffmpeg.is_file():settings['ffmpeg']=str(ffmpeg)

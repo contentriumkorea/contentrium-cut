@@ -116,6 +116,29 @@ class CoordinatorTests(unittest.TestCase):
             c=Coordinator(d);s=self.fixture();s['sequenceRef']='changed'
             with self.assertRaises(CutError) as e:c.bind('panel',s)
             self.assertEqual(e.exception.code,'SNAPSHOT_HASH_MISMATCH')
+    def test_calibration_rejects_bad_types_identity_and_clip_bounds_before_decode(self):
+        with tempfile.TemporaryDirectory() as d:
+            c=Coordinator(d);c.bind('panel',self.fixture());options={'mode':'separate','microphones':[{'instanceKey':'mic','speakerId':'A'}]}
+            key=c.audio_payload('panel',options)['sources'][0]['inputKey'];valid={'speakerId':'A','inputKey':key,'startFrame':60,'endFrame':360}
+            for bad in [None,{},[None],[dict(valid,startFrame=True)],[dict(valid,startFrame=60.5)],[dict(valid,startFrame=59)],[dict(valid,endFrame=361)],[dict(valid,startFrame=90,endFrame=60)],[dict(valid,inputKey='unknown')],[dict(valid,speakerId='B')]]:
+                with self.subTest(bad=bad):
+                    with self.assertRaises(CutError) as error:c.audio_payload('panel',dict(options,calibration=bad))
+                    self.assertEqual(error.exception.code,'INVALID_AUDIO_INPUT')
+            self.assertEqual(c.audio_payload('panel',dict(options,calibration=[valid]))['settings']['calibration'],[valid])
+            legacy=dict(valid);legacy.pop('inputKey');self.assertEqual(c.audio_payload('panel',dict(options,calibration=[legacy]))['settings']['calibration'][0]['inputKey'],key)
+            self.assertEqual(c.audio_payload('panel',{'mode':'mixed','microphones':[{'instanceKey':'mic'}],'calibration':[None]})['settings']['calibration'],[])
+
+    def test_calibration_legacy_ambiguity_and_exact_subframe_bounds(self):
+        with tempfile.TemporaryDirectory() as d:
+            c=Coordinator(d);s=self.fixture();other=copy.deepcopy(s['clips'][0]);other['instanceKey']='repeated';s['clips'].append(other);s.pop('snapshotHash');s['snapshotHash']=canonical_hash(s);c.bind('panel',s)
+            options={'mode':'separate','microphones':[{'instanceKey':'mic','speakerId':'A'},{'instanceKey':'repeated','speakerId':'A'}]};example={'speakerId':'A','startFrame':60,'endFrame':90}
+            with self.assertRaises(CutError) as error:c.audio_payload('panel',dict(options,calibration=[example]))
+            self.assertEqual(error.exception.code,'INVALID_AUDIO_INPUT');key=c.audio_payload('panel',options)['sources'][0]['inputKey'];self.assertEqual(c.audio_payload('panel',dict(options,calibration=[dict(example,inputKey=key)]))['settings']['calibration'][0]['inputKey'],key)
+            s=self.fixture();s['clips'][0]['startTicks']=str(2*TICKS_PER_SECOND+1);s['clips'][0]['endTicks']=str(12*TICKS_PER_SECOND-1);s.pop('snapshotHash');s['snapshotHash']=canonical_hash(s);c.bind('panel',s);options['microphones']=options['microphones'][:1]
+            for start,end in [(60,90),(61,360)]:
+                with self.assertRaises(CutError):c.audio_payload('panel',dict(options,calibration=[dict(example,startFrame=start,endFrame=end)]))
+            self.assertEqual(c.audio_payload('panel',dict(options,calibration=[dict(example,startFrame=61,endFrame=359)]))['settings']['calibration'][0]['startFrame'],61)
+
     def test_analysis_scalar_active_validation(self):
         with tempfile.TemporaryDirectory() as d:
             c=Coordinator(d);c.bind('panel',self.fixture())

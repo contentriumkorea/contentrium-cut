@@ -86,6 +86,39 @@ function manualVisible(f,index){return !f.get('overrides').children[index].class
 function manualDelete(f,index=0){return f.get('overrides').children[index].children.find(n=>n.tag==='button');}
 function rawManual(f){return f.evaluate('JSON.stringify(overrideRows.map(r=>({first:r.first.value,last:r.last.value,camera:r.camera.value})))');}
 
+test('active analysis scalars reject blank nonfinite and out of range before job submission',async()=>{
+  for(const [mode,id,values] of [['separate','vad-threshold',['',' ','NaN','Infinity','0','0.049','0.951']],['mixed','speaker-count',['',' ','NaN','Infinity','0','1.5','27']]]){
+    const f=await panel();if(mode==='mixed')await f.click('mode-mixed');
+    for(const value of values){f.get(id).value=value;f.evaluate('toggle()');const count=f.calls.filter(c=>c.path==='/jobs').length;assert.equal(f.get('analyze').disabled,true,value);assert.equal(f.get(id).getAttribute('aria-invalid'),'true');assert.ok(f.get(id+'-error').textContent);await f.click('analyze');assert.equal(f.calls.filter(c=>c.path==='/jobs').length,count,value);}
+  }
+});
+test('inactive analysis settings are disabled ignored and preserve completed analysis identity',async()=>{
+  for(const [mode,id,active,boundaries] of [['separate','speaker-count','vad-threshold',['0.05','0.95']],['mixed','vad-threshold','speaker-count',['1','26']]]){
+    const f=await panel();if(mode==='mixed')await f.click('mode-mixed');assert.equal(f.get(id).disabled,true);f.get(id).value='';f.get(id).oninput();
+    for(const value of boundaries){f.get(active).value=value;f.get(active).oninput();assert.equal(f.get('analyze').disabled,false);await f.click('analyze');await f.tick();const identity=f.evaluate('analysisState.analysisId'),options=JSON.stringify(f.evaluate('microphoneOptions()'));f.get(id).value='Infinity';f.get(id).oninput();assert.equal(f.evaluate('analysisState.analysisId'),identity);assert.equal(JSON.stringify(f.evaluate('microphoneOptions()')),options);assert.equal(f.get(id).getAttribute('aria-invalid'),'false');}
+  }
+});
+test('analysis scalar raw restore preserves blanks numeric zero and input invalidates analysis immediately',async()=>{
+  const f=await analyzedPanel(),settings=JSON.parse(f.evaluate('JSON.stringify(captureSettings())'));settings.vadThreshold='';settings.speakerCount=' ';f.evaluate('restoreSettings('+JSON.stringify(settings)+');toggle()');assert.equal(f.get('vad-threshold').value,'');assert.equal(f.get('speaker-count').value,' ');assert.equal(f.get('analyze').disabled,true);
+  settings.vadThreshold=0;settings.speakerCount=0;f.evaluate('restoreSettings('+JSON.stringify(settings)+');toggle()');assert.equal(f.get('vad-threshold').value,'0');assert.equal(f.get('speaker-count').value,'0');
+  f.get('vad-threshold').value='0.5';f.get('vad-threshold').oninput();await f.click('analyze');await f.tick();await f.click('plan');f.get('vad-threshold').value='';f.get('vad-threshold').oninput();assert.equal(f.evaluate('analysisState'),null);assert.equal(f.evaluate('plan'),null);assert.equal(f.evaluate('captureSettings().vadThreshold'),'');assert.equal(f.get('analyze').disabled,true);
+});
+test('analysis scalar guard rechecks after async sequence read and update stays immediate',async()=>{
+  const f=await updatePanel();let resume;f.host.snapshot=()=>new Promise(resolve=>{resume=resolve;});const operation=f.click('analyze');for(let i=0;i<20;i++)await Promise.resolve();f.get('vad-threshold').value='';await f.click('update');assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);const timer=f.evaluate('settingsTimer');f.get('vad-threshold').oninput();assert.equal(f.evaluate('settingsTimer'),timer);resume({snapshot:structuredClone(f.native.snapshot),perFrame:f.native.perFrame,sequence:f.native.sequence});await operation;assert.equal(f.calls.filter(c=>c.path==='/jobs').length,0);
+  const g=await panel();let go;g.host.snapshot=()=>new Promise(resolve=>{go=resolve;});const run=g.click('analyze');for(let i=0;i<20;i++)await Promise.resolve();g.get('vad-threshold').value='';go({snapshot:structuredClone(g.native.snapshot),perFrame:g.native.perFrame,sequence:g.native.sequence});await run;assert.equal(g.calls.filter(c=>c.path==='/jobs').length,0);
+});
+
+test('legacy scalar analysis reference restores only matching valid active inputs then migrates hash',async()=>{
+  const f=await analyzedPanel();f.get('speaker-count').value='9';const settings=JSON.parse(f.evaluate('JSON.stringify(captureSettings())'));settings.analysisReference.inputHash=hash({...f.evaluate('microphoneOptions()'),speakerCount:9});f.evaluate('clearAnalysis();restoreSettings('+JSON.stringify(settings)+')');assert.equal(await f.evaluate('restoreSavedAnalysis('+JSON.stringify(settings)+')'),true);assert.equal(f.evaluate('analysisState.analysisId'),f.analysisId);assert.equal(f.evaluate('captureSettings().analysisReference.inputHash'),hash(f.evaluate('microphoneOptions()')));
+  const bad=structuredClone(settings);bad.vadThreshold='';f.evaluate('clearAnalysis();restoreSettings('+JSON.stringify(bad)+')');const before=f.calls.length;await assert.rejects(f.evaluate('restoreSavedAnalysis('+JSON.stringify(bad)+')'));assert.equal(f.calls.slice(before).some(c=>c.path.startsWith('/analyses/')||c.path.startsWith('/jobs/')),false);
+  f.evaluate('restoreSettings('+JSON.stringify(settings)+')');settings.analysisReference.inputHash='0'.repeat(64);await assert.rejects(f.evaluate('restoreSavedAnalysis('+JSON.stringify(settings)+')'));assert.equal(f.evaluate('analysisState'),null);
+});
+test('analysis scalar callbacks honor direct update recovery and pending locks',async()=>{
+  for(const state of ['pending=true','updateIntent={inFlight:true}','localEditPending=true','state.applyRecovery.blocked=true','job={jobId:"owned"}','validationCount=1']){const f=await analyzedPanel();f.evaluate(state);const id=f.evaluate('analysisState.analysisId'),timer=f.evaluate('settingsTimer');f.get('vad-threshold').value='';f.get('vad-threshold').oninput();f.get('vad-threshold').onchange();assert.equal(f.evaluate('analysisState.analysisId'),id,state);assert.equal(f.evaluate('settingsTimer'),timer,state);}
+});
+test('active scalar controls reflect recovery compatibility and update intent locks',async()=>{
+  for(const condition of ['localEditPending=true','state.applyRecovery.blocked=true','state.compatible=false','updateIntent={inFlight:true}']){const f=await analyzedPanel();f.evaluate(condition+';toggle()');assert.equal(f.get('vad-threshold').disabled,true,condition);assert.equal(f.get('speaker-count').disabled,true,condition);f.evaluate('localEditPending=false;state.applyRecovery.blocked=false;state.compatible=true;updateIntent=null;toggle()');assert.equal(f.get('vad-threshold').disabled,false);assert.equal(f.get('speaker-count').disabled,true);}
+});
 test('update click locks manual add and delete and direct handlers preserve all raw rows',async()=>{
   const f=await updatePanel();await f.click('add-override');await f.click('add-override');overrideRow(f).first.value=' ';overrideRow(f).first.oninput();await f.click('override-filter');const remove=manualDelete(f);
   await f.click('update');const before=rawManual(f),timer=f.evaluate('settingsTimer'),display=f.get('override-summary').textContent;assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);

@@ -87,8 +87,7 @@ function restoreSettings(settings){
   if(!settings.reserve||cameraValues().some(c=>c[0]===settings.reserve))$('reserve-camera').value=settings.reserve;
   $('min-shot').value=String(settings.policy.minShot);$('short-turn').value=String(settings.policy.shortTurn);$('overlap').value=String(settings.policy.overlap);
   for(const [id,key] of [['min-shot','minShot'],['short-turn','shortTurn'],['overlap','overlap']])if(typeof settings.policyInput?.[key]==='string')$(id).value=settings.policyInput[key];
-  if(settings.speakerCount)$('speaker-count').value=settings.speakerCount;
-  if(settings.vadThreshold)$('vad-threshold').value=settings.vadThreshold;
+  for(const [id,key] of [['speaker-count','speakerCount'],['vad-threshold','vadThreshold']])if(typeof settings[key]==='string'||typeof settings[key]==='number'&&Number.isFinite(settings[key]))$(id).value=String(settings[key]);
   const bounds=settings.range;
   if(bounds&&Number.isSafeInteger(bounds.startFrame)&&Number.isSafeInteger(bounds.endFrame)&&bounds.startFrame>=0&&bounds.endFrame>bounds.startFrame&&bounds.endFrame<=(connected.fullRangeEnd||connected.snapshot.range.endFrame)){
     $('range-start').value=String(bounds.startFrame);$('range-end').value=String(bounds.endFrame);rangeDirty=bounds.startFrame!==connected.snapshot.range.startFrame||bounds.endFrame!==connected.snapshot.range.endFrame;
@@ -121,7 +120,7 @@ async function restoreSavedSettings(optional=false){
 async function restoreSavedAnalysis(settings){
   const ref=settings.analysisReference;if(!ref)return false;
   const matches=()=>ref.schemaVersion===1&&/^[a-f0-9]{64}$/.test(ref.analysisId)&&/^[a-zA-Z0-9_-]{1,128}$/.test(ref.jobId)&&
-    Number.isSafeInteger(ref.revision)&&ref.revision>=0&&ref.snapshotHash===connected?.snapshot.snapshotHash&&ref.mode===mode&&ref.inputHash===ContentriumHost.hash(microphoneOptions());
+    Number.isSafeInteger(ref.revision)&&ref.revision>=0&&ref.snapshotHash===connected?.snapshot.snapshotHash&&ref.mode===mode&&!analysisOptionsFeedback()&&analysisReferenceMatches(ref.inputHash);
   await requireCurrent();if(!matches())throw new Error('이전 분석의 타임라인 또는 음성 입력이 달라졌습니다. 새로 분석해 주세요.');
   const completed=await api('/jobs/'+ref.jobId);
   if(completed.kind!=='analysis'||completed.status!=='completed')throw new Error('이전 분석 작업을 확인할 수 없습니다. 새로 분석해 주세요.');
@@ -184,6 +183,7 @@ function toggle(){
   if(plan&&!planMatches()){clearPolicyPlan();planInvalidated=true;}
   const busy=pending||applying||!!job||validationCount>0,locked=workLocked();
   for(const el of document.querySelectorAll('input,select,button.mode'))el.disabled=inputLocked();
+  $('speaker-count').disabled=workLocked()||mode!=='mixed';$('vad-threshold').disabled=workLocked()||mode!=='separate';
   for(const id of ['analyze','sync','plan','apply-sync','apply','save-settings','load-settings'])$(id).disabled=locked||!connected||(id==='plan'&&!analysisState)||(id==='apply'&&!plan)||(id==='apply-sync'&&!syncResult);
   for(const id of ['read-project','read-selection','install-model','save-resources','prune-cache'])$(id).disabled=locked;
   for(const el of document.querySelectorAll('[data-work]'))el.disabled=locked;
@@ -231,7 +231,28 @@ function rangeFeedback(){
   const node=$('range-error');if(node.textContent!==input.text)node.textContent=input.text;
   node.className='hint input-error'+(input.text?'':' hidden');return input.text;
 }
+function analysisOptionsFeedback(){
+  let first='';
+  for(const [id,active,text,integer,min,max] of [['speaker-count',mode==='mixed','예상 화자 수는 1–26의 정수로 입력하세요.',true,1,26],['vad-threshold',mode==='separate','발화 민감도는 0.05–0.95의 숫자로 입력하세요.',false,.05,.95]]){
+    const field=$(id),raw=field.value.trim(),value=Number(raw),invalid=active&&(!raw||!Number.isFinite(value)||value<min||value>max||integer&&!Number.isSafeInteger(value));
+    const flag=invalid?'true':'false';if(field.getAttribute('aria-invalid')!==flag)field.setAttribute('aria-invalid',flag);
+    const node=$(id+'-error'),message=invalid?text:'';if(node.textContent!==message)node.textContent=message;
+    node.className='hint input-error'+(message?'':' hidden');if(message&&!first)first=message;
+  }
+  return first;
+}
+function analysisReferenceMatches(inputHash){
+  const current=microphoneOptions();if(inputHash===ContentriumHost.hash(current))return true;
+  const count=Number($('speaker-count').value),threshold=Number($('vad-threshold').value);
+  return Number.isFinite(count)&&Number.isFinite(threshold)&&inputHash===ContentriumHost.hash({...current,speakerCount:count,vadThreshold:threshold});
+}
+function analysisOptionChanged(id){
+  if(workLocked())return;
+  if(id===(mode==='mixed'?'speaker-count':'vad-threshold'))invalidateAnalysis();
+  else {scheduleSettings();toggle();}
+}
 function microphoneFeedback(){
+  const scalarIssue=analysisOptionsFeedback();
   let first='',selected=0;
   for(const row of microphoneRows){
     const active=row.check.checked;selected+=active?1:0;
@@ -249,7 +270,7 @@ function microphoneFeedback(){
     if(row.issue.textContent!==text)row.issue.textContent=text;
     row.issue.className='hint input-error'+(text?'':' hidden');if(text&&!first)first=text;
   }
-  return connected&&!selected?'분석할 마이크를 하나 이상 선택하세요.':first;
+  return connected&&!selected?'분석할 마이크를 하나 이상 선택하세요.':first||scalarIssue;
 }
 function renderSources(){
   for(const id of ['microphones','cameras','calibration','speaker-mapping','sync-sources'])$(id).innerHTML='';
@@ -420,7 +441,7 @@ async function listenExample(example){
   job={...await api('/analyses/'+identity.analysisId+'/example',{exampleId:example.exampleId,expectedRevision:identity.revision,epoch:state.epoch}),...identity};
   say('단독 발화 샘플을 준비하고 있습니다.');toggle();
 }
-function microphoneOptions(){return {mode,microphones:microphoneRows.filter(r=>r.check.checked).map(r=>({instanceKey:r.clip.instanceKey,speakerId:r.speaker.value.trim(),streamIndex:Number(r.stream.value)-1,channelIndex:Number(r.channel.value)-1})),speakerCount:Number($('speaker-count').value),vadThreshold:Number($('vad-threshold').value),calibration:calibrationRows.filter(r=>Number(r.last.value)>Number(r.first.value)).map(r=>({speakerId:r.speaker.value.trim(),inputKey:ContentriumHost.hash({instanceKey:r.instanceKey,streamIndex:Number(r.stream.value)-1,channelIndex:Number(r.channel.value)-1}),startFrame:Number(r.first.value),endFrame:Number(r.last.value)}))};}
+function microphoneOptions(){return {mode,microphones:microphoneRows.filter(r=>r.check.checked).map(r=>({instanceKey:r.clip.instanceKey,speakerId:r.speaker.value.trim(),streamIndex:Number(r.stream.value)-1,channelIndex:Number(r.channel.value)-1})),speakerCount:mode==='mixed'?Number($('speaker-count').value):2,vadThreshold:mode==='separate'?Number($('vad-threshold').value):.5,calibration:calibrationRows.filter(r=>Number(r.last.value)>Number(r.first.value)).map(r=>({speakerId:r.speaker.value.trim(),inputKey:ContentriumHost.hash({instanceKey:r.instanceKey,streamIndex:Number(r.stream.value)-1,channelIndex:Number(r.channel.value)-1}),startFrame:Number(r.first.value),endFrame:Number(r.last.value)}))};}
 function mapping(){const s=connected.snapshot;return {speakers:Object.fromEntries(speakerRows.map(r=>[r.id,r.select.value])),cameras:cameraRows.filter(r=>r.role.value!=='protected').map(r=>({cameraId:r.id,role:r.role.value,coveredSpeakers:r.covered.value.split(',').map(v=>v.trim()).filter(Boolean),clips:s.clips.filter(c=>c.trackRef===r.id).map(c=>({instanceKey:c.instanceKey,startFrame:Math.round(Number(c.startTicks)/connected.perFrame),endFrame:Math.round(Number(c.endTicks)/connected.perFrame)}))})),startCameraId:$('start-camera').value,fallbackOrder:$('reserve-camera').value?[$('reserve-camera').value]:[]};}
 function policyFeedback(){
   let first='';
@@ -675,7 +696,7 @@ handler('refresh',async()=>{if(credentials)await refresh();else await initialize
 handler('read-project',()=>readProject());
 handler('analyze',async()=>{
   admitted();const issue=microphoneFeedback();if(issue)throw new Error(issue);
-  await requireCurrent();await stopPreview();clearAnalysis();
+  await requireCurrent();await stopPreview();admitted();if(updateIntent)throw Object.assign(new Error('UPDATE_IN_PROGRESS'),{code:'UPDATE_IN_PROGRESS'});const currentIssue=microphoneFeedback();if(currentIssue)throw new Error(currentIssue);clearAnalysis();
   job={...await api('/jobs',{kind:'analysis',options:microphoneOptions(),epoch:state.epoch}),snapshotHash:connected.snapshot.snapshotHash};say('화자 분석을 시작합니다.');
 });
 handler('sync',async()=>{
@@ -790,7 +811,7 @@ for(const value of ['separate','mixed'])handler('mode-'+value,async()=>{mode=val
 for(const id of ['range-start','range-end'])$(id).oninput=$(id).onchange=()=>{rangeDirty=true;invalidateAnalysis();say(rangeIssue||'분석할 범위를 변경했습니다. 다음 분석에 적용됩니다.');};
 for(const id of ['min-shot','short-turn','overlap'])$(id).oninput=$(id).onchange=policyInputsChanged;
 for(const id of ['start-camera','reserve-camera'])$(id).onchange=invalidatePlan;
-for(const id of ['speaker-count','vad-threshold'])$(id).onchange=invalidateAnalysis;
+for(const id of ['speaker-count','vad-threshold'])$(id).oninput=$(id).onchange=()=>analysisOptionChanged(id);
 $('sync-method').onchange=syncMethodChanged;
 $('review-camera').onchange=$('review-search').oninput=()=>{reviewPage=0;renderReviewCuts();};
 $('review-previous').onclick=()=>{if(plan&&reviewWindow?.previous){reviewPage--;renderReviewCuts();}};

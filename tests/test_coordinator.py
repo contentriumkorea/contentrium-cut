@@ -116,6 +116,25 @@ class CoordinatorTests(unittest.TestCase):
             c=Coordinator(d);s=self.fixture();s['sequenceRef']='changed'
             with self.assertRaises(CutError) as e:c.bind('panel',s)
             self.assertEqual(e.exception.code,'SNAPSHOT_HASH_MISMATCH')
+    def test_analysis_scalar_active_validation(self):
+        with tempfile.TemporaryDirectory() as d:
+            c=Coordinator(d);c.bind('panel',self.fixture())
+            for mode,key,invalid in [('separate','vadThreshold',['',None,True,float('nan'),float('inf'),10**1000,0,.049,.951]),('mixed','speakerCount',['',True,float('nan'),float('inf'),10**1000,0,1.5,27])]:
+                for value in invalid:
+                    with self.subTest(mode=mode,value=value):
+                        with self.assertRaises(CutError) as error:c.audio_payload('panel',{'mode':mode,'microphones':[{'instanceKey':'mic','speakerId':'A'}],key:value})
+                        self.assertEqual(error.exception.code,'INVALID_AUDIO_INPUT')
+
+    def test_analysis_scalar_inactive_defaults_boundaries_and_auto_count(self):
+        with tempfile.TemporaryDirectory() as d:
+            c=Coordinator(d);c.bind('panel',self.fixture())
+            for value in [.05,.95]:
+                settings=c.audio_payload('panel',{'mode':'separate','microphones':[{'instanceKey':'mic','speakerId':'A'}],'vadThreshold':value,'speakerCount':''})['settings']
+                self.assertEqual(settings['vadThreshold'],value);self.assertIsNone(settings['speakerCount'])
+            for value in [None,1,26]:
+                settings=c.audio_payload('panel',{'mode':'mixed','microphones':[{'instanceKey':'mic'}],'speakerCount':value,'vadThreshold':''})['settings']
+                self.assertEqual(settings['speakerCount'],value);self.assertEqual(settings['vadThreshold'],.5)
+
     def test_analysis_uses_selected_instance_start_minus_source_in(self):
         with tempfile.TemporaryDirectory() as d:
             c=Coordinator(d);s=self.fixture();c.bind('panel',s)

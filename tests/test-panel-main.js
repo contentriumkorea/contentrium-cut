@@ -72,6 +72,33 @@ async function updatePanel(extra={}){
   await f.tick();return f;
 }
 
+test('review distinguishes adjacent subsecond cuts by original frame bounds and duration',async()=>{
+  const f=await panel();let actual;f.native.sequence.setPlayerPosition=async value=>{actual=value;};
+  f.evaluate('plan={segments:[{startFrame:1,endFrame:2,cameraId:"video:0",reason:"speech"},{startFrame:2,endFrame:3,cameraId:"video:0",reason:"speech"}],reviews:[]};renderPlan();');
+  const rows=f.get('segments').children;
+  assert.equal(rows[0].children.find(n=>n.className==='segment-timing')?.textContent,'1–2 프레임 · 1프레임 / 0.033초');
+  assert.equal(rows[1].children.find(n=>n.className==='segment-timing')?.textContent,'2–3 프레임 · 1프레임 / 0.033초');
+  await rows[1].onclick();assert.equal(actual,String(2n*BigInt(f.native.perFrame)));
+});
+
+test('review uses rational FPS for fractional rate durations and shows the exact sequence rate',async()=>{
+  const native=nativeSnapshot();native.snapshot.fps={num:30000,den:1001};delete native.snapshot.snapshotHash;native.snapshot.snapshotHash=hash(native.snapshot);
+  const f=await panel({native});
+  assert.match(f.get('sequence-info').textContent,/29\.970 fps \(30000\/1001\)/);
+  f.evaluate('plan={segments:[{startFrame:29,endFrame:59,cameraId:"video:0",reason:"speech"}],reviews:[]};renderPlan();');
+  assert.equal(f.get('segments').children[0].children.find(n=>n.className==='segment-timing')?.textContent,'29–59 프레임 · 30프레임 / 1.001초');
+});
+
+test('review searches displayed end frames and keeps the complete original edit plan',async()=>{
+  const f=await panel();
+  f.evaluate('plan={segments:[{startFrame:1,endFrame:17,cameraId:"video:0",reason:"speech"},{startFrame:18,endFrame:25,cameraId:"video:0",reason:"speech"}],reviews:[]};renderPlan();');
+  const before=f.evaluate('JSON.stringify(plan)');
+  f.get('review-search').value='1–17';f.get('review-search').oninput();
+  assert.equal(f.get('segments').children.length,1);
+  assert.match(f.get('segments').children[0].children.find(n=>n.className==='segment-timing')?.textContent||'',/^1–17/);
+  assert.equal(f.evaluate('JSON.stringify(plan)'),before);
+});
+
 test('long-form cut review pages and filters without changing the edit plan',async()=>{
   const f=await panel(),segments=Array.from({length:121},(_,i)=>({startFrame:i*2,endFrame:i*2+2,cameraId:i%2?'video:1':'video:0',reason:i%2?'OVERLAP_HOLD':'SPEAKER_TURN'}));
   const value={planHash:'p'.repeat(64),segments,reviews:[]},before=JSON.stringify(value);

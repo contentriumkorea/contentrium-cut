@@ -83,6 +83,44 @@ function overrideRow(f,index=0){return f.evaluate('overrideRows['+index+']');}
 function manualToggle(f){return f.nodes.find(n=>n.attrs['data-disclosure']==='disclosure-6');}
 function manualVisible(f,index){return !f.get('overrides').children[index].className.split(/\s+/).includes('hidden');}
 
+function manualDelete(f,index=0){return f.get('overrides').children[index].children.find(n=>n.tag==='button');}
+function rawManual(f){return f.evaluate('JSON.stringify(overrideRows.map(r=>({first:r.first.value,last:r.last.value,camera:r.camera.value})))');}
+
+test('update click locks manual add and delete and direct handlers preserve all raw rows',async()=>{
+  const f=await updatePanel();await f.click('add-override');await f.click('add-override');overrideRow(f).first.value=' ';overrideRow(f).first.oninput();await f.click('override-filter');const remove=manualDelete(f);
+  await f.click('update');const before=rawManual(f),timer=f.evaluate('settingsTimer'),display=f.get('override-summary').textContent;assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);
+  assert.equal(f.get('add-override').disabled,true);assert.equal(remove.disabled,true);await f.click('add-override');remove.onclick();assert.equal(rawManual(f),before);assert.equal(f.evaluate('settingsTimer'),timer);assert.equal(f.get('override-summary').textContent,display);assert.equal(f.get('plan').disabled,true);
+});
+
+test('manual edit locks cover busy recovery unsupported authentication and disconnected states',async()=>{
+  const states=[['validation',f=>f.validation(1)],['job',f=>f.evaluate("job={jobId:'owned-running',kind:'analysis'};toggle()")],['applying',f=>f.evaluate('applying=true;toggle()')],['recovery',f=>f.evaluate('localEditPending=true;toggle()')],['server recovery',f=>f.evaluate('state.applyRecovery.blocked=true;toggle()')],['unsupported',f=>f.evaluate('state.compatible=false;toggle()')],['stopped',f=>f.evaluate('stopped=true;toggle()')],['gate closed',f=>f.evaluate('state.gateOpen=false;toggle()')],['credentials lost',f=>f.evaluate('credentials=null;toggle()')],['disconnected',f=>f.evaluate('connected=null;toggle()')],['intent only',f=>f.evaluate('updateIntent={inFlight:true};stopped=false;state.gateOpen=true;toggle()')]];
+  for(const [name,lock] of states){const f=await overridePanel();overrideRow(f).first.value=' ';overrideRow(f).first.oninput();const remove=manualDelete(f);lock(f);const before=rawManual(f),timer=f.evaluate('settingsTimer');assert.equal(f.get('add-override').disabled,true,name);assert.equal(remove.disabled,true,name);await f.click('add-override');remove.onclick();assert.equal(rawManual(f),before,name);assert.equal(f.evaluate('settingsTimer'),timer,name);}
+});
+
+test('pending project read blocks manual deletion and addition until the actual response completes',async()=>{
+  const f=await overridePanel(),remove=manualDelete(f);let resume;f.host.snapshot=()=>new Promise(resolve=>{resume=resolve;});const operation=f.click('read-project');for(let i=0;i<20;i++)await Promise.resolve();assert.equal(typeof resume,'function');const before=rawManual(f),timer=f.evaluate('settingsTimer');assert.equal(remove.disabled,true);assert.equal(f.get('add-override').disabled,true);
+  await f.click('add-override');remove.onclick();assert.equal(rawManual(f),before);assert.equal(f.evaluate('settingsTimer'),timer);resume({snapshot:structuredClone(f.native.snapshot),perFrame:f.native.perFrame,sequence:f.native.sequence});await operation;assert.equal(f.get('add-override').disabled,false);assert.equal(manualDelete(f).disabled,false);
+});
+
+test('stale or repeated manual deletion never removes another current row or schedules settings',async()=>{
+  const f=await overridePanel();await f.click('add-override');overrideRow(f,1).first.value='120';overrideRow(f,1).first.oninput();const oldDelete=manualDelete(f).onclick;oldDelete();const before=rawManual(f),timer=f.evaluate('settingsTimer');oldDelete();assert.equal(rawManual(f),before);assert.equal(f.evaluate('settingsTimer'),timer);assert.equal(f.evaluate('overrideRows.length'),1);
+  const detached=manualDelete(f).onclick,settings=JSON.parse(f.evaluate('JSON.stringify(captureSettings())'));f.evaluate('restoreSettings('+JSON.stringify(settings)+');toggle()');const restored=rawManual(f),restoredTimer=f.evaluate('settingsTimer');detached();assert.equal(rawManual(f),restored);assert.equal(f.evaluate('settingsTimer'),restoredTimer);
+});
+
+test('internal manual batch recovery remains available while public edits are pending locked',async()=>{
+  const f=await analyzedPanel(),settings=JSON.parse(f.evaluate('JSON.stringify(captureSettings())'));settings.overrideInput=[{first:' ',last:'300',camera:'video:0'},{first:'120',last:'300',camera:'video:0'}];f.evaluate('pending=true;restoreSettings('+JSON.stringify(settings)+');toggle()');assert.equal(f.evaluate('overrideRows.length'),2);assert.equal(overrideRow(f).first.value,' ');assert.equal(overrideRow(f,1).first.value,'120');assert.equal(f.get('add-override').disabled,true);assert.equal(manualDelete(f,1).disabled,true);
+  f.evaluate('pending=false;toggle()');assert.equal(f.get('add-override').disabled,false);assert.equal(manualDelete(f,1).disabled,false);
+});
+
+test('allowed manual edits invalidate the plan preserve analysis and save raw settings',async()=>{
+  const f=await analyzedPanel();await f.click('plan');await f.click('add-override');assert.equal(f.evaluate('overrideRows.length'),1);assert.equal(f.get('apply').disabled,true);assert.equal(f.evaluate('analysisState!==null'),true);assert.equal(f.get('add-override').disabled,false);assert.equal(manualDelete(f).disabled,false);overrideRow(f).first.value='120';overrideRow(f).first.oninput();await f.click('plan');assert.equal(f.get('apply').disabled,false);
+  manualDelete(f).onclick();assert.equal(f.evaluate('overrideRows.length'),0);assert.equal(f.get('apply').disabled,true);assert.equal(f.evaluate('analysisState!==null'),true);for(let i=0;i<f.timeouts.length;i++){const fn=f.timeouts[i];f.timeouts[i]=null;if(fn)await fn();}const key=[...f.saved.rows.keys()].find(k=>k.startsWith('cut-settings-'));assert.deepEqual(JSON.parse(f.saved.rows.get(key)).overrideInput,[]);
+});
+
+test('new manual delete controls are born locked during internal pending restore before later toggles',async()=>{
+  for(const lock of ['pending=true','updateIntent={inFlight:true};stopped=true']){const f=await analyzedPanel(),settings=JSON.parse(f.evaluate('JSON.stringify(captureSettings())'));settings.overrideInput=[{first:' ',last:'300',camera:'video:0'}];f.evaluate(lock+';toggle();restoreSettings('+JSON.stringify(settings)+')');assert.equal(f.get('add-override').disabled,true);assert.equal(manualDelete(f).disabled,true);for(const field of [overrideRow(f).first,overrideRow(f).last,overrideRow(f).camera])assert.equal(field.disabled,true,'restored input is locked before later toggle');const before=rawManual(f);manualDelete(f).onclick();assert.equal(rawManual(f),before);}
+});
+
 test('collapsed manual summary identifies restored invalid rows without forcing disclosure open',async()=>{
   const f=await analyzedPanel(),settings=JSON.parse(f.evaluate('JSON.stringify(captureSettings())'));
   settings.overrideInput=Array.from({length:7},(_,i)=>({first:i===6?'':'0',last:'300',camera:'video:0'}));f.evaluate('restoreSettings('+JSON.stringify(settings)+');toggle()');

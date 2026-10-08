@@ -74,6 +74,65 @@ async function updatePanel(extra={}){
 
 function mic(f,index=0){return f.evaluate('microphoneRows['+index+']');}
 function micError(f,index=0){return f.get('microphones').children[index]?.children.find(n=>n.className.includes('input-error'))?.textContent||'';}
+function syncRow(f,index=0){return f.evaluate('syncRows['+index+']');}
+
+test('sync source malformed indices are rejected before submitting a job',async()=>{
+  for(const [field,value] of [['channel',''],['channel','0'],['channel','-1'],['stream','1.5'],['stream','invalid'],['stream','9007199254740992']]){
+    const f=await panel(),row=syncRow(f);row[field].value=value;row[field].onchange();await f.click('sync');
+    assert.equal(f.calls.some(c=>c.path==='/jobs'),false);assert.equal(f.get('sync').disabled,true);assert.equal(f.get('analyze').disabled,false);
+    assert.match(f.get('sync-error').textContent,/camera.mov.*정수/);assert.equal(row[field].getAttribute('aria-invalid'),'true');
+    row[field].value='1';row[field].onchange();assert.equal(f.get('sync-error').textContent,'');assert.equal(f.get('sync').disabled,false);
+    await f.click('sync');const options=f.calls.find(c=>c.path==='/jobs').body.options;assert.equal(options.sourceSelections[0].streamIndex,0);assert.equal(options.sourceSelections[0].channelIndex,0);
+  }
+});
+
+test('sync selection count and excluded reference have visible correction guidance',async()=>{
+  const f=await panel(),first=syncRow(f);first.check.checked=false;first.check.onchange();await f.click('sync');
+  assert.equal(f.calls.some(c=>c.path==='/jobs'),false);assert.match(f.get('sync-error').textContent,/소스.*2/);
+  const native=nativeSnapshot();native.snapshot.sources.push({assetId:'extra',canonicalPath:'D:/owned/extra.wav'});delete native.snapshot.snapshotHash;native.snapshot.snapshotHash=hash(native.snapshot);
+  const g=await panel({native});syncRow(g).check.checked=false;syncRow(g).check.onchange();await g.click('sync');assert.equal(g.calls.some(c=>c.path==='/jobs'),false);assert.match(g.get('sync-error').textContent,/기준.*선택/);
+  g.get('sync-reference').value='mic';g.get('sync-reference').onchange();assert.equal(g.get('sync-error').textContent,'');assert.equal(g.get('sync').disabled,false);
+});
+
+test('invalid unchecked sync row is ignored and all methods retain index conversion',async()=>{
+  for(const method of ['audio','manual','timecode']){
+    const native=nativeSnapshot();native.snapshot.sources.push({assetId:'extra',canonicalPath:'D:/owned/extra.wav'});delete native.snapshot.snapshotHash;native.snapshot.snapshotHash=hash(native.snapshot);
+    const f=await panel({native}),ignored=syncRow(f,2);ignored.channel.value='';ignored.stream.value='bad';ignored.check.checked=false;ignored.check.onchange();
+    f.get('sync-method').value=method;f.get('sync-method').onchange();syncRow(f).stream.value='257';syncRow(f).channel.value='65';syncRow(f).stream.onchange();await f.click('sync');
+    assert.equal(f.get('sync-error').textContent,'');const options=f.calls.find(c=>c.path==='/jobs').body.options;assert.equal(options.method,method);assert.equal(options.sourceSelections.length,2);assert.equal(options.sourceSelections[0].streamIndex,256);assert.equal(options.sourceSelections[0].channelIndex,64);
+  }
+});
+
+test('sync settings preserve raw invalid and unchecked input without breaking legacy settings',async()=>{
+  const f=await panel();syncRow(f).stream.value='';syncRow(f,1).check.checked=false;syncRow(f,1).channel.value='bad';syncRow(f).stream.onchange();await f.click('save-settings');
+  syncRow(f).stream.value='1';syncRow(f,1).channel.value='1';await f.click('load-settings');assert.equal(syncRow(f).stream.value,'');assert.equal(syncRow(f,1).channel.value,'bad');assert.equal(syncRow(f,1).check.checked,false);
+  const settings=JSON.parse(f.evaluate('JSON.stringify(captureSettings())'));delete settings.syncInput;settings.sync.sourceSelections=[{assetId:'camera',streamIndex:1,channelIndex:2},{assetId:'mic',streamIndex:0,channelIndex:0}];
+  f.evaluate('restoreSettings('+JSON.stringify(settings)+');toggle()');assert.equal(syncRow(f).stream.value,'2');assert.equal(syncRow(f).channel.value,'3');assert.equal(f.get('sync').disabled,false);
+});
+
+test('typing sync input clears stale results without blocking unrelated analysis or immediate update',async()=>{
+  const f=await updatePanel();f.evaluate("syncJob='job-1';syncResult={};");f.get('sync-result').textContent='old result';f.evaluate('toggle()');assert.equal(f.get('apply-sync').disabled,false);
+  const row=syncRow(f);assert.equal(typeof row.channel.oninput,'function');row.channel.value='';row.channel.oninput();assert.equal(f.get('apply-sync').disabled,true);assert.equal(f.get('sync-result').textContent,'');assert.equal(f.get('analyze').disabled,false);
+  await f.click('update');assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.match(f.get('action-readiness').textContent,/업데이트/);
+});
+
+test('direct sync apply rejects changed malformed input even without an input event',async()=>{
+  const f=await panel();f.evaluate("syncJob='job-1';syncResult={};");syncRow(f).channel.value='';await f.click('apply-sync');
+  assert.equal(f.calls.some(c=>c.path==='/sync-plan'),false);assert.equal(f.get('project-name').textContent,'sequence-1');assert.match(f.get('status').textContent,/채널/);
+});
+
+test('sync input autosave preserves invalid values after automatic same-sequence refresh',async()=>{
+  const f=await panel();syncRow(f).stream.value='';syncRow(f).stream.oninput();syncRow(f,1).channel.value='bad';syncRow(f,1).check.checked=false;syncRow(f,1).check.onchange();
+  f.native.snapshot.sequenceName='Updated timeline';delete f.native.snapshot.snapshotHash;f.native.snapshot.snapshotHash=hash(f.native.snapshot);await f.tick();
+  for(let i=0;i<f.timeouts.length;i++){const callback=f.timeouts[i];f.timeouts[i]=null;if(callback)await callback();}
+  const settings=JSON.parse([...f.saved.rows.values()].find(raw=>typeof raw==='string'&&raw.includes('syncInput')));
+  assert.equal(settings.syncInput[0].stream,'');assert.equal(settings.syncInput[1].channel,'bad');assert.equal(syncRow(f).stream.value,'');assert.equal(syncRow(f,1).check.checked,false);
+});
+
+test('direct sync analysis rejects bad indices without events and input typing updates row accessibility',async()=>{
+  const f=await panel(),row=syncRow(f);row.stream.value='1.5';await f.click('sync');assert.equal(f.calls.some(c=>c.path==='/jobs'),false);assert.equal(row.stream.getAttribute('aria-invalid'),'true');assert.equal(row.stream.getAttribute('aria-describedby'),row.issue.id);
+  row.stream.value='2';row.stream.oninput();assert.equal(row.stream.getAttribute('aria-invalid'),'false');assert.equal(row.issue.textContent,'');assert.equal(f.get('sync').disabled,false);
+});
 
 test('invalid range does not discard the connected sequence or customized tracks',async()=>{
   const f=await panel(),row=mic(f);row.speaker.value='진행자';row.channel.value='2';row.channel.onchange();

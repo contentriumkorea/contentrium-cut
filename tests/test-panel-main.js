@@ -74,6 +74,7 @@ async function updatePanel(extra={}){
 }
 
 function mic(f,index=0){return f.evaluate('microphoneRows['+index+']');}
+function readinessDiagnostic(f){return f.evaluate('JSON.stringify({pending,applying,job,validationCount,stopped,credentials,state,localEditPending,updateIntent,microphoneIssue,rangeIssue,syncIssue,initializing,connected:!!connected})');}
 function micError(f,index=0){return f.get('microphones').children[index]?.children.find(n=>n.className.includes('input-error'))?.textContent||'';}
 function syncRow(f,index=0){return f.evaluate('syncRows['+index+']');}
 
@@ -85,6 +86,28 @@ function manualVisible(f,index){return !f.get('overrides').children[index].class
 
 function manualDelete(f,index=0){return f.get('overrides').children[index].children.find(n=>n.tag==='button');}
 function rawManual(f){return f.evaluate('JSON.stringify(overrideRows.map(r=>({first:r.first.value,last:r.last.value,camera:r.camera.value})))');}
+
+const trackLocks=['localEditPending=true','state.applyRecovery.blocked=true','state.compatible=false','updateIntent={inFlight:true}','pending=true','applying=true','job={jobId:"owned"}','validationCount=1','stopped=true','state.gateOpen=false','credentials=null','connected=null'];
+function trackControls(f){const r=mic(f),c=f.evaluate('cameraRows[0]');return [r.check,r.speaker,r.stream,r.channel,c.role,c.covered,...f.evaluate('speakerRows.map(r=>r.select)'),f.get('start-camera'),f.get('reserve-camera')];}
+test('track controls disable for recovery compatibility update and every work lock',async()=>{
+  for(const lock of trackLocks){const f=await analyzedPanel();f.evaluate(lock+';toggle()');for(const field of trackControls(f))assert.equal(field.disabled,true,lock);}
+});
+test('locked track callbacks retain analysis plan mapping intent and save timer',async()=>{
+  for(const lock of trackLocks){const f=await analyzedPanel();await f.click('plan');const controls=trackControls(f);f.evaluate(lock+';toggle()');const before=f.evaluate('JSON.stringify({analysis:analysisState,plan,savedSpeakerMappings,savedSpeakerMappingScope,speakerRowsScope,microphoneSelectionCustomized,settingsTimer})'),raw=controls.map(r=>[r.value,r.checked]);
+    for(const field of controls){field.oninput?.();field.onchange?.();}
+    assert.equal(f.evaluate('JSON.stringify({analysis:analysisState,plan,savedSpeakerMappings,savedSpeakerMappingScope,speakerRowsScope,microphoneSelectionCustomized,settingsTimer})'),before,lock);assert.deepEqual(controls.map(r=>[r.value,r.checked]),raw,lock);
+  }
+});
+test('track recovery unlock preserves rows and restores microphone and camera editing',async()=>{
+  const f=await analyzedPanel({native:twoCameraNative()}),r=mic(f),c=f.evaluate('cameraRows[0]');await f.click('plan');const controls=trackControls(f);f.evaluate('localEditPending=true;toggle()');for(const field of controls)assert.equal(field.disabled,true);f.evaluate('localEditPending=false;toggle()');for(const field of controls)assert.equal(field.disabled,false);assert.equal(mic(f),r);assert.equal(f.evaluate('cameraRows[0]'),c);
+  c.role.value='protected';c.role.onchange();assert.equal(f.evaluate('plan'),null);assert.equal(f.evaluate('analysisState.analysisId'),f.analysisId);assert.equal(f.get('start-camera').value,'video:1');assert.equal(f.evaluate('cameraValues().some(v=>v[0]==="video:0")'),false);
+  r.speaker.value='진행자';r.speaker.oninput();assert.equal(f.evaluate('analysisState'),null);assert.equal(mic(f).speaker.value,'진행자');assert.equal(f.evaluate('microphoneSelectionCustomized'),false);r.check.checked=false;r.check.onchange();assert.equal(f.evaluate('microphoneSelectionCustomized'),true);
+  const g=await analyzedPanel();await g.click('plan');const select=g.evaluate('speakerRows[0].select');select.value='';select.onchange();assert.equal(g.evaluate('plan'),null);assert.equal(g.evaluate('savedSpeakerMappings.A'),'');assert.equal(g.evaluate('analysisState.analysisId'),g.analysisId);
+});
+test('new track rows are locked immediately and pending read still admits update',async()=>{
+  const f=await analyzedPanel();f.evaluate('localEditPending=true;renderSpeakers(["A"])');assert.equal(f.evaluate('speakerRows[0].select.disabled'),true);f.evaluate('renderSources()');for(const field of trackControls(f))assert.equal(field.disabled,true);
+  const g=await updatePanel();let resume;g.host.snapshot=()=>new Promise(resolve=>{resume=resolve;});const read=g.click('read-project');for(let i=0;i<20;i++)await Promise.resolve();for(const field of trackControls(g))assert.equal(field.disabled,true);await g.click('update');assert.equal(g.calls.filter(c=>c.path==='/updates/start').length,1);const before=g.evaluate('settingsTimer');for(const field of trackControls(g)){field.oninput?.();field.onchange?.();}assert.equal(g.evaluate('settingsTimer'),before);resume({snapshot:structuredClone(g.native.snapshot),perFrame:g.native.perFrame,sequence:g.native.sequence});await read;for(const field of trackControls(g))assert.equal(field.disabled,true);
+});
 
 test('recording mode preserves source DOM raw settings protected cameras and policy choices',async()=>{
   const f=await overridePanel({native:twoCameraNative()}),r=mic(f),camera=f.evaluate('cameraRows[1]'),calibration=f.evaluate('calibrationRows[0]'),sync=syncRow(f);r.speaker.value=' 진행자 ';r.channel.value=' ';r.stream.value='2';r.channel.oninput();camera.role.value='protected';camera.role.onchange();calibration.first.value='';calibration.last.value='90';sync.stream.value='2';sync.channel.value='';overrideRow(f).first.value=' ';f.get('start-camera').value='video:0';
@@ -534,7 +557,7 @@ test('update priority survives periodic detection of a stale sync result',async(
 test('sync source malformed indices are rejected before submitting a job',async()=>{
   for(const [field,value] of [['channel',''],['channel','0'],['channel','-1'],['stream','1.5'],['stream','invalid'],['stream','9007199254740992']]){
     const f=await panel(),row=syncRow(f);row[field].value=value;row[field].onchange();await f.click('sync');
-    assert.equal(f.calls.some(c=>c.path==='/jobs'),false);assert.equal(f.get('sync').disabled,true);assert.equal(f.get('analyze').disabled,false);
+    assert.equal(f.calls.some(c=>c.path==='/jobs'),false);assert.equal(f.get('sync').disabled,true);assert.equal(f.get('analyze').disabled,false,readinessDiagnostic(f));
     assert.match(f.get('sync-error').textContent,/camera.mov.*정수/);assert.equal(row[field].getAttribute('aria-invalid'),'true');
     row[field].value='1';row[field].onchange();assert.equal(f.get('sync-error').textContent,'');assert.equal(f.get('sync').disabled,false);
     await f.click('sync');const options=f.calls.find(c=>c.path==='/jobs').body.options;assert.equal(options.sourceSelections[0].streamIndex,0);assert.equal(options.sourceSelections[0].channelIndex,0);
@@ -606,7 +629,7 @@ test('range feedback rejects malformed bounds and clears while typing a correcti
     assert.match(f.get('range-error').textContent,/프레임/);assert.equal(f.get('analyze').disabled,true);assert.equal(f.get('sync').disabled,true);
     await f.click('analyze');assert.equal(f.calls.some(c=>c.path==='/jobs'),false);assert.equal(f.get('project-name').textContent,'sequence-1');
     f.get('range-start').value='0';f.get('range-end').value='90';f.get('range-end').oninput();
-    assert.equal(f.get('range-error').textContent,'');assert.equal(f.get('range-end').getAttribute('aria-invalid'),'false');assert.equal(f.get('analyze').disabled,false);
+    assert.equal(f.get('range-error').textContent,'');assert.equal(f.get('range-end').getAttribute('aria-invalid'),'false');assert.equal(f.get('analyze').disabled,false,readinessDiagnostic(f));
     await f.click('analyze');assert.deepEqual(JSON.parse(JSON.stringify(f.calls.filter(c=>c.path==='/project').at(-1).body.snapshot.range)),{startFrame:0,endFrame:90});
   }
 });

@@ -8,6 +8,7 @@ get('sequence-info').textContent='01:02:18 · 29.97 fps · 예시 시퀀스';
 get('track-count').textContent='3 VIDEO / 2 AUDIO';
 get('connection').textContent='디자인 미리보기';
 get('status').textContent='트랙·화자·컷·검토 화면을 확인할 수 있습니다.';
+get('action-readiness').textContent='UI 검토용 예시 · 분석과 편집을 실행하지 않습니다.';
 get('version').textContent='DESIGN PREVIEW';
 get('cameras').innerHTML='';
 const cameras=[['V1','CAM A · 진행자','speaker','A'],['V2','CAM B · 게스트','speaker','B'],['V3','CAM C · 전체샷','wide','A, B']];

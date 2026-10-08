@@ -31,7 +31,7 @@ function clearPolicyPlan(){
   $('segments').appendChild(element('p','컷 설정을 확인하고 편집안을 다시 만들어 주세요.','hint'));
   $('review-page-info').textContent='편집안을 만들어 주세요';
 }
-function policyInputsChanged(){invalidatePlan();}
+function policyInputsChanged(){if(!workLocked()&&connected)invalidatePlan();}
 const messages={SOURCE_REANALYSIS_REQUIRED:'연결된 시퀀스의 모든 원본을 확인하려면 다시 분석하세요.',APPLY_CAPACITY_EXCEEDED:'편집 기록은 최대 8,192개 작업을 지원합니다. 검토 범위를 나누거나 컷 수를 줄여 주세요.',APPLY_RECOVERY_REQUIRED:'이전 편집 기록을 확인해야 합니다. 설정에서 중단 작업을 확인하세요.',APPLY_HOST_EXIT_REQUIRED:'프로젝트를 저장하고 Premiere를 정상 종료한 뒤 다시 열어 중단 작업을 확인하세요.',CORRECTION_REVISION_CONFLICT:'화자 교정 내용이 변경됐습니다. 최신 결과를 다시 불러왔습니다.',SPEAKER_LINK_REQUIRED:'아직 연결하지 않은 목소리가 있습니다. 화자 교정에서 연결하세요.',MODEL_NOT_READY:'설정에서 필요한 로컬 분석 모델을 준비하세요.',SOURCE_CHANGED:'분석한 원본 파일이 변경됐습니다. 소스를 다시 읽어 주세요.',HOST_SUPPORT_REQUIRED:'이 Premiere 버전에서는 적용 검증이 필요합니다.',INPUT_STREAM_UNSUPPORTED:'선택한 파일이 지정한 영상·오디오 역할을 지원하지 않습니다.',AUTH_REQUIRED:'편집 연결을 복구하고 있습니다.',SESSION_EXPIRED:'편집 연결을 복구하고 있습니다.',UPDATE_IN_PROGRESS:'업데이트를 위해 편집 작업이 중단됐습니다.'};
 Object.assign(messages,{PANEL_CONTEXT_CONFLICT:'다른 CUT 패널이 이 설치를 제어하고 있습니다. 제어 중인 패널에서 계속하세요.',EDIT_INTENT_STORAGE_UNAVAILABLE:'이전 편집 기록을 읽지 못했습니다. 설정에서 중단 작업을 확인하세요. (EDIT_INTENT_STORAGE_UNAVAILABLE)',EDIT_INTENT_CORRUPT:'이전 편집 기록이 손상되었습니다. 설정에서 중단 작업을 확인하세요. (EDIT_INTENT_CORRUPT)'});
 Object.assign(messages,{
@@ -189,6 +189,7 @@ function toggle(){
   for(const row of cameraRows)for(const field of [row.role,row.covered])field.disabled=locked||!connected;
   for(const row of speakerRows)row.select.disabled=locked||!connected;
   for(const id of ['start-camera','reserve-camera'])$(id).disabled=locked||!connected;
+  for(const id of ['range-start','range-end','min-shot','short-turn','overlap'])$(id).disabled=locked||!connected;
   $('speaker-count').disabled=workLocked()||mode!=='mixed';$('vad-threshold').disabled=workLocked()||mode!=='separate';
   for(const row of calibrationRows)for(const field of [row.first,row.last])field.disabled=workLocked()||!calibrationActive(row);
   for(const id of ['analyze','sync','plan','apply-sync','apply','save-settings','load-settings'])$(id).disabled=locked||!connected||(id==='plan'&&!analysisState)||(id==='apply'&&!plan)||(id==='apply-sync'&&!syncResult);
@@ -853,7 +854,7 @@ function changeRecordingMode(value){
   scheduleSettings();toggle();say('녹음 방식을 변경했습니다. 트랙 설정을 확인하고 새로 분석하세요.');return true;
 }
 for(const value of ['separate','mixed'])$('mode-'+value).onclick=async()=>{let changing=false;try{if(!changeRecordingMode(value))return;changing=pending=true;toggle();await refresh();}catch(e){error(e);toggle();}finally{if(changing){pending=false;toggle();}}};
-for(const id of ['range-start','range-end'])$(id).oninput=$(id).onchange=()=>{rangeDirty=true;invalidateAnalysis();say(rangeIssue||'분석할 범위를 변경했습니다. 다음 분석에 적용됩니다.');};
+for(const id of ['range-start','range-end'])$(id).oninput=$(id).onchange=()=>{if(workLocked()||!connected)return;rangeDirty=true;invalidateAnalysis();say(rangeIssue||'분석할 범위를 변경했습니다. 다음 분석에 적용됩니다.');};
 for(const id of ['min-shot','short-turn','overlap'])$(id).oninput=$(id).onchange=policyInputsChanged;
 for(const id of ['start-camera','reserve-camera'])$(id).onchange=()=>{if(!workLocked()&&connected)invalidatePlan();};
 for(const id of ['speaker-count','vad-threshold'])$(id).oninput=$(id).onchange=()=>analysisOptionChanged(id);
@@ -870,6 +871,7 @@ $('update-later').onclick=()=>{dismissedCandidate=state?.update?.candidate?.cand
 let initializing=false,retryAt=0,retryDelay=1000,sequencePollAt=0,enrollmentDeadline=0;
 async function initialize({manual=false}={}){
   if(initializing||panelContextConflict&&!manual)return;initializing=true;
+  toggle();
   if(manual)enrollmentDeadline=0;
   try{
     await connection.connect();credentials=true;panelContextConflict=false;retryDelay=1000;enrollmentDeadline=0;

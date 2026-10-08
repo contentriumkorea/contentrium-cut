@@ -57,7 +57,7 @@ async function panel(extra={}){
   const host={hash,snapshot:async()=>{if(f.snapshotError)throw new Error(f.snapshotError);return {snapshot:structuredClone(f.native.snapshot),perFrame:f.native.perFrame,sequence:f.native.sequence};},ppro:{SourceMonitor:{play:async()=>true,openFilePath:async()=>true}},time:v=>v};
   const uxp={storage:{secureStorage:saved},shell:{openExternal:async()=>true}};
   const context=vm.createContext({document:d.document,crypto:crypto.webcrypto,TextDecoder,Uint8Array,BigInt,Map,Set,Date:extra.Date||Date,JSON,console,
-    setInterval:fn=>{timers.push(fn);return timers.length;},setTimeout:fn=>{timeouts.push(fn);return timeouts.length;},clearTimeout:()=>{},ContentriumHost:host,
+    setInterval:fn=>{timers.push(fn);return timers.length;},setTimeout:fn=>{timeouts.push(fn);return timeouts.length;},clearTimeout:id=>{timeouts[id-1]=null;},ContentriumHost:host,
       require:name=>name==='uxp'?uxp:name==='./bundle.json'?bundle:name==='./connection.js'?{create:(_uxp,_bundle,options)=>{f.validation=options?.onValidation;return {connect:async()=>{f.connectCalls++;return extra.connect?extra.connect(f):{};},request,reset:()=>{f.resetCalls++;},cancelPending:async()=>{f.cancelValidationCalls++;}};}}:
       ['./sync.js','./selection.js'].includes(name)?{install:x=>x}:require('../plugin/'+name.replace('./',''))});
   vm.runInContext(fs.readFileSync('plugin/main.js','utf8'),context);
@@ -74,6 +74,95 @@ async function updatePanel(extra={}){
 
 function mic(f,index=0){return f.evaluate('microphoneRows['+index+']');}
 function micError(f,index=0){return f.get('microphones').children[index]?.children.find(n=>n.className.includes('input-error'))?.textContent||'';}
+
+test('invalid range does not discard the connected sequence or customized tracks',async()=>{
+  const f=await panel(),row=mic(f);row.speaker.value='진행자';row.channel.value='2';row.channel.onchange();
+  f.get('range-start').value='100';f.get('range-end').value='90';f.get('range-end').onchange();
+  const binds=f.calls.filter(c=>c.path==='/project').length;await f.click('analyze');
+  assert.equal(f.get('project-name').textContent,'sequence-1');assert.equal(mic(f),row);
+  assert.equal(row.speaker.value,'진행자');assert.equal(row.channel.value,'2');
+  assert.equal(f.get('range-start').value,'100');assert.equal(f.get('range-end').value,'90');
+  assert.equal(f.calls.filter(c=>c.path==='/project').length,binds);assert.equal(f.calls.some(c=>c.path==='/jobs'),false);
+});
+
+test('range feedback rejects malformed bounds and clears while typing a correction',async()=>{
+  for(const [start,end] of [['','90'],['0',''],['-1','90'],['1.5','90'],['invalid','90'],['90','90'],['0','301'],['0','9007199254740992']]){
+    const f=await panel();f.get('range-start').value=start;f.get('range-end').value=end;
+    assert.equal(typeof f.get('range-end').oninput,'function');f.get('range-end').oninput();
+    assert.match(f.get('range-error').textContent,/프레임/);assert.equal(f.get('analyze').disabled,true);assert.equal(f.get('sync').disabled,true);
+    await f.click('analyze');assert.equal(f.calls.some(c=>c.path==='/jobs'),false);assert.equal(f.get('project-name').textContent,'sequence-1');
+    f.get('range-start').value='0';f.get('range-end').value='90';f.get('range-end').oninput();
+    assert.equal(f.get('range-error').textContent,'');assert.equal(f.get('range-end').getAttribute('aria-invalid'),'false');assert.equal(f.get('analyze').disabled,false);
+    await f.click('analyze');assert.deepEqual(JSON.parse(JSON.stringify(f.calls.filter(c=>c.path==='/project').at(-1).body.snapshot.range)),{startFrame:0,endFrame:90});
+  }
+});
+
+test('manual refresh and automatic timeline change preserve invalid range and track choices',async()=>{
+  const f=await panel(),row=mic(f);row.speaker.value='진행자';row.channel.value='2';row.channel.onchange();
+  f.get('range-end').value='';f.get('range-end').onchange();await f.click('read-project');
+  assert.equal(mic(f),row);assert.equal(f.get('range-end').value,'');assert.equal(f.get('project-name').textContent,'sequence-1');
+  f.native.snapshot.sequenceName='Updated timeline';delete f.native.snapshot.snapshotHash;f.native.snapshot.snapshotHash=hash(f.native.snapshot);
+  await f.tick();assert.equal(f.get('project-name').textContent,'Updated timeline');assert.equal(mic(f).speaker.value,'진행자');assert.equal(mic(f).channel.value,'2');
+  assert.equal(f.get('range-end').value,'');assert.match(f.get('range-error').textContent,/프레임/);assert.equal(f.get('analyze').disabled,true);
+  assert.deepEqual(JSON.parse(JSON.stringify(f.calls.filter(c=>c.path==='/project').at(-1).body.snapshot.range)),{startFrame:0,endFrame:300});
+});
+
+test('invalid raw range persists in settings while legacy numeric ranges still restore',async()=>{
+  const f=await panel();f.get('range-start').value='';f.get('range-end').value='90';f.get('range-start').onchange();await f.click('save-settings');
+  f.get('range-start').value='30';await f.click('load-settings');assert.equal(f.get('range-start').value,'');assert.equal(f.get('analyze').disabled,true);
+  const settings=JSON.parse(f.evaluate('JSON.stringify(captureSettings())'));delete settings.rangeInput;settings.range={startFrame:30,endFrame:90};
+  f.evaluate('restoreSettings('+JSON.stringify(settings)+');toggle()');assert.equal(f.get('range-start').value,'30');assert.equal(f.get('range-end').value,'90');assert.equal(f.get('analyze').disabled,false);
+});
+
+test('invalid manual refresh reschedules queued autosave for raw bounds and track choices',async()=>{
+  const f=await panel();await f.click('save-settings');mic(f).speaker.value='진행자';mic(f).speaker.oninput();
+  f.get('range-end').value='';f.get('range-end').oninput();await f.click('read-project');
+  assert.equal(f.get('range-end').value,'');
+  for(let i=0;i<f.timeouts.length;i++){const callback=f.timeouts[i];f.timeouts[i]=null;if(callback)await callback();}
+  const settings=JSON.parse([...f.saved.rows.values()].find(raw=>typeof raw==='string'&&raw.includes('rangeInput')));
+  assert.equal(settings.rangeInput.end,'');assert.equal(settings.microphones[0].speaker,'진행자');
+});
+
+test('automatic same-sequence refresh preserves a pending settings autosave',async()=>{
+  const f=await panel();await f.click('save-settings');mic(f).speaker.value='진행자';mic(f).speaker.oninput();
+  f.get('range-end').value='';f.get('range-end').oninput();f.native.snapshot.sequenceName='Updated timeline';delete f.native.snapshot.snapshotHash;f.native.snapshot.snapshotHash=hash(f.native.snapshot);await f.tick();
+  for(let i=0;i<f.timeouts.length;i++){const callback=f.timeouts[i];f.timeouts[i]=null;if(callback)await callback();}
+  const settings=JSON.parse([...f.saved.rows.values()].find(raw=>typeof raw==='string'&&raw.includes('rangeInput')));
+  assert.equal(settings.rangeInput.end,'');assert.equal(settings.microphones[0].speaker,'진행자');assert.equal(settings.sequenceRef,'sequence-1');
+});
+
+test('typing a range invalidates the existing plan and does not prevent immediate update',async()=>{
+  const f=await updatePanel();await f.click('analyze');await f.tick();await f.click('plan');assert.equal(f.get('apply').disabled,false);
+  assert.equal(typeof f.get('range-end').oninput,'function');f.get('range-end').value='0';f.get('range-end').oninput();assert.equal(f.get('apply').disabled,true);
+  await f.click('update');assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.match(f.get('action-readiness').textContent,/업데이트/);
+});
+
+test('closing the native sequence still clears the connection even with invalid range input',async()=>{
+  const f=await panel();f.get('range-end').value='0';f.get('range-end').onchange();f.snapshotError='SEQUENCE_REQUIRED';await f.tick();
+  assert.equal(f.get('project-name').textContent,'시퀀스를 열어 주세요');assert.equal(f.get('microphones').children.length,0);assert.equal(f.get('analyze').disabled,true);
+});
+
+test('direct work handlers reject malformed bounds even when no input event fired',async()=>{
+  for(const action of ['sync','plan','apply-sync','apply']){
+    const f=await panel();f.get('range-end').value='';const before=f.calls.length;await f.click(action);
+    assert.equal(f.get('project-name').textContent,'sequence-1');assert.match(f.get('status').textContent,/프레임/);
+    assert.equal(f.calls.slice(before).some(c=>['/jobs','/plan','/apply/begin','/sync/begin'].includes(c.path)),false);
+  }
+});
+
+test('automatic timeline shrink preserves malformed input and falls back to a safe bound',async()=>{
+  const f=await panel();f.get('range-start').value='100';f.get('range-end').value='200';f.get('range-end').onchange();await f.click('read-project');
+  f.evaluate("cameraRows[0].role.value='wide'");f.get('range-end').value='';f.get('range-end').onchange();
+  f.native.snapshot.range.endFrame=50;delete f.native.snapshot.snapshotHash;f.native.snapshot.snapshotHash=hash(f.native.snapshot);await f.tick();
+  assert.deepEqual(JSON.parse(JSON.stringify(f.calls.filter(c=>c.path==='/project').at(-1).body.snapshot.range)),{startFrame:0,endFrame:50});
+  assert.equal(f.get('range-start').value,'100');assert.equal(f.get('range-end').value,'');assert.equal(f.evaluate('cameraRows[0].role.value'),'wide');
+  assert.equal(f.get('analyze').disabled,true);assert.match(f.get('range-error').textContent,/50/);
+});
+
+test('switching to another sequence does not carry invalid local range across sequences',async()=>{
+  const f=await panel();f.get('range-end').value='';f.get('range-end').onchange();f.native=nativeSnapshot('sequence-2');await f.tick();
+  assert.equal(f.get('project-name').textContent,'sequence-2');assert.equal(f.get('range-start').value,'0');assert.equal(f.get('range-end').value,'300');assert.equal(f.get('range-error').textContent,'');assert.equal(f.get('analyze').disabled,false);
+});
 
 test('invalid microphone channel inputs identify the row and block analysis before any job',async()=>{
   for(const value of ['', '0','1.5','invalid','65']){

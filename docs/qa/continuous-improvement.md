@@ -483,3 +483,21 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - [고정 복구 조회](migration-pinned-0.1.1-after-0.1.21-proof.json): latest 0.1.21에서도 서명된 정확한 v0.1.1 / release `404226839` / commit `268d27e6665c8b1f0753a634f8021dfa86935b37` AVAILABLE. 실제 설치 전환은 하지 않았다.
 - 현재 단계: 기획 → 설계 → 구현 → 검증 → 0.1.21 공개 및 공개 재검증 완료. 다음 회차는 재현한 복구/호환 대기 중 싱크 입력 잠금 불일치를 개선한다. 싱크 방법·기준·체크·스트림/채널·수동 오프셋·타임코드와 확인 입력의 표시/직접 이벤트에 같은 workLocked/연결 조건을 적용하고 내부 복구/표시 갱신은 허용하도록 먼저 설계한다. 완료 싱크 결과·원문·저장·해제 후 유효성·업데이트 즉시성을 RED·독립 검수·전체 회귀·패키지/공개 검증 뒤 배포한다. 버전만 올리지 않는다.
 - PC 활성 설치는 계속 0.1.0이며 active/journal/first-install 3개 해시는 배포 전후 동일함을 읽기 전용 확인했다. 서명 키 존재·보존과 기존 ACTIVE/15분 자동화를 확인했다. 기존 공개 파일·설정·실패 증거를 보존했고 컴퓨터유즈·Premiere 조작·재설치·제공자 접근을 하지 않았다. 실제 UXP/Premiere 편집·설치 전환·Community-1 품질은 미검증이다. 이전 범위/싱크 readiness·메모리/취소 간헐 시험 실패의 원인도 미확정이다.
+
+## 21회차 / 2026-10-09 / 복구·호환 대기의 싱크 입력 잠금
+
+- 시작 commit `e03e44ab8b7066f9adfec28e0e7bef1909bacc6c`, 공개 v0.1.21 / release `407233340`. Git clean, 진행 중인 기존 자체 시험/빌드/배포 없음. 이전 실제-main VM 15 fixture에서 복구/호환 대기의 싱크 방법·기준·선택·스트림·채널이 활성 상태이고 입력 이벤트가 완료 싱크 결과를 지우고 저장을 예약함을 재현했다.
+- 설계: 싱크 방법/기준과 소스별 참여 체크·스트림/채널·수동 오프셋/확인·공통 시계/날짜/FPS/drop-frame/타임코드 확인의 UI 표시와 직접 oninput/onchange에 같은 workLocked/연결 조건을 적용한다. 동적 행 생성 시점에도 즉시 잠금을 설정한다. UI 이벤트 전용 guard로 잠긴 이벤트의 싱크 결과/job/hash/무효화 플래그·분석·편집안·원문·저장 타이머·방법 표시를 보존한다. 내부 syncInputsChanged/syncMethodChanged는 복구/새 시퀀스 렌더링에 계속 허용한다. 잠금 해제 후 동일 행/값·기존 유효성 검사·싱크 입력 변경 시 결과 즉시 무효화·다음 요청 옵션을 유지한다. 숨겨진 방법 필드의 기존 값과 활성 방법 의미, 저장 schema/API/원본·오디오·자막·업데이트 절차는 유지한다.
+- 수용 조건: 양쪽 녹음 모드·audio/manual/timecode·12개 작업/연결 잠금×모든 필드/콜백의 disabled와 무해성, 초기 연결/동적 생성, 내부 pending 복구/새 시퀀스, 해제 후 오류와 결과·요청/실제 raw 저장, 저장/host 조회 대기 중 업데이트 즉시 시작을 실제 VM RED 후 검증한다. 독립 리뷰·전체 회귀·패키지 실행·익명 공개 발견/서명/실제 다운로드 해시·고정 v0.1.1 조회 뒤 0.1.22로 배포한다. 실제 UXP/Premiere/설치 전환/Community-1 품질은 미검증이며 기존 간헐 실패 원인·기준·timeout·증거를 유지한다. 컴퓨터유즈·Premiere 조작·PC 설치 없이 진행한다.
+
+- 신규 수용 2개 RED (기존 197개 통과, 1,900.5107 ms) 뒤 표시·동적 생성 잠금과 UI 전용 callback guard를 구현했다. 첫 green 199/199 (2,100.3441 ms), 모든 양쪽 모드/방법/잠금과 해제·최초/동적 생성·내부 복구/실제 raw 저장/새 시퀀스·방법 표시·저장/host 조회 대기 중 업데이트를 추가해 최종 관련 204/204 (2,552.752 ms), 실패·취소·skip 0. 추가 저장 시험의 key prefix 추정이 틀려 fixture TypeError가 있었으며 실제 settingsKey() 조회로 바로잡았다. 제품/기준/timeout을 바꾸지 않았고 최초 로그를 보존했다. 독립 리뷰와 전체 회귀로 진행한다.
+
+- 전체 Node 313/313 (18,659.9729 ms), 전체 Python 493/493 (89.999초; wrapper 90.028초), 실패·취소·오류·skip·제외 0. 소유 한국어 SAPI/Silero 192 speech frames/7 intervals 확인. 기존 범위/싱크 readiness·메모리/취소 간헐 실패는 이번 회귀에서 재현되지 않았으며 원인은 미확정이다. PC 활성 0.1.0과 active/journal/first-install 해시·서명 키 존재·기존 ACTIVE/15분 자동화를 읽기 전용 확인했다. 독립 최종 승인 뒤 소스를 고정해 패키지 및 공개 검증으로 진행한다.
+
+- 독립 최종 승인: 남은 Critical/Important/Minor 0/0/0. 별도 actual-main VM 9/9, 434 fixture (2,368.2623 ms), 실패·취소·skip·todo 0. 양쪽 모드×3방법×12잠금×22컨트롤/직접 이벤트의 분석·편집안·완료 싱크/DOM/타이머 보존, 해제/옵션/오류, 11개 연결 잠금 중 내부 복구, toggle 억제 동적 생성, 초기/재연결, 실제 저장/로드/새 시퀀스, 저장/host 조회 대기 중 업데이트 즉시 시작을 확인했다. main.js SHA-256 `eee4b66d4f3b1b5fe65217492f53aca0efa255dff33dcf9bf0b188565cac4f57`. 증거는 `%LOCALAPPDATA%/Temp/contentrium-cut-cycle21-independent-review`에 보존했다. 첫 private probe의 connected=null 기존 plan 무효화/렌더 직접 호출의 기존행 append에 대한 두 기대값 오류를 private만 바로잡았고 최초 로그를 보존했다. 제품 변경 없이 실제 호스트/설치/model 품질은 검수 밖이다.
+- 빌드 입력 52개 고정, 공개 파일 554개 비공개 키/토큰 패턴 검사·신뢰 키 보존 통과. 활성 0.1.0 설치 및 기존 자동화·서명 키를 보존한다. 패키지 빌드/실행과 공개 검증으로 진행한다.
+
+- 다음 후보 재현: 고정된 실제-main VM의 localEditPending/서버 applyRecovery.blocked/compatible=false/updateIntent 잠금에서 수동 고정 구간의 시작·종료·카메라 입력이 활성 상태였다(12 fixture). 유효 값 변경 후 직접 oninput이 기존 편집안을 지우고 자동 저장을 예약했다. 분석은 보존됐다. `cycle21-next-inspect.js/.log`를 보존했고 이번 소스에 추가 변경하지 않는다. 다음 회차는 수동 구간 입력·직접 callback의 workLocked/연결 일치, 원문/편집안/검토/저장 보존, 내부 로드/새 시퀀스·해제 후 범위/겹침·고정 카메라 오류 검사, 업데이트 즉시성을 먼저 설계한다. 실제 호스트/사용자 자료 없이 확인했다.
+
+- 패키지 검증: [0.1.22 증거](package-0.1.22-proof.json). ZIP/CCX CRC·경로·크기·비공개 자료 제외, CCX 최종 소스·Silero 해시, frozen 엔진 29개/설치기 26개 제품 모듈·두 진입점이 검증 소스와 일치했다. 추출 엔진 probe runtimeReady=true/0.1.22과 Setup help exit 0, 59.860초. 기존 선택적 모듈/torchcodec 경고를 보존하며 Community-1 실제 품질 판정으로 확대하지 않는다.
+- 현재 단계: 기획·설계·구현·독립 검수·전체 회귀·패키지 실행 완료. 0.1.22 공개 및 익명 발견/서명/실제 다운로드 해시·고정 v0.1.1 검증으로 진행한다. 실제 UXP/Premiere/설치 전환/Community-1 품질은 미검증이다. 다음 후보는 복구/호환 대기 중 수동 고정 구간 입력의 잠금이다.

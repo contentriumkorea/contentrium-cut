@@ -338,3 +338,12 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 다음 우선 후보 재현: 소유 실제 패널 VM에서 단독 발화 교정의 빈 시작/종료 90을 startFrame=0/endFrame=90으로 보냈다. 역순 150–90은 calibration=[]로 조용히 누락되며 분석 버튼은 활성이다. 프레임 필드에 oninput이 없어 입력 중 기존 분석이 남는다. 실제 음성/호스트/설치 없이 `cycle15-next-inspect.log`를 보존했다. 0/0의 기존 미사용 계약·선택 마이크/녹음 방식·원문 저장/범위/입력 중 무효화를 다음 회차에서 설계한다. 이번 스칼라 수정의 소스 동결 뒤 발견했으며 현재 변경에 포함하지 않는다.
 - 패키지 검증: [0.1.16 증거](package-0.1.16-proof.json). ZIP/CCX CRC·경로·크기·비공개 자료 제외, CCX 최종 소스와 Silero 해시, frozen 엔진 29개/설치기 26개 제품 모듈·두 진입점 소스 일치. 압축 엔진 probe runtimeReady=true / 0.1.16, Setup help exit 0 확인. 65.218초. 기존 선택적 모듈/torchcodec 경고를 보존하며 Community-1 품질 판정으로 확대하지 않는다.
 - 현재 단계: 기획·설계·구현·독립 검수·전체 회귀·패키지 실행 완료. 0.1.16 공개와 익명 서명/다운로드 해시·고정 v0.1.1을 검증한다. 실제 UXP/Premiere 편집·설치 전환·Community-1 품질은 미검증이다. 다음 후보는 단독 발화 교정 프레임 입력이다.
+
+### 공개 결과
+
+- [v0.1.16](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.16): release `407142284`, 정확한 제목 `Contentrium CUT`, draft/prerelease 아님. 공개 시각 2026-10-09 03:29:43 KST (`2026-10-08T18:29:43Z`), target/tag commit `97cb51014166f5bd10501dba1525714a3c5584a0`를 remote 조회로 확인했다.
+- [공개 실제 재다운로드](release-0.1.16-proof.json): 익명 제품 경로에서 0.1.15 → 0.1.16 AVAILABLE. 서명과 실제 ZIP/CCX/Setup 3개의 크기·SHA-256이 일치한다.
+- [현재 버전](release-0.1.16-current-proof.json): 별도 빈 상태에서 0.1.16 CURRENT / 후보 없음. 공개 자산 5개 ID·크기·digest와 서명 문서 실제 바이트가 로컬과 일치한다.
+- [고정 복구 조회](migration-pinned-0.1.1-after-0.1.16-proof.json): latest 0.1.16에서도 서명된 정확한 v0.1.1 / release `404226839` / commit `268d27e6665c8b1f0753a634f8021dfa86935b37` AVAILABLE. 실제 설치 전환은 하지 않았다.
+- 현재 단계: 기획 → 설계 → 구현 → 검증 → 0.1.16 공개 및 공개 재검증 완료. 다음 회차는 위 재현된 단독 발화 교정 프레임 입력의 유효성·원문·즉시 무효화·선택/미사용 계약을 먼저 설계하고 같은 검증/배포 순서를 진행한다. 버전만 올리지 않는다.
+- PC 활성 설치는 계속 0.1.0이며 active/journal/first-install 3개 해시는 배포 전후 동일하다. 서명 키 존재와 보존을 읽기 전용으로 확인했고 기존 공개 파일·설정·실패 증거를 보존했다. 컴퓨터유즈·Premiere 조작·재설치·제공자 접근은 하지 않았다. 실제 UXP 화면/Premiere 편집·설치 전환·Community-1 품질은 미검증이다. 기존 메모리/취소 간헐 실패의 원인도 미확정이다.

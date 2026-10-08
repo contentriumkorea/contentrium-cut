@@ -50,7 +50,7 @@ async function panel(extra={}){
     if(path==='/jobs/job-1')return {jobId:'job-1',kind:f.jobKind,status:f.jobStatus,result:{}};
     if(path==='/analyses/register'||path==='/analyses/'+'a'.repeat(64))return analysis();
     if(path.endsWith('/correct')){f.analysisRevision++;return analysis();}
-    if(path==='/plan')return {planHash:'p'.repeat(64),snapshotHash:f.bound.snapshotHash,segments:[{startFrame:0,endFrame:300,cameraId:'video:0',reason:'speech'}],reviews:[]};
+    if(path==='/plan')return f.planResult||{planHash:'p'.repeat(64),snapshotHash:f.bound.snapshotHash,segments:[{startFrame:0,endFrame:300,cameraId:'video:0',reason:'speech'}],reviews:[]};
     if(path==='/resources')return {settings:{device:'cpu',cacheBudgetBytes:1073741824},status:{cacheBytes:0,freeDiskBytes:10737418240}};
     return {};
   };
@@ -63,6 +63,7 @@ async function panel(extra={}){
   vm.runInContext(fs.readFileSync('plugin/main.js','utf8'),context);
   for(let i=0;i<40;i++)await Promise.resolve();
   f.click=async id=>{assert.ok(d.get(id),id);await d.get(id).onclick();};f.tick=()=>timers[0]();f.host=host;f.state=state;f.evaluate=source=>vm.runInContext(source,context);
+  f.reviewPlan=async expression=>{f.planResult=f.evaluate('('+expression+')');await f.click('analyze');await f.tick();await f.click('plan');};
   return f;
 }
 
@@ -77,6 +78,51 @@ function micError(f,index=0){return f.get('microphones').children[index]?.childr
 function syncRow(f,index=0){return f.evaluate('syncRows['+index+']');}
 
 async function analyzedPanel(extra={}){const f=await panel(extra);await f.click('analyze');await f.tick();return f;}
+
+function twoCameraNative(){const native=nativeSnapshot();native.snapshot.tracks.push({trackRef:'video:1',mediaType:'video',index:1,name:'Other',muted:false});native.snapshot.clips.push({...native.snapshot.clips[0],instanceKey:'other-camera',trackRef:'video:1'});delete native.snapshot.snapshotHash;native.snapshot.snapshotHash=hash(native.snapshot);return native;}
+const planChanges=[
+  ['min shot',f=>{f.get('min-shot').value='3';}],['short turn',f=>{f.get('short-turn').value='0.75';}],['overlap',f=>{f.get('overlap').value='1.25';}],
+  ['speaker camera',f=>{speakerCamera(f).value='video:1';}],['camera role',f=>{f.evaluate("cameraRows[1].role.value='protected'");}],
+  ['camera coverage',f=>{f.evaluate("cameraRows[0].covered.value='A, B'");}],['start camera',f=>{f.get('start-camera').value='video:1';}],['reserve camera',f=>{f.get('reserve-camera').value='video:1';}]
+];
+test('reviewed plan rejects valid silent changes to every effective planning input',async()=>{
+  for(const [name,change] of planChanges){const f=await analyzedPanel({native:twoCameraNative()});await f.click('plan');change(f);await f.click('apply');
+    assert.equal(f.calls.some(c=>c.path==='/apply/begin'),false,name);assert.match(f.get('status').textContent,/편집안.*다시/,name);assert.equal(f.get('cut-count').textContent,'—');assert.equal(f.evaluate('analysisState!==null'),true);}
+});
+test('plan response cannot promote results after valid planning input changes',async()=>{
+  for(const [name,change] of planChanges){const f=await analyzedPanel({native:twoCameraNative(),request:(path,body,fixture)=>{if(path==='/plan'){change(fixture);return {planHash:'p'.repeat(64),segments:[],reviews:[]};}}});await f.click('plan');
+    assert.equal(f.get('apply').disabled,true,name);assert.match(f.get('status').textContent,/편집안.*다시/,name);assert.equal(f.evaluate('analysisState!==null'),true);}
+});
+test('native permit rechecks every effective plan input and preserves failed recovery records',async()=>{
+  for(const [name,change] of planChanges){const f=await analyzedPanel({native:twoCameraNative(),request:(path,body,fixture)=>{if(path==='/apply/begin'){change(fixture);return {applyId:'owned-plan',epoch:0,execute:true,plan:{planHash:'p'.repeat(64)}};}}});let calls=0;f.host.apply=async()=>{calls++;throw new Error('Owned fixture stop');};await f.click('plan');await f.click('apply');
+    assert.equal(calls,0,name);assert.equal(f.calls.filter(c=>c.path==='/apply/end').at(-1)?.body.status,'failed',name);assert.match(f.get('status').textContent,/편집안.*다시/,name);assert.ok([...f.saved.rows.keys()].some(k=>k.startsWith('cut-native-edit-intent')),name);}
+});
+test('periodic plan mismatch clears review and retains replan guidance until a new plan',async()=>{
+  const f=await analyzedPanel();await f.click('plan');f.get('min-shot').value='3';await f.tick();assert.equal(f.get('apply').disabled,true);assert.equal(f.get('cut-count').textContent,'—');assert.match(f.get('action-readiness').textContent,/편집안.*다시/);
+  f.get('min-shot').value='2';await f.tick();assert.equal(f.get('apply').disabled,true);assert.match(f.get('action-readiness').textContent,/편집안.*다시/);await f.click('plan');assert.equal(f.get('apply').disabled,false);
+});
+test('planning input identity is required even when a plan appears current',async()=>{
+  const f=await analyzedPanel();await f.click('plan');f.evaluate('planInputHash=null');await f.click('apply');assert.equal(f.calls.some(c=>c.path==='/apply/begin'),false);assert.match(f.get('status').textContent,/편집안.*다시/);
+});
+test('equivalent numeric inputs and unused settings preserve reviewed plan identity',async()=>{
+  const f=await analyzedPanel();await f.click('plan');f.get('min-shot').value='2.00';f.get('short-turn').value='0.600';f.get('speaker-count').value='4';f.get('sync-method').value='manual';await f.click('apply');assert.equal(f.calls.filter(c=>c.path==='/apply/begin').length,1);
+});
+test('manual override typing removal and coverage input clear the reviewed preview and autosave',async()=>{
+  const f=await analyzedPanel();await f.click('plan');const coverage=f.evaluate('cameraRows[0].covered');assert.equal(typeof coverage.oninput,'function');coverage.value='A';coverage.oninput();assert.equal(f.get('cut-count').textContent,'—');
+  await f.click('add-override');await f.click('plan');const row=f.evaluate('overrideRows[0]');assert.equal(typeof row.first.oninput,'function');row.first.value='30';row.first.oninput();assert.equal(f.get('apply').disabled,true);assert.equal(f.get('cut-count').textContent,'—');
+  for(let i=0;i<f.timeouts.length;i++){const fn=f.timeouts[i];f.timeouts[i]=null;if(fn)await fn();}const key=[...f.saved.rows.keys()].find(k=>k.startsWith('cut-settings-'));assert.equal(JSON.parse(f.saved.rows.get(key)).policy.overrides[0].startFrame,30);
+  await f.click('plan');const remove=f.get('overrides').children[0].children.find(n=>n.tag==='button');remove.onclick();assert.equal(f.get('cut-count').textContent,'—');
+  for(let i=0;i<f.timeouts.length;i++){const fn=f.timeouts[i];f.timeouts[i]=null;if(fn)await fn();}assert.equal(JSON.parse(f.saved.rows.get(key)).policy.overrides.length,0);
+});
+test('manual override silent changes and approval wait cannot reach native mutation',async()=>{
+  for(const stage of ['direct','permit']){const change=f=>{f.evaluate("overrideRows[0].last.value='150'");};const f=await analyzedPanel({request:(path,body,fixture)=>{if(stage==='permit'&&path==='/apply/begin'){change(fixture);return {applyId:'owned-override',epoch:0,execute:true,plan:{planHash:'p'.repeat(64)}};}}});await f.click('add-override');await f.click('plan');if(stage==='direct')change(f);let calls=0;f.host.apply=async()=>{calls++;throw new Error('Owned fixture stop');};await f.click('apply');assert.equal(calls,0);if(stage==='direct')assert.equal(f.calls.some(c=>c.path==='/apply/begin'),false);assert.match(f.get('status').textContent,/편집안.*다시/);}
+});
+test('analysis correction invalidates the old visible plan and preserves its new revision',async()=>{
+  const f=await analyzedPanel();await f.click('plan');assert.equal(f.get('cut-count').textContent,'1');
+  await f.nodes.find(n=>n.tag==='button'&&n.textContent==='이름 저장').onclick();
+  assert.equal(f.get('cut-count').textContent,'—');assert.equal(f.get('timeline').children.length,0);assert.equal(f.get('segments').children.some(n=>n.tag==='button'),false);
+  assert.equal(f.evaluate('analysisState.revision'),1);assert.equal(f.get('apply').disabled,true);await f.click('plan');assert.equal(f.calls.filter(c=>c.path==='/plan').at(-1).body.analysisRevision,1);assert.equal(f.get('apply').disabled,false);
+});
 
 test('malformed cut duration identifies its field and prevents planning without losing analysis',async()=>{
   for(const [id,value,label] of [['min-shot','','최소 샷'],['min-shot','-1','최소 샷'],['short-turn','bad','짧은 발화'],['overlap','1e309','동시 발화']]){
@@ -611,7 +657,7 @@ test('action guidance identifies missing sequence and explicit edit recovery',as
 
 test('review distinguishes adjacent subsecond cuts by original frame bounds and duration',async()=>{
   const f=await panel();let actual;f.native.sequence.setPlayerPosition=async value=>{actual=value;};
-  f.evaluate('plan={segments:[{startFrame:1,endFrame:2,cameraId:"video:0",reason:"speech"},{startFrame:2,endFrame:3,cameraId:"video:0",reason:"speech"}],reviews:[]};renderPlan();');
+  await f.reviewPlan('{segments:[{startFrame:1,endFrame:2,cameraId:"video:0",reason:"speech"},{startFrame:2,endFrame:3,cameraId:"video:0",reason:"speech"}],reviews:[]}');
   const rows=f.get('segments').children;
   assert.equal(rows[0].children.find(n=>n.className==='segment-timing')?.textContent,'1–2 프레임 · 1프레임 / 0.033초');
   assert.equal(rows[1].children.find(n=>n.className==='segment-timing')?.textContent,'2–3 프레임 · 1프레임 / 0.033초');
@@ -622,13 +668,13 @@ test('review uses rational FPS for fractional rate durations and shows the exact
   const native=nativeSnapshot();native.snapshot.fps={num:30000,den:1001};delete native.snapshot.snapshotHash;native.snapshot.snapshotHash=hash(native.snapshot);
   const f=await panel({native});
   assert.match(f.get('sequence-info').textContent,/29\.970 fps \(30000\/1001\)/);
-  f.evaluate('plan={segments:[{startFrame:29,endFrame:59,cameraId:"video:0",reason:"speech"}],reviews:[]};renderPlan();');
+  await f.reviewPlan('{segments:[{startFrame:29,endFrame:59,cameraId:"video:0",reason:"speech"}],reviews:[]}');
   assert.equal(f.get('segments').children[0].children.find(n=>n.className==='segment-timing')?.textContent,'29–59 프레임 · 30프레임 / 1.001초');
 });
 
 test('review searches displayed end frames and keeps the complete original edit plan',async()=>{
   const f=await panel();
-  f.evaluate('plan={segments:[{startFrame:1,endFrame:17,cameraId:"video:0",reason:"speech"},{startFrame:18,endFrame:25,cameraId:"video:0",reason:"speech"}],reviews:[]};renderPlan();');
+  await f.reviewPlan('{segments:[{startFrame:1,endFrame:17,cameraId:"video:0",reason:"speech"},{startFrame:18,endFrame:25,cameraId:"video:0",reason:"speech"}],reviews:[]}');
   const before=f.evaluate('JSON.stringify(plan)');
   f.get('review-search').value='1–17';f.get('review-search').oninput();
   assert.equal(f.get('segments').children.length,1);
@@ -639,7 +685,7 @@ test('review searches displayed end frames and keeps the complete original edit 
 test('long-form cut review pages and filters without changing the edit plan',async()=>{
   const f=await panel(),segments=Array.from({length:121},(_,i)=>({startFrame:i*2,endFrame:i*2+2,cameraId:i%2?'video:1':'video:0',reason:i%2?'OVERLAP_HOLD':'SPEAKER_TURN'}));
   const value={planHash:'p'.repeat(64),segments,reviews:[]},before=JSON.stringify(value);
-  f.evaluate('plan='+before+';renderPlan();');
+  await f.reviewPlan(before);
   assert.equal(f.get('segments').children.length,50);
   assert.equal(f.get('review-previous').disabled,true);
   await f.click('review-next');assert.equal(f.get('segments').children.length,50);
@@ -657,7 +703,7 @@ test('long-form cut review pages and filters without changing the edit plan',asy
 
 test('a cut on a later review page seeks its original frame and update locks paging',async()=>{
   const f=await panel();let actual;f.native.sequence.setPlayerPosition=async value=>{actual=value;};
-  f.evaluate('plan={segments:Array.from({length:51},(_,i)=>({startFrame:i*2,endFrame:i*2+2,cameraId:"video:0",reason:"speech"})),reviews:[]};renderPlan();');
+  await f.reviewPlan('{segments:Array.from({length:51},(_,i)=>({startFrame:i*2,endFrame:i*2+2,cameraId:"video:0",reason:"speech"})),reviews:[]}');
   await f.click('review-next');await f.get('segments').children[0].onclick();
   assert.equal(actual,String(100n*BigInt(f.native.perFrame)));
   f.state.gateOpen=false;f.state.update.updateState='QUIESCING';await f.tick();
@@ -665,7 +711,7 @@ test('a cut on a later review page seeks its original frame and update locks pag
 });
 
 test('clearing analysis resets review filters and page status',async()=>{
-  const f=await panel();f.evaluate('plan={segments:[{startFrame:0,endFrame:2,cameraId:"video:0",reason:"speech"}],reviews:[]};renderPlan();');
+  const f=await panel();await f.reviewPlan('{segments:[{startFrame:0,endFrame:2,cameraId:"video:0",reason:"speech"}],reviews:[]}');
   f.get('review-search').value='발화';f.get('review-search').oninput();
   f.get('review-camera').value='video:0';f.evaluate('clearAnalysis();toggle();');
   assert.equal(f.get('review-search').value,'');assert.equal(f.get('review-camera').value,'');

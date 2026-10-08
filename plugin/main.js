@@ -683,8 +683,21 @@ function periodicHeartbeat(){
   return heartbeatRequest;
 }
 const canceledJobs=new Set();
+function polledJobCurrent(active,epoch){
+  return job===active&&!canceledJobs.has(active.jobId)&&!stopped&&!updateIntent&&!applying&&!validationCount&&!panelContextConflict&&!!credentials&&!!state?.gateOpen&&state.compatible!==false&&!localEditPending&&!state.applyRecovery?.blocked&&state.stopEpoch==null&&state.epoch===epoch;
+}
 function inputProbeCurrent(active,scope){
-  return job===active&&!canceledJobs.has(active.jobId)&&!stopped&&!updateIntent&&!applying&&!validationCount&&!panelContextConflict&&!!credentials&&!!state?.gateOpen&&state.compatible!==false&&!localEditPending&&!state.applyRecovery?.blocked&&state.stopEpoch==null&&state.epoch===scope.epoch&&!!scope.selection&&projectSelection===scope.selection&&projectSelection.selectionId===active.selectionId&&selectedRows.length===scope.rows.length&&scope.rows.every((row,index)=>selectedRows[index]===row);
+  return polledJobCurrent(active,scope.epoch)&&!!scope.selection&&projectSelection===scope.selection&&projectSelection.selectionId===active.selectionId&&selectedRows.length===scope.rows.length&&scope.rows.every((row,index)=>selectedRows[index]===row);
+}
+function analysisResultCurrent(active,scope){
+  return polledJobCurrent(active,scope.epoch)&&!!scope.connection&&connected===scope.connection&&connected.snapshot.snapshotHash===scope.snapshotHash&&scope.snapshotHash===active.snapshotHash&&connected.snapshot.hostSnapshotHash===scope.hostSnapshotHash&&mode===scope.mode&&analysisState===scope.analysisState&&analysisState?.revision===scope.revision;
+}
+async function analysisSnapshotCurrent(active,scope){
+  let fresh;
+  try{fresh=await ContentriumHost.snapshot();}catch(e){if(!analysisResultCurrent(active,scope))return false;error(e);throw e;}
+  if(!analysisResultCurrent(active,scope))return false;
+  if(fresh?.snapshot?.snapshotHash!==scope.hostSnapshotHash){resetSequence();const issue=new Error('분석 중 타임라인이 변경됐습니다. 현재 시퀀스를 다시 읽어 주세요.');error(issue);throw issue;}
+  return true;
 }
 function finishPolledJob(active){
   if(job===active)job=null;
@@ -693,9 +706,10 @@ function finishPolledJob(active){
 }
 async function pollJob(){
   if(!job)return;
-  const active=job,inputScope=active.kind==='input-probe'?{selection:projectSelection,rows:selectedRows.slice(),epoch:state?.epoch}:null;let value;
+  const active=job,inputScope=active.kind==='input-probe'?{selection:projectSelection,rows:selectedRows.slice(),epoch:state?.epoch}:null,analysisScope=active.kind==='analysis'?{connection:connected,snapshotHash:connected?.snapshot.snapshotHash,hostSnapshotHash:connected?.snapshot.hostSnapshotHash,epoch:state?.epoch,mode,analysisState,revision:analysisState?.revision}:null;let value;
   try{value=await api('/jobs/'+active.jobId);}catch(e){
-    if(inputScope&&!inputProbeCurrent(active,inputScope)){finishPolledJob(active);return;}
+    if(inputScope&&!inputProbeCurrent(active,inputScope)||analysisScope&&!analysisResultCurrent(active,analysisScope)){finishPolledJob(active);return;}
+    if(e.code==='VALIDATION_BUSY'){error(e);return;}
     if(!['SOURCE_CHANGED','SOURCE_REANALYSIS_REQUIRED','CANCELED','CONTINUATION_EXPIRED','VALIDATION_EXPIRED','VALIDATION_WORKER_EXITED','VALIDATION_STALE','VALIDATION_UNAVAILABLE','VALIDATION_SCOPE'].includes(e.code)&&!canceledJobs.has(active.jobId))throw e;
     if(job===active)job=null;
     if(active.kind==='analysis')clearAnalysis();
@@ -703,7 +717,7 @@ async function pollJob(){
     if(active.kind==='input-probe')inputCapability=null;
     if(active.kind==='model-setup')say(modelInstallResult(['CANCELED','UPDATE_IN_PROGRESS'].includes(e.code)?'canceled':'failed',e.code));else error(e);toggle();return;
   }
-  if(inputScope&&!inputProbeCurrent(active,inputScope)){finishPolledJob(active);return;}
+  if(inputScope&&!inputProbeCurrent(active,inputScope)||analysisScope&&!analysisResultCurrent(active,analysisScope)){finishPolledJob(active);return;}
   if(['running','canceling'].includes(value.status)){
     if(active.kind==='model-setup'&&value.status==='canceling')modelInstallResult('canceling');
     const labels={sync:'소스의 싱크를 분석하고 있습니다.',analysis:'로컬에서 화자를 분석하고 있습니다.',example:'단독 발화 샘플을 준비하고 있습니다.','model-setup':'화자 모델을 설치하고 있습니다.','input-probe':'선택 소스의 영상과 오디오를 확인하고 있습니다.'};
@@ -712,13 +726,18 @@ async function pollJob(){
   try{
     if(canceledJobs.has(active.jobId)){say(active.kind==='model-setup'?modelInstallResult('canceled'):'작업을 중단했습니다.');return;}
     if(value.status!=='completed'){say(active.kind==='model-setup'?modelInstallResult(value.status==='canceled'?'canceled':'failed',value.error?.code):'작업 중단 · '+(value.error?.code||value.status));return;}
-    if(['analysis','sync','example'].includes(active.kind)){
+    if(analysisScope){if(!await analysisSnapshotCurrent(active,analysisScope)||!analysisResultCurrent(active,analysisScope))return;}
+    else if(['sync','example'].includes(active.kind)){
       const fresh=await ContentriumHost.snapshot();
       if(!connected||active.snapshotHash!==connected.snapshot.snapshotHash||fresh.snapshot.snapshotHash!==connected.snapshot.hostSnapshotHash){resetSequence();throw new Error('분석 중 타임라인이 변경됐습니다. 현재 시퀀스를 다시 읽어 주세요.');}
     }
     if(active.kind==='analysis'){
-      analysisJob=value.jobId;acceptAnalysis(await api('/analyses/register',{jobId:value.jobId,epoch:state.epoch}));
-      view.show('speakers');say('화자 분석이 끝났습니다. 목소리와 카메라를 확인하세요.');
+      let next;
+      try{next=await api('/analyses/register',{jobId:value.jobId,epoch:analysisScope.epoch});}catch(e){if(!analysisResultCurrent(active,analysisScope))return;error(e);throw e;}
+      if(!analysisResultCurrent(active,analysisScope))return;
+      if(!await analysisSnapshotCurrent(active,analysisScope)||!analysisResultCurrent(active,analysisScope))return;
+      try{acceptAnalysis(next);}catch(e){error(e);throw e;}
+      analysisJob=value.jobId;view.show('speakers');say('화자 분석이 끝났습니다. 목소리와 카메라를 확인하세요.');
     }else if(active.kind==='sync'){
       if(active.inputHash!==syncInputHash()){invalidateSyncResult();return;}
       syncJob=value.jobId;syncResult=value.result;syncResultInputHash=active.inputHash;

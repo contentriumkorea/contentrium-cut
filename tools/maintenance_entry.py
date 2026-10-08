@@ -23,8 +23,19 @@ from contentrium_cut.integration import install_integration
 from contentrium_cut import launcher_transaction as launcher
 from contentrium_cut.migration_registration import prepare as prepare_registration
 from contentrium_cut.lifecycle import supervisor_lease, verify_runtime, spawn_verified
-from contentrium_cut.updater import UpdateManager, TERMINAL, PRE_REPLACE, _json
+from contentrium_cut.updater import UpdateManager, GitHubTransport, API_ROOT, LATEST_URL, TERMINAL, PRE_REPLACE, _json
 from contentrium_cut.windows_install import WindowsInstallation, WindowsNamedMutex, _guard_path
+
+
+class _MigrationTransport:
+    """Resolve the fixed migration tag even after newer regular releases."""
+    def __init__(self, transport):self.transport=transport
+    def get(self, url, headers, timeout, max_bytes):
+        if url==LATEST_URL:
+            url=API_ROOT+'/releases/tags/v0.1.1'
+            headers={key:value for key,value in headers.items() if key.lower()!='if-none-match'}
+        return self.transport.get(url,headers,timeout,max_bytes)
+    def download(self,*args,**kwargs):return self.transport.download(*args,**kwargs)
 
 
 def _leases(root, sid):
@@ -110,7 +121,7 @@ def migrate(root, *, tag, version, commit, action='start', installation=None, tr
         config = _read(root/'launcher-config.json')
         installed = installation or WindowsInstallation(root, migration_registry=registry)
         manager = UpdateManager(root, config['publicKey'], '0.1.0', lambda epoch: None, installed,
-            transport=transport, signing_key_id=config.get('signingKeyId','contentrium-cut-2026-01'),
+            transport=_MigrationTransport(transport or GitHubTransport()), signing_key_id=config.get('signingKeyId','contentrium-cut-2026-01'),
             participant_exited=lambda _, identity: installed.host_identity_exited(identity), clock=clock)
         legacy = _legacy(manager, root, config, installed)
         state = manager.state()

@@ -18,7 +18,7 @@ $migrationCommit = Read-Host '검토된 v0.1.1 Release의 40자리 커밋 SHA'
 .build-venv/Scripts/python.exe -m tools.maintenance_entry --root $migrationRoot --tag v0.1.1 --version 0.1.1 --commit $migrationCommit --action start --wait
 ```
 
-대체 공개 키, activation token 또는 완료 영수증을 CLI로 전달하는 옵션은 없습니다. 신뢰 기준은 해당 설치에 저장된 공개 키와 원래 서명된 배포 기록입니다. `latest`가 정확한 요청과 다르면 시작을 거부합니다. 선택한 Release ID·tag·version·commit·서명 자산을 journal에 고정하고 교체 직전에 같은 Release ID를 다시 확인합니다.
+대체 공개 키, activation token 또는 완료 영수증을 CLI로 전달하는 옵션은 없습니다. 신뢰 기준은 해당 설치에 저장된 공개 키와 원래 서명된 배포 기록입니다. 전용 전환 도구는 `v0.1.1` tag를 직접 조회하므로 이후 일반 버전이 공개되어도 이 경로를 사용할 수 있습니다. 최신 버전 조회의 ETag는 재사용하지 않습니다. 조회 결과의 tag·version·정확한 commit·서명이 요청과 다르면 시작을 거부합니다. 선택한 Release ID·tag·version·commit·서명 자산을 journal에 고정하고 교체 직전에 같은 Release ID를 다시 확인합니다. 일반 패널 업데이트는 계속 `latest`를 사용합니다.
 
 ## 단계와 중단
 

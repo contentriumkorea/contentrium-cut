@@ -72,6 +72,69 @@ async function updatePanel(extra={}){
   await f.tick();return f;
 }
 
+async function modelPanel(extra={}){
+  return panel({request:async(path,body,f)=>{
+    if(extra.request){const value=await extra.request(path,body,f);if(value!==undefined)return value;}
+    if(path==='/models/community-1/revision')return {revision:'b'.repeat(40)};
+    if(path==='/models/community-1/install')return {jobId:'job-1',kind:'model-setup',status:'running'};
+  }});
+}
+async function installModel(f){f.get('model-token').value='owned-fixture-access';f.get('model-terms').checked=true;await f.click('install-model');}
+
+test('model setup request failures clear busy guidance without exposing provider details',async()=>{
+  for(const endpoint of ['revision','install']){
+    const f=await modelPanel({request:path=>{if(path==='/models/community-1/'+endpoint)throw Object.assign(new Error('private authenticated URL'),{code:'MODEL_NOT_READY'});}});
+    await installModel(f);assert.equal(f.get('model-token').value,'');assert.match(f.get('model-install-status').textContent,/실패.*권한.*네트워크.*토큰.*다시/);
+    assert.doesNotMatch(f.get('model-install-status').textContent,/private|확인하고 있습니다|설치 중/);assert.doesNotMatch(f.get('status').textContent,/private/);assert.equal(f.get('install-model').disabled,false);
+  }
+});
+
+test('model worker failure and cancellation show distinct terminal guidance and allow retry',async()=>{
+  for(const status of ['failed','canceled']){
+    const f=await modelPanel({request:(path,body,f)=>{if(path==='/jobs/job-1')return {jobId:'job-1',status:f.jobStatus,error:{code:'MODEL_NOT_READY',message:'private provider URL'}};}});await installModel(f);f.jobStatus=status;await f.tick();
+    assert.match(f.get('model-install-status').textContent,status==='failed'?/실패.*다시/:/중단.*토큰.*다시/);
+    assert.doesNotMatch(f.get('model-install-status').textContent,/private provider/);assert.doesNotMatch(f.get('status').textContent,/private provider/);
+    assert.equal(f.get('install-model').disabled,false);assert.doesNotMatch(f.get('model-install-status').textContent,/설치 중/);
+    await installModel(f);assert.match(f.get('model-install-status').textContent,/설치 중/);assert.equal(f.get('install-model').disabled,true);
+  }
+});
+
+test('model worker canceling updates its own installation status before terminal drain',async()=>{
+  const f=await modelPanel();await installModel(f);f.jobStatus='canceling';await f.tick();
+  assert.match(f.get('model-install-status').textContent,/중단.*요청.*종료.*기다/);assert.equal(f.get('install-model').disabled,true);
+});
+
+test('model setup input guidance resets stale outcome and keeps token out of display',async()=>{
+  const f=await modelPanel();f.get('model-token').value='owned-fixture-access';f.get('model-terms').checked=false;await f.click('install-model');
+  assert.equal(f.get('model-token').value,'');assert.match(f.get('model-install-status').textContent,/토큰.*동의.*다시 설치/);assert.doesNotMatch(f.get('model-install-status').textContent,/owned-fixture/);
+  assert.equal(f.calls.some(c=>c.path.startsWith('/models/')),false);
+});
+
+test('update interruption ends model installation guidance without allowing editing',async()=>{
+  const f=await modelPanel();await installModel(f);f.jobStatus='running';
+  f.state.update={updateState:'IDLE',checkState:'AVAILABLE',candidate:{candidateId:'release:hash',manifestDigest:'a'.repeat(64),appVersion:'0.1.1'}};await f.tick();await f.click('update');
+  assert.match(f.get('model-install-status').textContent,/중단.*요청/);assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);
+  f.jobStatus='completed';await f.tick();assert.match(f.get('model-install-status').textContent,/중단/);assert.doesNotMatch(f.get('model-install-status').textContent,/마쳤/);assert.equal(f.get('analyze').disabled,true);
+});
+
+test('model cancel reports a request before drain and never promotes a canceled completion',async()=>{
+  const f=await modelPanel();await installModel(f);f.jobStatus='running';await f.click('cancel');
+  assert.match(f.get('model-install-status').textContent,/중단.*요청/);assert.equal(f.get('install-model').disabled,true);
+  f.jobStatus='completed';await f.tick();assert.match(f.get('model-install-status').textContent,/중단.*토큰.*다시/);assert.doesNotMatch(f.get('model-install-status').textContent,/마쳤/);
+});
+
+test('model setup completion promises integrity verification on analysis rather than readiness',async()=>{
+  const f=await modelPanel();await installModel(f);await f.tick();
+  assert.match(f.get('model-install-status').textContent,/설치.*마쳤.*분석.*무결성.*확인/);assert.doesNotMatch(f.get('status').textContent,/분석을 시작할 수/);
+});
+
+test('invalid model metadata uses Korean repair instructions for the current recording mode',async()=>{
+  const f=await panel();f.state.models.silero.status='error';f.state.models['community-1'].status='error';await f.tick();await f.click('next-step');
+  assert.match(f.get('models').textContent,/정보.*확인 필요/);assert.doesNotMatch(f.get('models').textContent,/error/);
+  assert.match(f.get('model-status').textContent,/모델 정보.*Setup.*복구/);
+  await f.click('mode-mixed');assert.match(f.get('model-status').textContent,/모델 정보.*설정.*다시 설치/);assert.equal(f.get('analyze').disabled,true);
+});
+
 test('update information explains unavailable integration and incompatible candidates',async()=>{
   const f=await panel();f.state.update={updateState:'UNAVAILABLE',checkState:'UNAVAILABLE',error:{code:'UPDATER_UNAVAILABLE',message:'private detail'}};await f.tick();
   assert.match(f.get('update-info').textContent,/Setup.*복구/);assert.doesNotMatch(f.get('update-info').textContent,/private detail/);assert.equal(f.get('update').disabled,true);

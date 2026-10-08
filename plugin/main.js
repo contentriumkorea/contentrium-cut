@@ -110,7 +110,16 @@ async function restoreSavedAnalysis(settings){
 }
 async function api(path,body,method){return connection.request(path,body,method);}
 function admitted(){if(!credentials||!connected)throw new Error('Premiere에서 편집할 시퀀스를 열어 주세요.');if(!state?.gateOpen||stopped)throw new Error('현재 작업 상태를 확인한 뒤 다시 실행하세요.');if(localEditPending||state?.applyRecovery?.blocked)throw Object.assign(new Error('APPLY_RECOVERY_REQUIRED'),{code:'APPLY_RECOVERY_REQUIRED'});}
-function missingModelGuidance(){return mode==='separate'?'발화 모델을 찾지 못했습니다. Contentrium CUT Setup으로 설치를 복구하세요.':'설정에서 혼합 녹음 모델을 준비하세요.';}
+function missingModelGuidance(){
+  if(state?.models?.[mode==='separate'?'silero':'community-1']?.status==='error')return mode==='separate'?'발화 모델 정보를 확인하지 못했습니다. Contentrium CUT Setup으로 설치를 복구하세요.':'혼합 녹음 모델 정보를 확인하지 못했습니다. 설정에서 모델을 다시 설치하세요.';
+  return mode==='separate'?'발화 모델을 찾지 못했습니다. Contentrium CUT Setup으로 설치를 복구하세요.':'설정에서 혼합 녹음 모델을 준비하세요.';
+}
+function modelInstallResult(status,code){
+  const text=status==='completed'?'화자 모델 설치를 마쳤습니다. 다음 분석에서 모델 무결성을 확인합니다.':status==='canceling'?'모델 설치 중단을 요청했습니다. 실제 작업 종료를 기다리고 있습니다.':status==='canceled'?'모델 설치를 중단했습니다. 다시 설치하려면 접근 토큰을 다시 입력하세요.':
+    ['AUTH_REQUIRED','SESSION_EXPIRED'].includes(code)?'편집 연결을 확인하지 못했습니다. 연결이 복구되면 접근 토큰을 다시 입력하고 모델 설치를 재시도하세요.':'모델 설치에 실패했습니다. 제공자 접근 권한과 네트워크를 확인하고 접근 토큰을 다시 입력해 재시도하세요.';
+  const suffix=status==='failed'&&typeof code==='string'&&/^[A-Z][A-Z0-9_]{0,63}$/.test(code)?' ('+code+')':'';
+  $('model-install-status').textContent=text+suffix;return text+suffix;
+}
 function actionGuidance(){
   const update=state?.update?.updateState;
   if(update==='WAITING_HOST_EXIT')return '프로젝트를 저장하고 Premiere를 정상 종료하면 업데이트가 계속됩니다.';
@@ -406,7 +415,7 @@ async function refresh(){
   if(!compatible){stopped=true;plan=null;setConnection(false,'업데이트된 패널을 열려면 Premiere를 다시 시작하세요.');}
   else if(state.compatible===false)setConnection(false,'Premiere 연결 확인 중');
   else setConnection(true,updateIntent?'업데이트 진행 중':state.gateOpen?'편집 준비됨':state.maintenance?'캐시 정리 상태 확인':'업데이트 진행 중');
-  const statuses={ready:'준비됨',installed:'설치됨 · 분석 시 무결성 확인',not_installed:'설치 필요',failed:'확인 필요',installing:'설치 중'};
+  const statuses={ready:'준비됨',installed:'설치됨 · 분석 시 무결성 확인',not_installed:'설치 필요',error:'모델 정보 확인 필요',failed:'확인 필요',installing:'설치 중'};
   $('models').textContent=['silero','community-1'].map(id=>(id==='silero'?'Silero':'Community-1')+' · '+(statuses[state.models[id].status]||state.models[id].status)).join('\n');
   const required=state.models[mode==='separate'?'silero':'community-1'];$('model-status').textContent=['ready','installed'].includes(required.status)?'분석 시작 시 로컬 모델 무결성을 확인합니다.':missingModelGuidance();
   const update=state.update,candidate=update.candidate;
@@ -436,15 +445,16 @@ async function pollJob(){
     if(active.kind==='analysis')clearAnalysis();
     if(active.kind==='sync')syncResult=syncJob=null;
     if(active.kind==='input-probe')inputCapability=null;
-    error(e);toggle();return;
+    if(active.kind==='model-setup')say(modelInstallResult(['CANCELED','UPDATE_IN_PROGRESS'].includes(e.code)?'canceled':'failed',e.code));else error(e);toggle();return;
   }
   if(['running','canceling'].includes(value.status)){
+    if(active.kind==='model-setup'&&value.status==='canceling')modelInstallResult('canceling');
     const labels={sync:'소스의 싱크를 분석하고 있습니다.',analysis:'로컬에서 화자를 분석하고 있습니다.',example:'단독 발화 샘플을 준비하고 있습니다.','model-setup':'화자 모델을 설치하고 있습니다.','input-probe':'선택 소스의 영상과 오디오를 확인하고 있습니다.'};
     say(value.status==='canceling'?'작업을 중단하고 있습니다.':labels[active.kind]||'작업 중');return;
   }
   try{
-    if(canceledJobs.has(active.jobId)){say('작업을 중단했습니다.');return;}
-    if(value.status!=='completed'){say('작업 중단 · '+(value.error?.code||value.status));return;}
+    if(canceledJobs.has(active.jobId)){say(active.kind==='model-setup'?modelInstallResult('canceled'):'작업을 중단했습니다.');return;}
+    if(value.status!=='completed'){say(active.kind==='model-setup'?modelInstallResult(value.status==='canceled'?'canceled':'failed',value.error?.code):'작업 중단 · '+(value.error?.code||value.status));return;}
     if(['analysis','sync','example'].includes(active.kind)){
       const fresh=await ContentriumHost.snapshot();
       if(!connected||active.snapshotHash!==connected.snapshot.snapshotHash||fresh.snapshot.snapshotHash!==connected.snapshot.hostSnapshotHash){resetSequence();throw new Error('분석 중 타임라인이 변경됐습니다. 현재 시퀀스를 다시 읽어 주세요.');}
@@ -471,7 +481,7 @@ async function pollJob(){
       for(const row of selectedRows){const media=inputCapability.assets.find(a=>a.assetId===row.source.assetId);if(!media)throw new Error('INPUT_SCOPE');row.role.value=media.hasVideo?'camera':media.hasAudio?'audio':'exclude';row.audio.checked=!media.hasVideo&&media.hasAudio;row.info.textContent=media.hasVideo?(media.hasAudio?'영상 · 오디오':'영상만 있음'):(media.hasAudio?'오디오만 있음':'지원하는 스트림 없음');}
       say('선택 소스를 확인했습니다. 역할과 출력 오디오를 지정하세요.');
     }else if(active.kind==='model-setup'){
-      $('model-install-status').textContent='화자 모델 설치를 마쳤습니다.';say('모델 준비 완료 · 화자 분석을 시작할 수 있습니다.');
+      say(modelInstallResult('completed'));
     }
   }finally{if(job?.jobId===active.jobId)job=null;canceledJobs.delete(active.jobId);toggle();}
 }
@@ -541,6 +551,7 @@ handler('load-settings',async()=>{admitted();await stopPreview();if(settingsTime
 handler('add-override',()=>{addOverride();scheduleSettings();});
 handler('undo-correction',()=>correct({type:'undo'}));
 handler('cancel',async()=>{
+  if(job?.kind==='model-setup')modelInstallResult('canceling');
   stopped=true;plan=null;await stopPreview();
   const cancellations=[connection.cancelPending()];
   if(job){canceledJobs.add(job.jobId);cancellations.push(api('/jobs/'+job.jobId+'/cancel',{}));}
@@ -557,6 +568,7 @@ handler('update',async()=>{
   if(!updateIntent)updateIntent={candidateId:candidate.candidateId,manifestDigest:candidate.manifestDigest,requestId:requestId(),epoch:state.epoch};
   updateIntent.inFlight=true;
   stopped=true;plan=null;if(job)canceledJobs.add(job.jobId);toggle();
+  if(job?.kind==='model-setup')modelInstallResult('canceling');
   say('Contentrium CUT 작업을 중단하고 업데이트를 시작합니다.');
   // Start the global stop independently of an unresponsive Adobe playback API.
   const intent=updateIntent;
@@ -571,10 +583,12 @@ handler('open-model-provider',()=>uxp.shell.openExternal('https://huggingface.co
 handler('install-model',async()=>{
   if(!credentials||!state?.gateOpen)throw new Error('편집 연결을 확인하세요.');
   const token=$('model-token').value.trim(),termsAccepted=$('model-terms').checked;$('model-token').value='';
-  if(!token||!termsAccepted)throw new Error('접근 토큰과 제공자 이용 조건 동의를 확인하세요.');
-  $('model-install-status').textContent='모델 리비전을 확인하고 있습니다.';
-  const epoch=state.epoch,revision=await api('/models/community-1/revision',{token,termsAccepted,epoch});
-  job=await api('/models/community-1/install',{token,termsAccepted,revision:revision.revision,epoch});$('model-install-status').textContent='로컬 모델 설치 중';
+  if(!token||!termsAccepted){$('model-install-status').textContent='접근 토큰을 입력하고 제공자 이용 조건 동의를 확인한 뒤 다시 설치하세요.';throw new Error($('model-install-status').textContent);}
+  try{
+    $('model-install-status').textContent='모델 리비전을 확인하고 있습니다.';
+    const epoch=state.epoch,revision=await api('/models/community-1/revision',{token,termsAccepted,epoch});
+    job=await api('/models/community-1/install',{token,termsAccepted,revision:revision.revision,epoch});$('model-install-status').textContent='로컬 모델 설치 중';
+  }catch(e){const canceled=['CANCELED','UPDATE_IN_PROGRESS'].includes(e.code);say(modelInstallResult(canceled?'canceled':'failed',e.code));}
 });
 async function loadResources(){
   const value=await api('/resources');$('analysis-device').value=value.settings.device;const budget=value.settings.cacheBudgetBytes;$('cache-budget').value=Number.isSafeInteger(budget)&&budget>0?String(budget/1073741824):'';

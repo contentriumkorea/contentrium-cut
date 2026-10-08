@@ -78,6 +78,69 @@ function micError(f,index=0){return f.get('microphones').children[index]?.childr
 function syncRow(f,index=0){return f.evaluate('syncRows['+index+']');}
 
 async function analyzedPanel(extra={}){const f=await panel(extra);await f.click('analyze');await f.tick();return f;}
+async function overridePanel(extra={}){const f=await analyzedPanel(extra);await f.click('add-override');return f;}
+function overrideRow(f,index=0){return f.evaluate('overrideRows['+index+']');}
+test('manual frame errors identify the row and field and block only plan and apply',async()=>{
+  for(const [field,value] of [['first',''],['first',' '],['first','-1'],['first','0.5'],['first','bad'],['first','1e309'],['first','9007199254740992'],['first','300'],['last','0'],['last','301'],['last','']]){
+    const f=await overridePanel(),row=overrideRow(f);row[field].value=value;row[field].oninput();await f.click('plan');assert.equal(f.calls.some(c=>c.path==='/plan'),false,field+value);
+    assert.equal(f.get('plan').disabled,true);assert.equal(f.get('analyze').disabled,false);assert.equal(f.get('sync').disabled,false);assert.equal(f.get('save-settings').disabled,false);
+    assert.match(row.error.textContent,/수동 구간 1/);assert.equal(row[field].getAttribute('aria-invalid'),'true');assert.equal(row[field].getAttribute('aria-describedby'),row.error.getAttribute('id'));
+    row[field].value=field==='first'?'30':'300';row[field].oninput();assert.equal(f.get('plan').disabled,false);await f.click('plan');assert.equal(f.get('apply').disabled,false);
+  }
+});
+test('manual frame bounds respect a nonzero editing range and half-open adjacency',async()=>{
+  const f=await analyzedPanel();f.get('range-start').value='30';f.get('range-end').value='150';f.get('range-end').onchange();await f.click('analyze');await f.tick();await f.click('add-override');const row=overrideRow(f);
+  row.first.value='29';row.first.oninput();await f.click('plan');assert.equal(f.calls.some(c=>c.path==='/plan'),false);assert.match(row.error.textContent,/30.*150/);
+  row.first.value='30';row.last.value='150';row.last.oninput();await f.click('plan');assert.equal(f.calls.filter(c=>c.path==='/plan').at(-1).body.policy.overrides[0].startFrame,30);
+});
+test('different-camera overlaps are rejected while same-camera overlaps and adjacent cuts are accepted',async()=>{
+  for(const [camera,start,blocked] of [['video:1','90',true],['video:0','90',false],['video:1','100',false]]){
+    const f=await overridePanel({native:twoCameraNative()});overrideRow(f).last.value='100';await f.click('add-override');const row=overrideRow(f,1);row.first.value=start;row.last.value='200';row.camera.value=camera;row.camera.onchange();await f.click('plan');
+    assert.equal(f.calls.some(c=>c.path==='/plan'),!blocked);if(blocked){assert.match(row.error.textContent,/겹|중복/);assert.match(overrideRow(f).error.textContent,/겹|중복/);}
+  }
+});
+test('protected manual camera is preserved for correction instead of silently selecting another',async()=>{
+  const f=await overridePanel({native:twoCameraNative()}),row=overrideRow(f);row.camera.value='video:1';row.camera.onchange();f.evaluate("cameraRows[1].role.value='protected';cameraRows[1].role.onchange()");
+  assert.equal(row.camera.value,'video:1');assert.equal(f.get('plan').disabled,true);assert.equal(row.camera.getAttribute('aria-invalid'),'true');assert.match(row.error.textContent,/카메라/);row.camera.value='video:0';row.camera.onchange();assert.equal(f.get('plan').disabled,false);
+});
+test('invalid manual rows survive raw settings and legacy numeric recovery without dropping rows',async()=>{
+  const f=await overridePanel(),row=overrideRow(f);row.first.value='';row.last.value='bad';row.last.oninput();await f.click('save-settings');await f.click('load-settings');
+  assert.equal(f.evaluate('overrideRows.length'),1);assert.equal(overrideRow(f).first.value,'');assert.equal(overrideRow(f).last.value,'bad');assert.equal(f.evaluate('analysisState!==null'),true);assert.equal(f.get('plan').disabled,true);
+  const settings=JSON.parse(f.evaluate('JSON.stringify(captureSettings())'));delete settings.overrideInput;settings.policy.overrides=[{startFrame:30,endFrame:150,cameraId:'video:0'},{startFrame:200,endFrame:100,cameraId:'missing'}];
+  f.evaluate('restoreSettings('+JSON.stringify(settings)+');toggle()');assert.equal(f.evaluate('overrideRows.length'),2);assert.equal(overrideRow(f).first.value,'30');assert.equal(overrideRow(f,1).camera.value,'missing');assert.equal(overrideRow(f,1).last.value,'100');assert.equal(f.get('plan').disabled,true);
+});
+test('manual raw input survives pending autosave and same-sequence refresh',async()=>{
+  const f=await overridePanel();overrideRow(f).first.value=' ';overrideRow(f).first.oninput();await f.click('read-project');assert.equal(f.evaluate('overrideRows.length'),1);assert.equal(overrideRow(f).first.value,' ');
+  for(let i=0;i<f.timeouts.length;i++){const fn=f.timeouts[i];f.timeouts[i]=null;if(fn)await fn();}const key=[...f.saved.rows.keys()].find(k=>k.startsWith('cut-settings-'));assert.equal(JSON.parse(f.saved.rows.get(key)).overrideInput[0].first,' ');
+});
+test('manual input is validated at direct apply plan response and native permit boundaries',async()=>{
+  for(const stage of ['direct','response','permit']){
+    const f=await overridePanel({request:(path,body,fixture)=>{if(stage==='response'&&path==='/plan'){overrideRow(fixture).last.value='';return {planHash:'p'.repeat(64),segments:[],reviews:[]};}if(stage==='permit'&&path==='/apply/begin'){overrideRow(fixture).last.value='';return {applyId:'owned-manual',epoch:0,execute:true,plan:{planHash:'p'.repeat(64)}};}}});let calls=0;f.host.apply=async()=>{calls++;throw new Error('Owned fixture stop');};await f.click('plan');if(stage==='direct')overrideRow(f).last.value='';await f.click('apply');assert.equal(calls,0);assert.match(f.get('status').textContent,/수동 구간.*종료/);if(stage==='direct'||stage==='response')assert.equal(f.calls.some(c=>c.path==='/apply/begin'),false);else assert.equal(f.calls.filter(c=>c.path==='/apply/end').at(-1)?.body.status,'failed');
+  }
+});
+test('invalid manual rows do not delay immediate update and update guidance wins',async()=>{
+  const f=await updatePanel();await f.click('add-override');overrideRow(f).last.value='';overrideRow(f).last.oninput();await f.nodes.find(n=>n.attrs['data-step']==='cut').onclick();await f.click('update');assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.match(f.get('action-readiness').textContent,/업데이트/);
+});
+test('manual row errors renumber after deletion and stable guidance does not rewrite live text',async()=>{
+  const f=await overridePanel();await f.click('add-override');const row=overrideRow(f,1);row.last.value='';row.last.oninput();const id=row.error.getAttribute('id');let text=row.error.textContent,writes=0;
+  Object.defineProperty(row.error,'textContent',{get:()=>text,set:value=>{text=value;writes++;}});await f.tick();await f.tick();assert.equal(writes,0);
+  f.get('overrides').children[0].children.find(n=>n.tag==='button').onclick();assert.match(row.error.textContent,/수동 구간 1/);assert.equal(row.error.getAttribute('id'),id);assert.equal(row.last.getAttribute('aria-describedby'),id);
+  row.last.value='300';row.last.oninput();assert.equal(row.error.textContent,'');assert.equal(row.last.getAttribute('aria-invalid'),'false');assert.equal(f.get('plan').disabled,false);
+});
+test('manual range coverage rejection from the engine receives Korean actionable guidance',async()=>{
+  const f=await overridePanel({request:path=>{if(path==='/plan')throw Object.assign(new Error('Fixed camera does not cover the complete override'),{code:'OVERRIDE_COVERAGE_GAP'});}});await f.click('plan');assert.match(f.get('status').textContent,/영상.*구간.*카메라/);assert.doesNotMatch(f.get('status').textContent,/Fixed camera/);assert.equal(f.get('apply').disabled,true);
+});
+test('restoring many manual rows validates the batch once while preserving raw invalid rows',async()=>{
+  const f=await analyzedPanel(),settings=JSON.parse(f.evaluate('JSON.stringify(captureSettings())'));
+  settings.overrideInput=Array.from({length:500},(_,i)=>({first:i===499?'':'0',last:'300',camera:'video:0'}));
+  f.evaluate('var feedbackCalls=0,originalOverrideFeedback=overrideFeedback;overrideFeedback=()=>{feedbackCalls++;return originalOverrideFeedback();}');
+  const small={...settings,overrideInput:settings.overrideInput.slice(0,2)};f.evaluate('restoreSettings('+JSON.stringify(small)+')');const smallPasses=f.evaluate('feedbackCalls');f.evaluate('feedbackCalls=0');
+  f.evaluate('restoreSettings('+JSON.stringify(settings)+')');assert.equal(f.evaluate('feedbackCalls'),smallPasses,'validation passes should be independent of row count');
+  assert.equal(f.evaluate('overrideRows.length'),500);assert.equal(overrideRow(f,499).first.value,'');assert.match(overrideRow(f,499).error.textContent,/수동 구간 500/);f.evaluate('toggle()');assert.equal(f.get('plan').disabled,true);
+});
+test('simultaneously invalid manual frames and camera keep the first-field correction actionable',async()=>{
+  for(const field of ['first','last']){const f=await overridePanel(),row=overrideRow(f);row[field].value='';row.camera.value='missing';row[field].oninput();assert.match(row.error.textContent,/프레임은.*정수/);assert.doesNotMatch(row.error.textContent,/프레임를|프레임을 다시 선택/);assert.equal(row.camera.getAttribute('aria-invalid'),'true');}
+});
 
 function twoCameraNative(){const native=nativeSnapshot();native.snapshot.tracks.push({trackRef:'video:1',mediaType:'video',index:1,name:'Other',muted:false});native.snapshot.clips.push({...native.snapshot.clips[0],instanceKey:'other-camera',trackRef:'video:1'});delete native.snapshot.snapshotHash;native.snapshot.snapshotHash=hash(native.snapshot);return native;}
 const planChanges=[

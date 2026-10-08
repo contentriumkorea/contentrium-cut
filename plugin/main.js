@@ -294,7 +294,7 @@ async function readProject({fresh=null,automatic=false}={}){
     s.range={startFrame:start,endFrame:end};delete s.snapshotHash;s.snapshotHash=ContentriumHost.hash(s);
     await heartbeat();await api('/project',{snapshot:s,hostIdentity:null,epoch:state.epoch});connected=next;rangeDirty=false;
     $('project-name').textContent=s.sequenceName;$('project-name').title=s.projectName+' / '+s.sequenceName;
-    $('sequence-info').textContent=frameLabel(s.range.endFrame)+' · '+(s.fps.num/s.fps.den).toFixed(2)+' fps';
+    $('sequence-info').textContent=frameLabel(s.range.endFrame)+' · '+(s.fps.num/s.fps.den).toFixed(3)+' fps ('+s.fps.num+'/'+s.fps.den+')';
     $('track-count').textContent=s.tracks.filter(t=>t.mediaType==='video').length+' V / '+s.tracks.filter(t=>t.mediaType==='audio').length+' A';
     $('range-start').value=String(start);$('range-end').value=String(end);
     clearAnalysis();syncResult=syncJob=null;savedSpeakerMappings={};overrideRows.length=0;$('overrides').innerHTML='';
@@ -304,6 +304,7 @@ async function readProject({fresh=null,automatic=false}={}){
   finally{binding=false;}
 }
 function frameLabel(frame){const rate=connected?connected.snapshot.fps.num/connected.snapshot.fps.den:30,seconds=Math.max(0,Math.floor(frame/rate));return [Math.floor(seconds/3600),Math.floor(seconds/60)%60,seconds%60].map(n=>String(n).padStart(2,'0')).join(':');}
+function segmentTiming(segment){const fps=connected?.snapshot.fps||{num:30,den:1},frames=segment.endFrame-segment.startFrame;return segment.startFrame+'–'+segment.endFrame+' 프레임 · '+frames+'프레임 / '+(frames*fps.den/fps.num).toFixed(3)+'초';}
 function clearAnalysis(){reviewPage=0;reviewWindow=null;$('review-search').value='';options($('review-camera'),[],'모든 카메라');$('review-page-info').textContent='편집안을 만들어 주세요';if(mode==='mixed'||speakerRowsScope?.mode==='mixed'||savedSpeakerMappingScope?.mode==='mixed')clearMixedMappings();analysisJob=analysis=plan=null;analysisState=null;if(mode==='mixed'){$('speaker-mapping').innerHTML='';speakerRows.length=0;}$('cut-count').textContent=$('review-count').textContent='—';for(const id of ['timeline','segments','reviews','speaker-corrections','correction-history'])$(id).innerHTML='';$('segments').appendChild(element('p','화자를 분석하고 편집안을 만들어 주세요.','hint'));}
 function resetSequence(){connected=null;clearAnalysis();syncResult=syncJob=null;$('sync-result').textContent='';$('project-name').textContent='시퀀스를 열어 주세요';$('sequence-info').textContent='Premiere 타임라인을 자동으로 읽습니다.';$('track-count').textContent='TIMELINE';for(const id of ['microphones','cameras','calibration','speaker-mapping','sync-sources'])$(id).innerHTML='';microphoneRows.length=cameraRows.length=calibrationRows.length=speakerRows.length=syncRows.length=0;toggle();}
 async function followSequence(){
@@ -333,11 +334,11 @@ function renderPlan(){
 }
 function renderReviewCuts(){
   reviewWindow=cutReview.window(plan?.segments||[],{cameraId:$('review-camera').value,query:$('review-search').value,page:reviewPage},
-    segment=>(cameraRows.find(row=>row.id===segment.cameraId)?.title||segment.cameraId)+' '+segmentReason(segment)+' '+frameLabel(segment.startFrame));
+    segment=>(cameraRows.find(row=>row.id===segment.cameraId)?.title||segment.cameraId)+' '+segmentReason(segment)+' '+frameLabel(segment.startFrame)+' '+segmentTiming(segment));
   reviewPage=reviewWindow.index;$('segments').innerHTML='';
   for(const segment of reviewWindow.rows){
     const row=workButton('',()=>seekFrame(segment.startFrame));row.className='segment-row';
-    const camera=cameraRows.find(r=>r.id===segment.cameraId);row.appendChild(element('span',frameLabel(segment.startFrame)+'–'+frameLabel(segment.endFrame),'segment-range'));row.appendChild(element('span',camera?.title||segment.cameraId,'segment-camera'));row.appendChild(element('span',segmentReason(segment),'segment-reasons'));$('segments').appendChild(row);
+    const camera=cameraRows.find(r=>r.id===segment.cameraId);row.appendChild(element('span',frameLabel(segment.startFrame)+'–'+frameLabel(segment.endFrame),'segment-range'));row.appendChild(element('span',camera?.title||segment.cameraId,'segment-camera'));row.appendChild(element('span',segmentReason(segment),'segment-reasons'));row.appendChild(element('span',segmentTiming(segment),'segment-timing'));$('segments').appendChild(row);
   }
   if(!reviewWindow.total)$('segments').appendChild(element('p',plan?'일치하는 컷이 없습니다. 검색과 카메라 필터를 확인하세요.':'편집안을 만들어 주세요.','hint'));
   $('review-page-info').textContent=reviewWindow.total?reviewWindow.first+'–'+reviewWindow.last+' / '+reviewWindow.total+' 컷':'0 컷';toggle();

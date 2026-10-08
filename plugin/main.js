@@ -16,7 +16,7 @@ let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,
 let analysisState=null;
 let validationCount=0,heartbeatRequest=null,updateIntent=null;
 let reviewPage=0,reviewWindow=null;
-let microphoneIssue='',rangeIssue='';
+let microphoneIssue='',rangeIssue='',syncIssue='';
 const selectedRows=[];
 function say(value){$('status').textContent=value;}
 function setConnection(ready,text){$('connection').textContent=text;$('connection-dot').className=ready?'connected':'disconnected';$('host-status').textContent=ready?'PREMIERE 로컬 연결됨':'PREMIERE 연결 대기';}
@@ -54,7 +54,7 @@ function captureSettings(){
     microphones:microphoneRows.map(r=>({key:r.clip.instanceKey,checked:r.check.checked,speaker:r.speaker.value,channel:r.channel.value,stream:r.stream?.value??'1'})),
     cameras:cameraRows.map(r=>({id:r.id,assets:connected.snapshot.clips.filter(c=>c.trackRef===r.id).map(c=>c.assetId).sort(),role:r.role.value,covered:r.covered.value})),
     speakers:speakerRows.map(r=>({id:r.id,camera:r.select.value})),speakerMappingScope:currentSpeakerMappingScope(),speakerCount:$('speaker-count').value,vadThreshold:$('vad-threshold').value,start:$('start-camera').value,reserve:$('reserve-camera').value,
-    range:{startFrame:Number($('range-start').value),endFrame:Number($('range-end').value)},rangeInput:{start:$('range-start').value,end:$('range-end').value},sync:syncOptions(),
+    range:{startFrame:Number($('range-start').value),endFrame:Number($('range-end').value)},rangeInput:{start:$('range-start').value,end:$('range-end').value},sync:syncOptions(),syncInput:syncRows.map(r=>({assetId:r.source.assetId,stream:r.stream.value,channel:r.channel.value})),
     analysisReference:analysisState&&analysisJob?{schemaVersion:1,analysisId:analysisState.analysisId,jobId:analysisJob,revision:analysisState.revision,
       snapshotHash:analysisState.snapshotHash,mode,inputHash:ContentriumHost.hash(microphoneOptions())}:null};
 }
@@ -89,7 +89,9 @@ function restoreSettings(settings){
       if(selection){r.stream.value=String(selection.streamIndex+1);r.channel.value=String(selection.channelIndex+1);}
       const manual=sync.manualOffsets?.[r.source.assetId];if(manual){r.offset.value=manual.offsetSeconds;r.confirmed.checked=manual.confirmed===true;}
       const clock=sync.timecodeConfirmations?.[r.source.assetId];if(clock){r.clockId.value=clock.clockId;r.date.value=clock.date;r.fps.value=clock.fps.num+'/'+clock.fps.den;r.drop.checked=clock.dropFrame===true;r.clockConfirmed.checked=clock.confirmed===true;}
-    }syncMethodChanged();
+    }
+    for(const r of syncRows){const input=settings.syncInput?.find(v=>v.assetId===r.source.assetId);if(input&&typeof input.stream==='string'&&typeof input.channel==='string'){r.stream.value=input.stream;r.channel.value=input.channel;}}
+    syncMethodChanged();
   }
   overrideRows.length=0;$('overrides').innerHTML='';
   for(const v of settings.policy.overrides||[]){if(v.startFrame>=connected.snapshot.range.startFrame&&v.endFrame<=connected.snapshot.range.endFrame&&v.endFrame>v.startFrame&&cameraValues().some(c=>c[0]===v.cameraId)){addOverride();const r=overrideRows[overrideRows.length-1];r.first.value=String(v.startFrame);r.last.value=String(v.endFrame);r.camera.value=v.cameraId;}}
@@ -144,6 +146,7 @@ function actionGuidance(){
   if(!connected)return 'Premiere에서 편집할 시퀀스를 열고 트랙을 확인하세요.';
   if(rangeIssue)return rangeIssue;
   if(microphoneIssue&&['tracks','speakers'].includes(view.current()))return microphoneIssue;
+  if(syncIssue&&view.current()==='tracks')return syncIssue;
   const step=view.current();
   if(step==='speakers')return ['ready','installed'].includes(state?.models?.[mode==='separate'?'silero':'community-1']?.status)?'마이크와 카메라를 확인하고 분석을 시작하세요. 시작 시 모델 무결성을 확인합니다.':missingModelGuidance();
   if(step==='cut')return analysisState?'컷 설정을 확인하고 편집안을 만드세요.':'화자 단계에서 음성을 분석한 뒤 편집안을 만들 수 있습니다.';
@@ -153,6 +156,7 @@ function actionGuidance(){
 function toggle(){
   microphoneIssue=microphoneFeedback();
   rangeIssue=rangeFeedback();
+  syncIssue=syncFeedback();
   const busy=pending||applying||!!job||validationCount>0,locked=!credentials||!state?.gateOpen||state.compatible===false||stopped||busy||localEditPending||state?.applyRecovery?.blocked;
   for(const el of document.querySelectorAll('input,select,button.mode'))el.disabled=busy||stopped||!credentials||!state?.gateOpen;
   for(const id of ['analyze','sync','plan','apply-sync','apply','save-settings','load-settings'])$(id).disabled=locked||!connected||(id==='plan'&&!analysisState)||(id==='apply'&&!plan)||(id==='apply-sync'&&!syncResult);
@@ -173,6 +177,7 @@ function toggle(){
   if(!['ready','installed'].includes(state?.models?.[mode==='separate'?'silero':'community-1']?.status))$('analyze').disabled=true;
   if(microphoneIssue)$('analyze').disabled=true;
   if(rangeIssue)for(const id of ['analyze','sync','plan','apply-sync','apply'])$(id).disabled=true;
+  if(syncIssue)for(const id of ['sync','apply-sync'])$(id).disabled=true;
   const guidance=actionGuidance();if($('action-readiness').textContent!==guidance)$('action-readiness').textContent=guidance;
 }
 function cameraValues(){return cameraRows.filter(r=>r.role.value!=='protected').map(r=>[r.id,r.title]);}
@@ -254,18 +259,34 @@ function renderSyncSources(){
   const values=[];
   for(const source of connected.snapshot.sources){
     const row=element('div',undefined,'source-row'),check=checkbox(true),title=element('label',basename(source.canonicalPath));title.insertBefore(check,title.firstChild);row.appendChild(title);
-    const fields=element('div',undefined,'row'),stream=number(1),channel=number(1);stream.min=channel.min='1';fields.appendChild(label('오디오 스트림',stream));fields.appendChild(label('채널',channel));row.appendChild(fields);
+    const fields=element('div',undefined,'row'),stream=number(1),channel=number(1);stream.min=channel.min='1';stream.step=channel.step='1';fields.appendChild(label('오디오 스트림',stream));fields.appendChild(label('채널',channel));row.appendChild(fields);
+    const issue=element('p','', 'hint input-error hidden');issue.id='sync-source-error-'+syncRows.length;issue.setAttribute('role','status');issue.setAttribute('aria-live','polite');
+    for(const field of [stream,channel])field.setAttribute('aria-describedby',issue.id);row.appendChild(issue);
     const manual=element('div'),offset=number(0),confirmed=checkbox();offset.step='0.001';manual.appendChild(label('기준 대비 오프셋 · 초',offset));manual.appendChild(label('이 오프셋을 확인했습니다',confirmed));row.appendChild(manual);
     const clock=element('div'),clockId=element('input'),date=element('input'),fps=element('select'),drop=checkbox(),clockConfirmed=checkbox();date.placeholder='YYYY-MM-DD';clockId.placeholder='같은 동기 장치 또는 시계 이름';
     options(fps,[['24000/1001','23.976'],['24/1','24'],['25/1','25'],['30000/1001','29.97'],['30/1','30'],['50/1','50'],['60000/1001','59.94'],['60/1','60']]);fps.value=connected.snapshot.fps.num+'/'+connected.snapshot.fps.den;
     clock.appendChild(label('공통 시계',clockId));clock.appendChild(label('촬영 날짜',date));clock.appendChild(label('타임코드 FPS',fps));clock.appendChild(label('Drop-frame',drop));clock.appendChild(label('날짜와 시계가 같고 촬영 중 리셋하지 않았습니다',clockConfirmed));row.appendChild(clock);
-    $('sync-sources').appendChild(row);syncRows.push({check,source,stream,channel,manual,offset,confirmed,clock,clockId,date,fps,drop,clockConfirmed});
-    for(const field of [check,stream,channel,offset,confirmed,clockId,date,fps,drop,clockConfirmed])field.onchange=()=>{syncResult=syncJob=null;scheduleSettings();toggle();};
+    $('sync-sources').appendChild(row);syncRows.push({check,source,stream,channel,issue,manual,offset,confirmed,clock,clockId,date,fps,drop,clockConfirmed});
+    for(const field of [check,stream,channel,offset,confirmed,clockId,date,fps,drop,clockConfirmed])field.oninput=field.onchange=syncInputsChanged;
     values.push([source.assetId,basename(source.canonicalPath)]);
   }
   options($('sync-reference'),values);syncMethodChanged();
 }
-function syncMethodChanged(){for(const r of syncRows){r.manual.className=$('sync-method').value==='manual'?'':'hidden';r.clock.className=$('sync-method').value==='timecode'?'':'hidden';}syncResult=syncJob=null;scheduleSettings();toggle();}
+function syncInputsChanged(){syncResult=syncJob=null;$('sync-result').textContent='';scheduleSettings();toggle();}
+function syncMethodChanged(){for(const r of syncRows){r.manual.className=$('sync-method').value==='manual'?'':'hidden';r.clock.className=$('sync-method').value==='timecode'?'':'hidden';}syncInputsChanged();}
+function syncFeedback(){
+  let first='';const selected=syncRows.filter(r=>r.check.checked);
+  for(const row of syncRows){
+    const invalidStream=row.check.checked&&(!row.stream.value.trim()||!Number.isSafeInteger(Number(row.stream.value))||Number(row.stream.value)<1);
+    const invalidChannel=row.check.checked&&(!row.channel.value.trim()||!Number.isSafeInteger(Number(row.channel.value))||Number(row.channel.value)<1);
+    for(const [field,invalid] of [[row.stream,invalidStream],[row.channel,invalidChannel]]){const value=invalid?'true':'false';if(field.getAttribute('aria-invalid')!==value)field.setAttribute('aria-invalid',value);}
+    const errors=[];if(invalidStream)errors.push('오디오 스트림은 1 이상의 정수로 입력하세요.');if(invalidChannel)errors.push('채널은 1 이상의 정수로 입력하세요.');
+    const text=errors.length?basename(row.source.canonicalPath)+' · '+errors.join(' '):'';
+    if(row.issue.textContent!==text)row.issue.textContent=text;row.issue.className='hint input-error'+(text?'':' hidden');if(text&&!first)first=text;
+  }
+  const issue=!connected?'':first|| (selected.length<2?'싱크할 소스를 2개 이상 선택하세요.':!selected.some(r=>r.source.assetId===$('sync-reference').value)?'기준 소스를 선택한 싱크 소스 중에서 지정하세요.':'');
+  const node=$('sync-error');if(node.textContent!==issue)node.textContent=issue;node.className='hint input-error'+(issue?'':' hidden');return issue;
+}
 function syncOptions(){
   const rows=syncRows.filter(r=>r.check.checked),method=$('sync-method').value;
   return {assetIds:rows.map(r=>r.source.assetId),reference:$('sync-reference').value,method,
@@ -558,6 +579,7 @@ handler('analyze',async()=>{
   job={...await api('/jobs',{kind:'analysis',options:microphoneOptions(),epoch:state.epoch}),snapshotHash:connected.snapshot.snapshotHash};say('화자 분석을 시작합니다.');
 });
 handler('sync',async()=>{
+  admitted();const issue=syncFeedback();if(issue)throw new Error(issue);
   await requireCurrent();await stopPreview();syncResult=syncJob=null;$('sync-result').textContent='';
   job={...await api('/jobs',{kind:'sync',options:syncOptions(),epoch:state.epoch}),snapshotHash:connected.snapshot.snapshotHash};say('싱크 분석을 시작합니다.');
 });
@@ -575,7 +597,7 @@ handler('apply',async()=>{
   clearAnalysis();say('적용 완료 · '+result.sequenceName+' / 원본·오디오 보존 확인');
 });
 handler('apply-sync',async()=>{
-  await requireCurrent();if(!syncJob||!syncResult)throw new Error('싱크 분석을 먼저 실행하세요.');
+  await requireCurrent();const issue=syncFeedback();if(issue)throw new Error(issue);if(!syncJob||!syncResult)throw new Error('싱크 분석을 먼저 실행하세요.');
   const source=connected.snapshot,assets=new Set(syncRows.filter(r=>r.check.checked).map(r=>r.source.assetId)),keys=source.clips.filter(c=>assets.has(c.assetId)).map(c=>c.instanceKey);
   const reviewed=await api('/sync-plan',{jobId:syncJob,selectedClipInstanceKeys:keys,epoch:state.epoch});
   const result=await performNative('sync',{planHash:reviewed.planHash,snapshotHash:source.snapshotHash,epoch:state.epoch},(approved,control)=>ContentriumHost.applySync(approved.plan,source,control),(approved,result)=>savedReceipt(approved,result,source));
@@ -663,7 +685,7 @@ $('review-camera').onchange=$('review-search').oninput=()=>{reviewPage=0;renderR
 $('review-previous').onclick=()=>{if(plan&&reviewWindow?.previous){reviewPage--;renderReviewCuts();}};
 $('review-next').onclick=()=>{if(plan&&reviewWindow?.next){reviewPage++;renderReviewCuts();}};
 $('review-clear').onclick=()=>{$('review-camera').value='';$('review-search').value='';reviewPage=0;renderReviewCuts();};
-$('sync-reference').onchange=()=>{syncResult=syncJob=null;scheduleSettings();toggle();};
+$('sync-reference').onchange=syncInputsChanged;
 $('version').textContent=bundle.appVersion;
 $('header-version').textContent=bundle.appVersion;
 $('update-banner-button').onclick=()=>$('update').onclick();

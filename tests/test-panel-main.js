@@ -72,6 +72,56 @@ async function updatePanel(extra={}){
   await f.tick();return f;
 }
 
+test('update information explains unavailable integration and incompatible candidates',async()=>{
+  const f=await panel();f.state.update={updateState:'UNAVAILABLE',checkState:'UNAVAILABLE',error:{code:'UPDATER_UNAVAILABLE',message:'private detail'}};await f.tick();
+  assert.match(f.get('update-info').textContent,/Setup.*복구/);assert.doesNotMatch(f.get('update-info').textContent,/private detail/);assert.equal(f.get('update').disabled,true);
+  f.state.update={updateState:'IDLE',checkState:'INCOMPATIBLE',candidate:{appVersion:'9.0.0',compatibilityReasons:['private path']}};await f.tick();
+  assert.match(f.get('update-info').textContent,/9\.0\.0.*호환.*Premiere/);assert.equal(f.get('update').disabled,true);assert.doesNotMatch(f.get('update-info').textContent,/private path/);
+});
+
+test('update lookup failure offers retry and identifies integrity failures without server details',async()=>{
+  const f=await panel();f.state.update={updateState:'IDLE',checkState:'CHECK_FAILED',error:{code:'UPDATE_FAILED',message:'secret CDN query'}};await f.tick();
+  assert.match(f.get('update-info').textContent,/네트워크.*업데이트 확인/);assert.doesNotMatch(f.get('update-info').textContent,/secret CDN query/);
+  for(const code of ['UPDATE_SIGNATURE','UPDATE_HASH']){f.state.update.error.code=code;await f.tick();assert.match(f.get('update-info').textContent,/검증.*업데이트 확인/);assert.ok(f.get('update-info').textContent.includes(code));}
+  f.state.update.error={code:'unsafe/error/path',message:'private'};await f.tick();assert.doesNotMatch(f.get('update-info').textContent,/unsafe|private/);
+  const checks=f.calls.filter(c=>c.path==='/updates/check').length;await f.click('check-update');assert.equal(f.calls.filter(c=>c.path==='/updates/check').length,checks+1);
+});
+
+test('update request limit shows remaining wait and clears expired countdown',async()=>{
+  let now=100000;const clock=class extends Date{static now(){return now;}};
+  const f=await panel({Date:clock});f.state.update={updateState:'IDLE',checkState:'CHECK_FAILED',error:{code:'UPDATE_RATE_LIMIT'},retryAt:102.2};await f.tick();
+  assert.match(f.get('update-info').textContent,/요청.*제한.*3초.*업데이트 확인/);
+  now=103000;await f.tick();assert.doesNotMatch(f.get('update-info').textContent,/3초|0초|NaN/);assert.match(f.get('update-info').textContent,/업데이트 확인/);
+});
+
+test('update phases show installation and recovery actions rather than internal enum names',async()=>{
+  const f=await panel();
+  for(const [phase,expected] of [['INSTALLING',/파일.*교체/],['VERIFYING_INSTALL',/설치.*검증/],['ROLLING_BACK',/이전 버전.*복구/],['RECOVERY_REQUIRED',/설치 복구/],['FAILED',/설치 복구/],['UNKNOWN_PHASE',/상태.*확인/]]){
+    f.state.update={updateState:phase,checkState:'CURRENT'};await f.tick();assert.match(f.get('update-info').textContent,expected);assert.doesNotMatch(f.get('update-info').textContent,new RegExp(phase));
+    assert.equal(f.get('recover-update').disabled,!['FAILED','RECOVERY_REQUIRED'].includes(phase));
+  }
+});
+
+test('verified update remains immediately actionable during another lookup and intent guidance wins',async()=>{
+  let finish;const held=new Promise(resolve=>{finish=resolve;});
+  const f=await updatePanel({request:(path)=>path==='/updates/start'?held:undefined});f.state.update.checkState='CHECKING';await f.tick();
+  assert.match(f.get('update-info').textContent,/새 버전.*0\.1\.1/);assert.equal(f.get('update').disabled,false);
+  const click=f.click('update');for(let i=0;i<40;i++)await Promise.resolve();
+  await f.tick();assert.match(f.get('update-info').textContent,/시작 요청/);assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.equal(f.get('analyze').disabled,true);
+  finish({});await click;
+});
+
+test('retry intent replaces stale canceled failed or rolled-back update information',async()=>{
+  for(const phase of ['CANCELED','FAILED_BEFORE_REPLACE','ROLLED_BACK']){
+    let finish;const held=new Promise(resolve=>{finish=resolve;});
+    const f=await updatePanel({request:path=>path==='/updates/start'?held:undefined});f.state.update.updateState=phase;await f.tick();
+    const click=f.click('update');for(let i=0;i<40;i++)await Promise.resolve();
+    await f.tick();const text=f.get('update-info').textContent;
+    finish({});await click;
+    assert.match(text,/시작 요청/);assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);
+  }
+});
+
 test('action guidance follows step navigation and missing analysis or plan without data calls',async()=>{
   const f=await panel(),before=f.calls.length;
   await f.nodes.find(n=>n.attrs['data-step']==='cut').onclick();

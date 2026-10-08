@@ -198,6 +198,7 @@ function toggle(){
   for(const id of ['read-project','read-selection','install-model','save-resources','prune-cache'])$(id).disabled=locked;
   for(const el of document.querySelectorAll('[data-work]'))el.disabled=locked;
   $('add-override').disabled=locked||!connected;for(const row of overrideRows)row.remove.disabled=locked||!connected;
+  for(const row of overrideRows)for(const field of [row.first,row.last,row.camera])field.disabled=locked||!connected;
   $('override-filter').disabled=locked||!overrideRows.some(r=>r.error.textContent);
   $('create-input').disabled=locked||!projectSelection||!inputCapability;$('cancel').disabled=!job&&!applying&&!previewPlaying&&!validationCount;
   $('undo-correction').disabled=locked||!analysisState||activeCorrections().length===0;
@@ -611,7 +612,7 @@ function addOverride(defer=false){
   error.setAttribute('id',errorId);error.setAttribute('role','status');error.setAttribute('aria-live','polite');row.appendChild(title);
   options(camera,cameraValues());for(const field of [first,last]){field.setAttribute('min',String(connected.snapshot.range.startFrame));field.setAttribute('max',String(connected.snapshot.range.endFrame));field.setAttribute('step','1');}
   fields.appendChild(label('시작 · 프레임',first));fields.appendChild(label('종료 · 프레임',last));row.appendChild(fields);row.appendChild(label('고정 카메라',camera));row.appendChild(error);
-  const remove=element('button','삭제');remove.setAttribute('data-work','true');remove.disabled=workLocked()||!connected;row.appendChild(remove);const value={first,last,camera,error,title,row,remove};for(const field of [first,last,camera]){field.disabled=inputLocked();field.setAttribute('aria-describedby',errorId);field.oninput=field.onchange=invalidatePlan;}
+  const remove=element('button','삭제');remove.setAttribute('data-work','true');remove.disabled=workLocked()||!connected;row.appendChild(remove);const value={first,last,camera,error,title,row,remove};for(const field of [first,last,camera]){field.disabled=workLocked()||!connected;field.setAttribute('aria-describedby',errorId);field.oninput=field.onchange=()=>editOverrides(invalidatePlan);}
   overrideRows.push(value);remove.onclick=()=>editOverrides(()=>{const index=overrideRows.indexOf(value);if(index<0)return;overrideRows.splice(index,1);overrideVisibleRows.delete(value);row.remove();invalidatePlan();});$('overrides').appendChild(row);if(!defer)invalidatePlan();
 }
 function updateGuidance(update){

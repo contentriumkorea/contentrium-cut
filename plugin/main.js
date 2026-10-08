@@ -12,7 +12,7 @@ const workflow=require('./workflow.js').create({api:(...args)=>api(...args),stor
 let credentials=null,state=null,connected=null,mode='separate',job=null,analysisJob=null,analysis=null,plan=null,syncResult=null,syncJob=null,planCameraRefs=[],applying=false,batchRunning=false,stopped=false,applyId=null,polling=false,pending=false;
 const microphoneRows=[],cameraRows=[],speakerRows=[],calibrationRows=[],overrideRows=[],syncRows=[];
 let microphoneSelectionCustomized=false;
-let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;let projectRead=null,nativePreparation=null;
+let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;let projectRead=null,nativePreparation=null,editingSubmission=null;
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
 let analysisState=null;
 let planInputHash=null,planInvalidated=false;
@@ -501,12 +501,22 @@ async function afterEditingPreview(next,nativeToken=null){
   await stopPreview(current);if(!current())throw currentCheckDiscarded;
   return next();
 }
+async function submitEditingJob(path,body,identity,message,inputsCurrent=()=>true){
+  const token={},scope=projectScope(),read=projectRead,selection=projectSelection,capability=inputCapability,rows=selectedRows.slice(),reviewed=plan,reviewedHash=planInputHash,sync=syncResult,syncId=syncJob,syncHash=syncResultInputHash;
+  const current=()=>editingSubmission===token&&!binding&&!batchRunning&&projectRead===read&&projectScopeCurrent(scope)&&projectSelection===selection&&inputCapability===capability&&selectedRows.length===rows.length&&rows.every((row,index)=>selectedRows[index]===row)&&plan===reviewed&&planInputHash===reviewedHash&&syncResult===sync&&syncJob===syncId&&syncResultInputHash===syncHash&&inputsCurrent();
+  editingSubmission=token;
+  try{
+    if(!current())throw currentCheckDiscarded;
+    let next;try{next=await api(path,body);}catch(e){if(!current())throw currentCheckDiscarded;throw e;}
+    if(!current())throw currentCheckDiscarded;
+    job={...next,...identity};say(message);toggle();
+  }finally{if(editingSubmission===token)editingSubmission=null;}
+}
 async function listenExample(example){
   await requireCurrent();return afterEditingPreview(async()=>{
   if(!analysisState)throw new Error('화자 분석을 먼저 실행하세요.');
   const identity={analysisId:analysisState.analysisId,revision:analysisState.revision,snapshotHash:connected.snapshot.snapshotHash};
-  job={...await api('/analyses/'+identity.analysisId+'/example',{exampleId:example.exampleId,expectedRevision:identity.revision,epoch:state.epoch}),...identity};
-  say('단독 발화 샘플을 준비하고 있습니다.');toggle();
+  return submitEditingJob('/analyses/'+identity.analysisId+'/example',{exampleId:example.exampleId,expectedRevision:identity.revision,epoch:state.epoch},identity,'단독 발화 샘플을 준비하고 있습니다.');
   });
 }
 function microphoneOptions(){return {mode,microphones:microphoneRows.filter(r=>r.check.checked).map(r=>({instanceKey:r.clip.instanceKey,speakerId:r.speaker.value.trim(),streamIndex:Number(r.stream.value)-1,channelIndex:Number(r.channel.value)-1})),speakerCount:mode==='mixed'?Number($('speaker-count').value):2,vadThreshold:mode==='separate'?Number($('vad-threshold').value):.5,calibration:calibrationOptions()};}
@@ -838,14 +848,15 @@ handler('read-project',()=>readProject());
 handler('analyze',async()=>{
   admitted();const issue=microphoneFeedback();if(issue)throw new Error(issue);
   await requireCurrent();return afterEditingPreview(async()=>{admitted();if(updateIntent)throw Object.assign(new Error('UPDATE_IN_PROGRESS'),{code:'UPDATE_IN_PROGRESS'});const currentIssue=microphoneFeedback();if(currentIssue)throw new Error(currentIssue);clearAnalysis();
-  job={...await api('/jobs',{kind:'analysis',options:microphoneOptions(),epoch:state.epoch}),snapshotHash:connected.snapshot.snapshotHash};say('화자 분석을 시작합니다.');
+  const options=microphoneOptions(),inputHash=ContentriumHost.hash(options),snapshotHash=connected.snapshot.snapshotHash;
+  return submitEditingJob('/jobs',{kind:'analysis',options,epoch:state.epoch},{snapshotHash},'화자 분석을 시작합니다.',()=>ContentriumHost.hash(microphoneOptions())===inputHash);
   });
 });
 handler('sync',async()=>{
   admitted();const issue=syncFeedback();if(issue)throw new Error(issue);
   await requireCurrent();return afterEditingPreview(async()=>{clearSyncResult();
   const options=syncOptions(),inputHash=syncInputHash(options),snapshotHash=connected.snapshot.snapshotHash;
-  job={...await api('/jobs',{kind:'sync',options,epoch:state.epoch}),snapshotHash,inputHash};say('싱크 분석을 시작합니다.');
+  return submitEditingJob('/jobs',{kind:'sync',options,epoch:state.epoch},{snapshotHash,inputHash},'싱크 분석을 시작합니다.',()=>syncInputHash()===inputHash);
   });
 });
 handler('plan',async()=>{

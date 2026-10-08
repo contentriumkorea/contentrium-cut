@@ -364,3 +364,12 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 다음 후보 재현: 소유 실제 패널 VM에서 화자 진행자/스트림2/채널2와 카메라 role=protected를 설정한 뒤 mixed→separate로 바꾸면 A/1/1/speaker로 초기화됐다. 교정 raw는 이번 회차에서 보존했지만 나머지는 기존 모드 기본값 정책을 유지한 상태다. `cycle16-next-inspect.log`를 보존했다. 실제 호스트/음성/설치를 하지 않았으며 다음 회차는 보호 카메라와 오디오 선택 원문 보존·모드별 선택 기본값·혼합 목소리 연결 범위를 먼저 설계한다. 현재 고정 소스/패키지에 추가하지 않는다.
 - 패키지 검증: [0.1.17 증거](package-0.1.17-proof.json). ZIP/CCX CRC·경로·크기·비공개 자료 제외, CCX 최종 소스 및 Silero 해시, frozen 엔진 29개/설치기 26개 제품 모듈·두 진입점 일치. 압축 엔진 probe runtimeReady=true / 0.1.17과 Setup help exit 0 확인. 58.719초. 기존 선택적 모듈/torchcodec 경고를 보존하며 Community-1 품질 판정으로 확대하지 않는다.
 - 현재 단계: 기획·설계·구현·독립 검수·전체 회귀·패키지 실행 완료. 0.1.17 공개 및 익명 발견/서명/실제 다운로드 해시·고정 v0.1.1 검증으로 진행한다. 실제 UXP/Premiere/설치 전환/Community-1 품질은 미검증이다. 다음 후보는 녹음 방식 전환의 보호 카메라·오디오 설정 보존이다.
+
+### 공개 결과
+
+- [v0.1.17](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.17): release `407162626`, 정확한 제목 `Contentrium CUT`, draft/prerelease 아님. 공개 시각 2026-10-09 03:55:12 KST (`2026-10-08T18:55:12Z`), target/tag commit `696a0d8d4198b019a23d12347b4d63231a62e553`를 remote 조회로 확인했다.
+- [공개 실제 재다운로드](release-0.1.17-proof.json): 익명 제품 경로에서 0.1.16 → 0.1.17 AVAILABLE. 서명과 실제 ZIP/CCX/Setup 3개의 크기·SHA-256이 일치한다.
+- [현재 버전](release-0.1.17-current-proof.json): 별도 빈 상태에서 0.1.17 CURRENT / 후보 없음. 공개 자산 5개 ID·크기·digest와 서명 문서 실제 바이트가 로컬과 일치한다.
+- [고정 복구 조회](migration-pinned-0.1.1-after-0.1.17-proof.json): latest 0.1.17에서도 서명된 정확한 v0.1.1 / release `404226839` / commit `268d27e6665c8b1f0753a634f8021dfa86935b37` AVAILABLE. 실제 설치 전환은 하지 않았다.
+- 현재 단계: 기획 → 설계 → 구현 → 검증 → 0.1.17 공개 및 공개 재검증 완료. 다음 회차는 재현한 녹음 방식 전환의 보호 카메라·화자 이름·오디오 스트림/채널 설정 초기화를 개선한다. 이전 기록의 교정 raw 보존은 완료했으며 나머지 트랙 설정은 기존 기본값 정책이다. 선택 마이크의 모드별 기본값/사용자 선택 보존, 혼합 목소리 연결 scope, 같은 시퀀스/새 시퀀스 경계를 설계하고 RED·독립 검수·전체 회귀·패키지/공개 검증 뒤 배포한다. 버전만 올리지 않는다.
+- PC 활성 설치는 계속 0.1.0이며 active/journal/first-install 3개 해시는 배포 전후 동일하다. 서명 키 존재와 보존을 읽기 전용 확인했다. 기존 공개 파일·설정·실패 증거를 보존했고 컴퓨터유즈·Premiere 조작·재설치·제공자 접근을 하지 않았다. 실제 UXP/Premiere 편집·설치 전환·Community-1 품질은 미검증이다. 기존 메모리/취소 간헐 실패의 원인도 미확정이다.

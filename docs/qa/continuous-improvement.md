@@ -721,3 +721,12 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 엔진/CCX와 Setup 빌드 exit 0 완료. 빌드 후 입력 52개 해시가 고정 소스와 동일하고 공개 파일 594개 패턴 검사·신뢰 키 보존도 통과했다. 현재 단계는 별도 owned 폴더에서 최종 ZIP/CCX CRC·소스 일치·Silero 검증·엔진 probe·Setup help 실행 검증이다. 기존 공개 파일·활성 설치·서명 키·설정·실패 증거를 보존한다.
 
 - [0.1.30 패키지 증거](package-0.1.30-proof.json): ZIP/CCX CRC·경로·크기·비공개 자료 제외, CCX 최종 소스·Silero 해시, frozen 엔진 29개/설치기 26개 제품 모듈·두 진입점이 검증 소스와 일치했다. 추출 엔진 runtimeReady=true/0.1.30과 Setup help exit 0, 56.984초. 기존 선택적 모듈/torchcodec 경고를 보존하며 Community-1 실제 품질 판정으로 확대하지 않는다. 현재 단계: 기획·설계·구현·독립 검수·전체 회귀·패키지 실행 완료. 0.1.30 공개 및 익명 발견/서명/실제 다운로드 해시·고정 v0.1.1 검증으로 진행한다. 활성 설치·기존 자동화·서명 키 존재를 다시 읽기 전용 확인했다. 실제 UXP/Premiere/설치 전환/Community-1 품질은 미검증이다.
+
+### 공개 결과
+
+- [v0.1.30](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.30): release `407348316`, 정확한 제목 `Contentrium CUT`, draft/prerelease 아님. 공개 시각 2026-10-09 08:43:36 KST (`2026-10-08T23:43:36Z`), target/tag commit `b989f79e8f15e9db5b71b049bdec01820f434021`를 확인했다.
+- [공개 실제 재다운로드](release-0.1.30-proof.json): 익명 제품 경로에서 0.1.29 → 0.1.30 AVAILABLE. 서명과 실제 ZIP/CCX/Setup 3개의 크기·SHA-256이 일치한다.
+- [현재 버전](release-0.1.30-current-proof.json): 별도 빈 상태에서 0.1.30 CURRENT / 후보 없음. 공개 자산 5개 ID·크기·digest와 서명 문서 실제 바이트가 로컬과 일치한다.
+- [고정 복구 조회](migration-pinned-0.1.1-after-0.1.30-proof.json): latest 0.1.30에서도 서명된 정확한 v0.1.1 / release `404226839` / commit `268d27e6665c8b1f0753a634f8021dfa86935b37` AVAILABLE. 실제 설치 전환은 하지 않았다.
+- 현재 단계: 기획 → 설계 → 구현 → 검증 → 0.1.30 공개 및 공개 재검증 완료. 다음 회차는 두 모드에서 재현한 /correct 응답 대기 중 update 뒤 오래된 교정 revision/이름/완료 안내 반영을 차단하도록 설계한다. 교정 요청과 CORRECTION_REVISION_CONFLICT 복구 조회에 현재 요청·분석/revision·epoch/연결/hash scope를 성공/실패 뒤 검사한다. 정상 이름/합침/구간 재배정/목소리 연결/undo와 conflict 복구·현재 실패·중복/취소/업데이트 즉시성·heartbeat·검토/적용·source/audio/caption 보존을 RED·독립 리뷰·전체 회귀·패키지/공개 검증 뒤 배포한다. 이번 제출 응답 수정으로 전체 action lifetime을 보호한다고 주장하지 않는다. 버전만 올리지 않는다.
+- 활성 설치는 계속 0.1.0이며 active/journal/first-install 해시는 배포 전후 동일함을 읽기 전용 확인했다. 서명 키 존재·보존과 기존 ACTIVE/15분 자동화를 확인했다. 기존 공개 파일·설정·실패 증거를 보존했고 컴퓨터유즈·Premiere 조작·재설치·제공자 접근을 하지 않았다. 실제 UXP/Premiere 편집·설치 전환·Community-1 품질은 미검증이다. 기존 간헐 실패는 이번 회귀에서 재현되지 않았고 원인은 미확정이다. 이번 자체 마지막 fixture 대기와 독립 초기 14 fail은 시험 구성 오류로 수정·증거 보존했고 제품 수용 기준·timeout을 낮추지 않았다.

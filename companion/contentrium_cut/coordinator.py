@@ -67,6 +67,12 @@ class Coordinator:
         snap=self.session(instance)['snapshot'];clips={c['instanceKey']:c for c in snap['clips']};assets={s['assetId']:s for s in snap['sources']}
         mode=options.get('mode');microphones=options.get('microphones',[])
         if mode not in {'separate','mixed'} or not microphones:raise CutError('INVALID_AUDIO_INPUT','Select recording mode and microphone clips.')
+        threshold=options.get('vadThreshold',.5) if mode=='separate' else .5
+        count=options.get('speakerCount') if mode=='mixed' else None
+        if isinstance(threshold,bool) or not isinstance(threshold,(int,float)) or not .05<=threshold<=.95 or not math.isfinite(threshold):
+            raise CutError('INVALID_AUDIO_INPUT','Speech sensitivity must be a finite number between 0.05 and 0.95.')
+        if count is not None and (isinstance(count,bool) or not isinstance(count,(int,float)) or not 1<=count<=26 or not math.isfinite(count) or int(count)!=count):
+            raise CutError('INVALID_AUDIO_INPUT','Expected speaker count must be an integer between 1 and 26, or omitted for automatic detection.')
         sources=[];offsets={};instance_offsets={};channels=[];seen=set();ambiguous=set()
         for selected in microphones:
             clip=clips.get(selected.get('instanceKey'))
@@ -88,7 +94,7 @@ class Coordinator:
             if mode=='separate':channels.append({'assetId':key,'instanceKey':clip['instanceKey'],'inputKey':input_key,'speakerId':selected.get('speakerId'),'streamIndex':stream,'channelIndex':channel})
         for key in ambiguous:offsets.pop(key,None)
         if mode=='separate':check_assignments(channels,sources)
-        settings=dict(self.resource_settings(include_status=False)['settings'],fps=snap['fps'],range=snap['range'],offsets=offsets,channels=channels,calibration=options.get('calibration',[]),modelRoot=str(self.root/'models'),speakerCount=options.get('speakerCount'),vadThreshold=float(options.get('vadThreshold',.5)),bleedTolerance=float(options.get('bleedTolerance',1.8)))
+        settings=dict(self.resource_settings(include_status=False)['settings'],fps=snap['fps'],range=snap['range'],offsets=offsets,channels=channels,calibration=options.get('calibration',[]),modelRoot=str(self.root/'models'),speakerCount=int(count) if count is not None else None,vadThreshold=float(threshold),bleedTolerance=float(options.get('bleedTolerance',1.8)))
         settings['instanceOffsets']=instance_offsets
         ffmpeg=self.root/'app'/'ffmpeg'/'ffmpeg.exe'
         if ffmpeg.is_file():settings['ffmpeg']=str(ffmpeg)

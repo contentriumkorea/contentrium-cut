@@ -430,3 +430,22 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 현재 단계: 기획 → 설계 → 구현 → 검증 → 0.1.19 공개 및 공개 재검증 완료. 다음 회차는 재현한 미선택 마이크 설정 변경 시 불필요한 재분석 요구를 개선한다. 활성 입력 hash가 같은 미선택 원문 변경은 raw 저장/피드백만 갱신하여 분석·편집안·화자 연결을 보존하고, 재선택/선택 마이크 변경은 즉시 무효화하도록 먼저 설계한다. 잠금·업데이트·저장 복구·초기 선택 의도를 포함해 RED·독립 검수·전체 회귀·패키지/공개 검증 뒤 배포한다. 버전만 올리지 않는다.
 - PC 활성 설치는 계속 0.1.0이며 active/journal/first-install 3개 해시는 배포 전후 동일함을 읽기 전용 확인했다. 서명 키 존재·보존과 기존 ACTIVE/15분 자동화를 확인했다. 기존 공개 파일·설정·실패 증거를 보존했고 컴퓨터유즈·Premiere 조작·재설치·제공자 접근을 하지 않았다. 실제 UXP/Premiere 편집·설치 전환·Community-1 품질은 미검증이다. 이전 범위/싱크 readiness·메모리/취소 간헐 시험 실패의 원인도 미확정이다.
 - 최종 문서 closeout helper의 첫 자동화 TOML 읽기는 Windows 기본 cp949가 UTF-8 한국어를 해석하지 못해 실패했다. 제품 실패와 구분하며 오류를 보존하고 명시적 UTF-8로 수정했다. 공개 proof 3개는 첫 문서 commit에 이미 저장됐고 README/이 결과 기록은 후속 문서 commit으로 완료한다. 서명 대상 소스/패키지/tag는 변경하지 않는다.
+
+## 19회차 / 2026-10-09 / 미선택 마이크 입력의 결과 보존
+
+- 시작 commit `1042416975aa01b0119e4d065394e64df927968d`, 공개 v0.1.19 / release `407201587`. Git clean, 이전 자체 시험/빌드/배포 없음. 컴퓨터유즈·Premiere 조작·PC 설치 없이 진행한다.
+- 기획 근거: 이전 실제 패널 VM에서 양쪽 모드의 미선택 마이크 이름/채널/스트림 변경 6개가 유효 microphoneOptions를 바꾸지 않아도 기존 분석/편집안을 삭제했다. 작업에서 제외한 소스를 미리 설정하는 데 불필요한 재분석이 필요하다.
+- 설계: 마이크 UI 콜백은 기존 workLocked/연결 guard를 먼저 적용한다. 선택 체크의 변경은 선택 의도를 기록하고 기존처럼 분석·편집안·연결 scope를 무효화한다. 선택되지 않은 행의 화자 ID·스트림·채널 입력은 raw 자동 저장 및 입력 피드백만 갱신하며 분석/analysisJob/revision·편집안/hash/검토·화자 연결/coverage/수동 구간/싱크·선택 의도를 그대로 보존한다. 선택된 행의 변경은 기존 즉시 무효화를 유지한다. 행에 안정적인 접근성 안내 `분석에서 제외됨 · 설정은 저장되며 다시 선택하면 적용됩니다.`를 표시하고 선택 시 숨긴다. 미선택 오류는 기존처럼 분석을 차단하지 않으며 재선택하면 현재 raw 유효성 검사를 적용한다. 저장 schema/API/서버/모델 계약은 바꾸지 않는다. 저장 분석 복구에서는 유효 selected 입력 hash와 기존 snapshot/job 검증을 유지한다. 미선택 필드의 값만 바뀐 분석 참조는 그대로 복구할 수 있다.
+- 수용 조건: 양쪽 모드의 이름/채널/스트림 oninput/onchange·유효/빈/비수치 raw에서 결과/DOM/mapping/scope/hash/선택 의도 보존과 실제 자동 저장, 제외 안내/ARIA 및 선택 복귀 오류, 선택 행·체크 변경의 즉시 무효화, 저장 분석 복구, 모든 잠금·비동기 조회 중 업데이트 즉시 시작을 실제 VM RED 후 검증한다. 독립 리뷰·전체 회귀·패키지 실행·익명 공개 발견/서명/실제 다운로드 해시·고정 v0.1.1을 완료해 0.1.20으로 배포한다. 기존 실패·진단·timeout·기준을 보존하고 실제 UXP/Premiere/설치 전환/Community-1 품질은 미검증으로 명시한다.
+
+- 실제 패널 신규 수용 3개 RED (기존 183개 통과) 뒤 구현했다. 첫 green 전체 186/186 (1,783.6847 ms), 선택 마이크/기본 선택 의도/모든 잠금/자동 저장 대기 중 업데이트 즉시 시작을 추가한 최종 관련 시험 190/190 (1,740.8754 ms), 실패·취소·skip 0. 최초 로그를 보존했고 제품/API/schema·기존 진단·기준·timeout은 유지한다. 독립 리뷰 및 전체 회귀로 진행한다.
+
+- 전체 Node 299/299 (18,872.3496 ms), 전체 Python 493/493 (94.793초; wrapper 94.829초), 실패·취소·오류·skip·제외 0. 소유 한국어 SAPI/Silero 192 speech frames/7 intervals 확인. 이전 간헐 readiness·메모리/취소 시험 실패는 이번 전체 회귀에서 재현되지 않았고 원인은 미확정이다. 진단·기준·timeout을 유지했다. PC 활성 0.1.0과 active/journal/first-install 해시·서명 키 존재를 읽기 전용 확인했다. 독립 최종 승인 뒤 소스를 고정하여 패키지 및 공개 검증으로 진행한다.
+
+- 독립 최종 소스 승인: 남은 Critical/Important/Minor 0/0/0. 독립 실제-main VM 9/9, 225 fixture (648.7032 ms), 실패·취소·skip·todo 0. 미선택 필드별 raw/oninput/onchange·실제 자동 저장·교정 revision/선택 hash/DOM·편집안 적용 요청 및 mock permit 재검사·양쪽 모드 실제 load-settings/연결/coverage 복구·stale 선택 입력 참조 거절·선택 변경/재선택/직접 분석 오류 및 수정 옵션·ARIA 연결/기본 선택 의도·12개 잠금×양쪽 모드×필드/콜백·toggle 억제 초기 생성·자동 저장/host read 대기 중 업데이트 즉시 시작을 확인했다. main.js SHA-256 `a724355e3df286bc2c526be77c94d808423b7b7aa0a1c7fa531f105b2abf5e0b`. 원문과 증거는 `%LOCALAPPDATA%/Temp/contentrium-cut-cycle19-independent-review`에 보존했다. 실제 UXP 접근성 표시/Premiere/설치/Community-1은 검수 범위 밖이며 기존 간헐 실패 원인은 미확정이다.
+
+- 빌드 입력 52개 고정, 공개 파일 544개 비공개 키/토큰 패턴 검사 및 신뢰 키 보존 통과. PC 활성 0.1.0과 active/journal/first-install 해시를 읽기 전용 확인해 동일했다. 기존 자동화 ACTIVE/15분/target 유지 확인.
+- 다음 후보 재현: 고정된 실제 패널 VM에서 localEditPending/서버 applyRecovery.blocked/compatible=false의 분석 범위 시작·종료와 min-shot/short-turn/overlap 5개 입력이 disabled=false였다(15개 fixture). 입력 이벤트가 저장을 예약하고 범위는 분석·편집안을, 컷 옵션은 편집안을 무효화했다. `cycle19-next-inspect.log`를 보존했고 현재 소스를 변경하지 않았다. 다음 회차는 범위·컷 옵션의 표시/직접 콜백 workLocked 일치, 원문·분석·편집안·타이머 보존과 내부 로드/새 시퀀스·잠금 해제·업데이트 즉시성을 먼저 설계한다. 실제 호스트/설치 없이 확인했다.
+
+- 패키지 검증: [0.1.20 증거](package-0.1.20-proof.json). ZIP/CCX CRC·경로·크기·비공개 자료 제외, CCX 최종 소스·Silero 해시, frozen 엔진 29개/설치기 26개 제품 모듈·두 진입점이 검증 소스와 일치했다. 추출 엔진 probe runtimeReady=true/0.1.20과 Setup help exit 0, 61.750초. 기존 선택적 모듈/torchcodec 경고를 보존하며 Community-1 품질 판정으로 확대하지 않는다.
+- 현재 단계: 기획·설계·구현·독립 검수·전체 회귀·패키지 실행 완료. 0.1.20 공개 및 익명 발견/서명/실제 다운로드 해시·고정 v0.1.1 검증으로 진행한다. 실제 UXP/Premiere/설치 전환/Community-1 품질은 미검증이다. 다음 후보는 복구/호환 대기 시 범위·컷 옵션의 입력 잠금이다.

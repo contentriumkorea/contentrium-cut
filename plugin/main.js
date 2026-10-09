@@ -1485,7 +1485,7 @@ async function runResourceSettings(save=false,discard=false){
 handler('save-resources',()=>runResourceSettings(true));
 handler('discard-resources',()=>runResourceSettings(false,true));
 function cacheReady(release=false){
-  return !!credentials&&!!state&&!initializing&&!initializationIncomplete&&!updateIntent&&!panelContextConflict&&state.compatible!==false&&state.stopEpoch==null&&!binding&&!projectRead&&!job&&!validationCount&&!applying&&!batchRunning&&!previewBusy&&!localEditPending&&!state.applyRecovery?.blocked&&(release?state.maintenance?.canRelease===true&&state.maintenance.drained===true&&!state.gateOpen:state.gateOpen&&!stopped&&!state.maintenance&&!resourceInputDirty&&!resourceBudgetMissing);
+  return !!credentials&&!!state&&!initializing&&!initializationIncomplete&&!cancelRequest&&!updateIntent&&!panelContextConflict&&state.compatible!==false&&state.stopEpoch==null&&!binding&&!projectRead&&!job&&!validationCount&&!applying&&!batchRunning&&!previewBusy&&!localEditPending&&!state.applyRecovery?.blocked&&(release?state.maintenance?.canRelease===true&&state.maintenance.drained===true&&!state.gateOpen:state.gateOpen&&!stopped&&!state.maintenance&&!resourceInputDirty&&!resourceBudgetMissing);
 }
 function cacheValidation(count,descriptors){
   const token=cacheRequest;if(!token)return false;

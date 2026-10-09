@@ -288,6 +288,7 @@ function toggle(){
     const active=!!cacheRequest&&cacheRequest.release===release;$(id).textContent=active?(cacheRequest.phase==='checking'?(release?'편집 상태 확인 중…':'정리 결과 확인 중…'):(release?'정리 종료 요청 중…':'분석 캐시 정리 중…')):idle;$(id).setAttribute('aria-busy',active?'true':'false');
   }
   for(const el of document.querySelectorAll('[data-work]'))el.disabled=locked;
+  for(const row of microphoneRows)if(row.jump)row.jump.disabled=locked||!connected;
   $('add-override').disabled=locked||!connected;for(const row of overrideRows)row.remove.disabled=locked||!connected;
   for(const row of overrideRows)for(const field of [row.first,row.last,row.camera])field.disabled=locked||!connected;
   $('override-filter').disabled=locked||!overrideRows.some(r=>r.error.textContent);
@@ -439,7 +440,8 @@ function renderSources(){
     const issue=element('p','','hint input-error hidden');issue.id='microphone-error-'+microphoneRows.length;issue.setAttribute('role','status');issue.setAttribute('aria-live','polite');row.appendChild(issue);
     const selectionHint=element('p','','hint hidden');selectionHint.id='microphone-selection-'+microphoneRows.length;selectionHint.setAttribute('role','status');selectionHint.setAttribute('aria-live','polite');row.appendChild(selectionHint);
     for(const field of [speaker,channel,stream])field.setAttribute('aria-describedby',issue.id+' '+selectionHint.id+(field===speaker?'':' '+audioGuide.id)+(positionGuide?' '+positionGuide.id:''));check.setAttribute('aria-describedby',selectionHint.id+(positionGuide?' '+positionGuide.id:''));
-    $('microphones').appendChild(row);microphoneRows.push({clip,check,speaker,channel,stream,issue,selectionHint,audioGuide,defaultChecked:{separate:order<2,mixed:order<1},title:'A'+(track.index+1)+' · '+track.name+' · '+microphoneNames.get(clip.assetId)+(position?' · '+position:'')});
+    $('microphones').appendChild(row);const microphoneRow={clip,check,speaker,channel,stream,issue,selectionHint,audioGuide,defaultChecked:{separate:order<2,mixed:order<1},title:'A'+(track.index+1)+' · '+track.name+' · '+microphoneNames.get(clip.assetId)+(position?' · '+position:'')};microphoneRows.push(microphoneRow);
+    if(positionGuide){const jump=element('button','시작 위치로 이동');jump.setAttribute('data-work','true');jump.setAttribute('data-microphone-jump','true');jump.setAttribute('aria-describedby',positionGuide.id);jump.setAttribute('aria-label','마이크 클립 시작 위치로 이동 · '+microphoneRow.title);jump.disabled=workLocked()||!connected;jump.onclick=()=>{if(!microphoneRows.includes(microphoneRow)||workLocked()||!connected)return;return runAction(()=>seekMicrophone(microphoneRow));};row.appendChild(jump);microphoneRow.jump=jump;}
     for(const field of [check,speaker,channel,stream]){field.disabled=workLocked()||!connected;field.onchange=()=>{if(workLocked()||!connected)return;if(field!==check&&!check.checked){scheduleSettings();toggle();return;}if(field===check)microphoneSelectionCustomized=true;invalidateAnalysis();renderSpeakers(mode==='mixed'?[]:[...new Set(microphoneRows.filter(r=>r.check.checked).map(r=>r.speaker.value.trim()))]);};}
     for(const field of [speaker,channel,stream])field.oninput=field.onchange;
     const calibration=element('div',undefined,'source-row'),bounds=element('div',undefined,'row'),first=number(0),last=number(0);
@@ -826,6 +828,14 @@ async function requireCurrent({responseCurrent=()=>true,guardFactory=null,onSett
   }
 }
 async function seekFrame(frame){await requireCurrent();return afterEditingPreview(()=>connected.sequence.setPlayerPosition(ContentriumHost.time(String(BigInt(frame)*BigInt(connected.perFrame)))));}
+async function seekMicrophone(row){
+  const scopeCurrent=editingResponseGuard(),current=()=>scopeCurrent()&&microphoneRows.includes(row);
+  await requireCurrent({responseCurrent:current});if(!current())throw currentCheckDiscarded;
+  await stopPreview(current);if(!current())throw currentCheckDiscarded;
+  let moved;try{moved=await connected.sequence.setPlayerPosition(ContentriumHost.time(row.clip.startTicks));}catch(e){if(!current())throw currentCheckDiscarded;throw e;}
+  if(!current())throw currentCheckDiscarded;
+  if(!moved)throw new Error('클립 시작 위치로 이동하지 못했습니다.');
+}
 const cutReasons={START_CAMERA:'시작 카메라',START_SPEAKER:'첫 발화 화자',SPEAKER_TURN:'화자 전환',speech:'발화',speaker:'화자',MANUAL_OVERRIDE:'수동 카메라 지정',OVERRIDE_END:'수동 지정 종료',OVERLAP_SUSTAINED:'지속된 동시 발화',OVERLAP_HOLD:'동시 발화 중 카메라 유지',MIN_SHOT_HOLD:'최소 샷 길이 유지',VIDEO_GAP_FALLBACK:'영상 공백으로 대체 카메라',MIN_SHOT_EXCEPTION_OVERRIDE:'수동 지정으로 최소 샷 길이 예외',MIN_SHOT_EXCEPTION_OVERRIDE_END:'수동 지정 종료로 최소 샷 길이 예외',MIN_SHOT_EXCEPTION_OVERLAP:'동시 발화로 최소 샷 길이 예외',MIN_SHOT_EXCEPTION_COVERAGE:'영상 공백으로 최소 샷 길이 예외',RANGE_END_SHORT:'분석 범위 끝의 짧은 샷'};
 Object.assign(cutReasons,{HOLD:'카메라 유지',UNKNOWN_HOLD:'화자 불확실로 카메라 유지'});
 function segmentReason(segment){const codes=[...new Set([segment.reason,...(Array.isArray(segment.reasonCodes)?segment.reasonCodes:[])].filter(code=>typeof code==='string'&&code.trim()))];return codes.length?'이유 · '+codes.map(code=>Object.prototype.hasOwnProperty.call(cutReasons,code)?cutReasons[code]:code).join(' · '):'이유 정보 없음';}

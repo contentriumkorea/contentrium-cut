@@ -2,7 +2,7 @@
 
 Premiere Pro 패널에서 트랙을 설정하고, 오디오를 로컬로 분석해 말하는 화자에 맞춰 카메라를 전환하는 플러그인입니다. 자동 싱크와 컷 편집 결과는 Premiere에서 계속 수정할 수 있는 새 시퀀스로 만듭니다.
 
-**[0.1.44을 공개했습니다](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.44).** 수동 업데이트 확인과 후속 상태 조회의 늦은 응답이 중단·새 연결·안내를 덮지 않도록 개선했습니다. 확인 중 중복 클릭을 막고 편집·즉시 업데이트를 유지합니다. 상태 조회에서 업데이트 정지를 발견하면 실제 유휴 상태를 확인해 응답합니다. Node521개·Python496개·독립523개 시나리오·패널412개·패키지 실행·공개 실제 다운로드 서명/해시를 확인했습니다. 업데이트 복구 handler와 connection 물리 전송/API rollback은 후속 검증 대상입니다. [반복 개선 기록](docs/qa/continuous-improvement.md)에 실패·남은 문제·다음 계획을 기록했습니다. 실제 Premiere/UXP 편집·기존0.1.0 설치 전환·Community-1 품질은 아직 미검증입니다.
+**[0.1.45을 공개했습니다](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.45).** 설치 복구 버튼의 중복 요청과 늦은 응답 처리를 개선했습니다. 복구 중 버튼·안내에 진행 상태를 표시하고 편집·추가 확인·자동 설정 저장을 잠급니다. 실제 busy·연결 준비 중에는 복구를 시작하지 않고, 기존 즉시 업데이트·중단 경로는 유지합니다. Node529개·Python496개·독립580개 시나리오·패널420개·패키지 실행·공개 실제 다운로드 서명/해시를 확인했습니다. 중단 작업 기록 확인·이미 발행한 API rollback·connection 물리 전송 취소는 후속 검증 대상입니다. [반복 개선 기록](docs/qa/continuous-improvement.md)에 실패·남은 문제·다음 계획을 기록했습니다. 실제 Premiere/UXP 편집·기존0.1.0 설치 전환·Community-1 품질은 아직 미검증입니다.
 
 ## 단일 패널 사용 흐름
 

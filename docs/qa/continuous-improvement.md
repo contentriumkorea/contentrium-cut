@@ -1120,3 +1120,12 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 다음 후보 actual recover-update handler를 FAILED 상태의 활성 버튼에서 연속 클릭하면 두 모드2/2에서 동시에2개 복구 요청을 제출하고 late 오류가 새 안내를 덮음을 재현했다(cycle43-next-inspect.js/.log). stopped=true 유지·실제 Adobe/provider/install0이므로 실제 복구/편집 성공을 주장하지 않는다. 다음 회차는 업데이트 복구의 중복 방지·owner/credential/stop/안내·후속 refresh 수명을 설계한다. 현재 manual check 개선은 해당 recovery handler나 connection 물리 전송/API rollback을 해결한 것이 아니다.
 
 - 엔진/CCX·Setup 빌드 exit0. 고정52개 physical 입력 해시를 빌드 후 유지했고 공개664개 비공개 패턴·신뢰 키 보존 확인. [0.1.44 패키지 증거](package-0.1.44-proof.json): ZIP/CCX CRC·경로·크기·비공개 자료 제외·CCX raw 최종 소스·Silero 해시·frozen runtime29/Setup26모듈·진입점2개 소스 일치. 추출 engine runtimeReady=true/0.1.44·Setup help exit0,49.657초. optional 모듈 경고를 보존하며 실제 Community-1 품질로 확대하지 않는다. 현재 단계: 기획·설계·구현·회귀·독립 검수·패키지 실행 완료.0.1.44 공개 및 익명 업데이트 발견·서명·실제 다운로드/CURRENT/고정v0.1.1 검증을 이어간다. 사용자 설치/활성화 없음.
+
+### 공개 결과
+
+- [v0.1.44](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.44): release `407551385`, 제목 `Contentrium CUT`, draft/prerelease 아님. 공개 시각 2026-10-09 14:37:35 KST (`2026-10-09T05:37:35Z`), target/tag commit `e10f0087e71b875ed5641040e8526ef3beefefda` 확인.
+- [공개 실제 재다운로드](release-0.1.44-proof.json): 익명 제품 경로0.1.43 →0.1.44 AVAILABLE·서명·실제 ZIP/CCX/Setup3개 크기/SHA-256 일치.
+- [현재 버전](release-0.1.44-current-proof.json): 빈 상태0.1.44 CURRENT/후보 없음. 공개 자산5개 ID·크기·digest 및 서명 문서 실제 바이트 일치.
+- [고정 복구 조회](migration-pinned-0.1.1-after-0.1.44-proof.json): latest0.1.44에서도 정확한 서명 v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+- 현재 단계: 기획 → 설계 → 구현 → 검증 →0.1.44 공개 및 공개 재검증 완료. 다음 회차는 업데이트 복구의 중복 방지·owner/credential/stop/안내·후속 refresh 수명이다. actual FAILED 상태 recover-update 활성 버튼 연속 클릭의 두 모드2/2에서 동시에2개 복구 요청과 late 오류의 새 안내 덮기를 재현한 cycle43-next-inspect.js/.log를 이어간다. stopped=true 유지·실제 Adobe/provider/install0; 실제 복구/편집 성공으로 확대하지 않는다. connection 물리 전송·이미 발행한 API 취소/rollback도 별도 미검증이다.
+- 활성0.1.0 active/journal/first-install 해시 동일·서명 키 존재·ACTIVE15분·기존 공개 파일/사용자 자료/실패 증거 보존. 컴퓨터유즈·브라우저·Premiere 조작·재설치·provider 없음. 실제 UXP/Premiere 편집·설치 전환·Community-1 품질 미검증. 원본 manual check4/4와 baseline RED를 수정하고 Node521/Python496/독립15top-level·523시나리오/패널412·scoped C/I/M0/0/0 확인. 독립 Important idle ack 누락과 원 안내 수명은 valid RED→GREEN으로 검증했다. 최초 dummy plan/moving-source fixture·unguarded Windows Python runner 실패는 제품 결함과 구별해 증거와 원인을 보존했다. 기존 간헐 실패는 이번 최종 전체 회귀에서 재현되지 않았고 원인은 미확정이다.

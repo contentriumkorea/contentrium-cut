@@ -519,8 +519,10 @@ function syncFeedback(){
     const text=errors.length?row.displayName+' · '+errors.join(' '):'';
     if(row.issue.textContent!==text)row.issue.textContent=text;row.issue.className='hint input-error'+(text?'':' hidden');if(text&&!first)first=text;
   }
-  const reference=syncRows.find(r=>r.source.assetId===$('sync-reference').value),referenceIssue=reference?.displayName?reference.displayName+' · 기준 소스가 싱크에서 제외되어 있습니다. 이 소스를 다시 선택하거나 기준 소스를 바꾸세요.':'기준 소스를 선택한 싱크 소스 중에서 지정하세요.';
-  const issue=!connected?'':first|| (selected.length<2?'싱크할 소스를 2개 이상 선택하세요.':!selected.some(r=>r.source.assetId===$('sync-reference').value)?referenceIssue:'');
+  const referenceField=$('sync-reference'),referenceSelected=selected.some(r=>r.source.assetId===referenceField.value),referenceInvalid=connected&&syncRows.length&&!referenceSelected?'true':'false';
+  if(referenceField.getAttribute('aria-invalid')!==referenceInvalid)referenceField.setAttribute('aria-invalid',referenceInvalid);
+  const reference=syncRows.find(r=>r.source.assetId===referenceField.value),referenceIssue=reference?.displayName?reference.displayName+' · 기준 소스가 싱크에서 제외되어 있습니다. 이 소스를 다시 선택하거나 기준 소스를 바꾸세요.':'기준 소스를 선택한 싱크 소스 중에서 지정하세요.';
+  const issue=!connected?'':first|| (selected.length<2?'싱크할 소스를 2개 이상 선택하세요.':!referenceSelected?referenceIssue:'');
   const node=$('sync-error');if(node.textContent!==issue)node.textContent=issue;node.className='hint input-error'+(issue?'':' hidden');return issue;
 }
 function syncOptions(){

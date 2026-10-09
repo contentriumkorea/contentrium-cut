@@ -15,7 +15,7 @@ let microphoneSelectionCustomized=false;
 let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;let projectRead=null,nativePreparation=null,editingSubmission=null,correctionRequest=null,settingsRestore=null,settingsSave=null;
 let settingsWriteTail=Promise.resolve();
 let modelRequest=null,modelInputRevision=0,modelPoll=null;
-let cacheRequest=null,syncPoll=null,examplePoll=null,refreshRequest=null,updateCheckRequest=null,updateRecoveryRequest=null,applyRecoveryRequest=null,cancelRequest=null;
+let cacheRequest=null,syncPoll=null,examplePoll=null,refreshRequest=null,updateCheckRequest=null,updateRecoveryRequest=null,applyRecoveryRequest=null,cancelRequest=null,updateStartRequest=null;
 let previewBusy=0,previewGeneration=0;
 let resourceRequest=null,resourceInputRevision=0,resourceViewRevision=0,resourceInputDirty=false,stopRevision=0;
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
@@ -1319,22 +1319,44 @@ async function checkUpdate(){
   }finally{if(updateCheckRequest===token){updateCheckRequest=null;toggle();}}
 }
 handler('check-update',checkUpdate);
-handler('update',async()=>{
+function updateStartScope(){
+  // Update gate/epoch/phase and native drain can change because of this start.
+  // Capture identity, not those expected server progress values.
+  return [state?.appVersion,state?.bundleId,state?.protocolVersion,state?.compatible,
+    panelContextConflict,mode,connected,connected?.snapshot.snapshotHash,connected?.snapshot.hostSnapshotHash];
+}
+async function startUpdate(){
   if(updateIntent?.inFlight||updateIntent?.accepted)return;
   const candidate=state?.update?.candidate;if(!candidate&&!updateIntent)throw new Error('업데이트를 다시 확인하세요.');
   if(!updateIntent)updateIntent={candidateId:candidate.candidateId,manifestDigest:candidate.manifestDigest,requestId:requestId(),epoch:state.epoch};
-  updateIntent.inFlight=true;stopRevision++;
-  stopped=true;plan=null;if(job)canceledJobs.add(job.jobId);toggle();
+  const intent=updateIntent;intent.inFlight=true;stopRevision++;
+  stopped=true;plan=null;if(job)canceledJobs.add(job.jobId);
+  const token={credential:credentials,intent,revision:stopRevision,scope:updateStartScope(),identity:JSON.stringify([intent.candidateId,intent.manifestDigest,intent.requestId,intent.epoch])};updateStartRequest=token;toggle();
   if(job?.kind==='model-setup'||modelRequest)modelInstallResult('canceling');
   say('Contentrium CUT 작업을 중단하고 업데이트를 시작합니다.');
-  // Start the global stop independently of an unresponsive Adobe playback API.
-  const intent=updateIntent,previewStopRevision=statusRevision,previewStopGeneration=previewGeneration;
+  token.guidanceRevision=statusRevision;
+  const current=()=>{if(updateStartRequest!==token||credentials!==token.credential||updateIntent!==intent||stopRevision!==token.revision||token.identity!==JSON.stringify([intent.candidateId,intent.manifestDigest,intent.requestId,intent.epoch]))return false;const scope=updateStartScope();return token.scope.every((value,index)=>value===scope[index]);};
+  const guide=()=>statusRevision===token.guidanceRevision;
+  // Submit the global stop before waiting for any Adobe playback response.
+  const previewStopGeneration=previewGeneration;
   const start=api('/updates/start',{candidateId:intent.candidateId,manifestDigest:intent.manifestDigest,requestId:intent.requestId});
-  stopPreview().catch(()=>{if(updateIntent===intent&&statusRevision===previewStopRevision&&previewGeneration===previewStopGeneration)say('업데이트를 시작했습니다. 미리보기가 멈추지 않으면 프로젝트를 저장하고 Premiere를 정상 종료하세요.');});
-  try{await start;intent.accepted=true;await refresh();}
-  catch(e){if(e.code==='UPDATE_CANDIDATE')updateIntent=null;throw e;}
-  finally{intent.inFlight=false;toggle();}
-});
+  stopPreview().catch(()=>{if(current()&&guide()&&previewGeneration===previewStopGeneration){say('업데이트를 시작했습니다. 미리보기가 멈추지 않으면 프로젝트를 저장하고 Premiere를 정상 종료하세요.');token.guidanceRevision=statusRevision;}});
+  try{
+    await start;if(!current())return;
+    intent.accepted=true;await refresh(current,()=>{},guide);
+  }catch(e){
+    if(!current())return;
+    if(e?.code==='PANEL_CONTEXT_CONFLICT'){contextConflict(guide());return;}
+    if(['AUTH_REQUIRED','SESSION_EXPIRED'].includes(e?.code)){credentials=null;stopped=true;connection.reset();retryAt=Date.now()+1000;setConnection(false,'편집 연결 복구 중');}
+    if(e?.code==='UPDATE_CANDIDATE')updateIntent=null;
+    if(guide())say(e?.code==='UPDATE_CANDIDATE'?'업데이트 후보를 다시 확인하세요.': ['AUTH_REQUIRED','SESSION_EXPIRED'].includes(e?.code)?'편집 연결을 복구하고 있습니다. 새로고침으로 업데이트 상태를 확인하세요.':'업데이트 시작 결과를 확인하지 못했습니다. 상태를 새로고침하거나 같은 업데이트를 다시 요청하세요.');
+  }finally{
+    // Release only the completed physical request. A stale result cannot mark
+    // acceptance or clear a replacement intent; unknown outcomes keep the ID.
+    if(updateStartRequest===token){updateStartRequest=null;if(updateIntent===intent)intent.inFlight=false;toggle();}
+  }
+}
+handler('update',startUpdate);
 function updateRecoveryReady(){return !!credentials&&!initializing&&!initializationIncomplete&&!cancelRequest&&!applyRecoveryRequest&&!updateRecoveryRequest&&!pending&&!applying&&!batchRunning&&!job&&!validationCount&&!previewPlaying&&!previewBusy&&!updateIntent?.inFlight&&['RECOVERY_REQUIRED','FAILED'].includes(state?.update?.updateState);}
 async function recoverUpdate(){
   if(!updateRecoveryReady())return;

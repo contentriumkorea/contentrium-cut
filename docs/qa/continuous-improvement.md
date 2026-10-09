@@ -1667,3 +1667,12 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 독립 판단 제외를 root 확인: 실제 UXP 숫자 정규화/화면/보조기술·Premiere 실제 재생/중단/편집·사용자 설치 전환·Community-1 품질은 CLI doubles로 입증하지 않는다. 패키지/공개 배포는 root 별도 검증. 제외된 manual raw 영속화/기준전환 자동 rebasing은 기존 schema/엔진 의미를 유지하는 현범위 밖이며 현 회차 변경하지 않는다. 비기준 blank/unconfirmed 안내 부족은 cycle64-next-inspect native0 both modes/2variants의 현재 inline 안내 없음 및 raw /jobs 제출에서 재현; 기존 per-source review/partial-manual 제출을 오류로 단정하지 않고 다음 회차 안내 개선으로 남긴다.
 
 - [0.1.65 패키지 검증](package-0.1.65-proof.json): runtime/CCX native76179/exit0·Setup native70386/exit0·추출 proof native54932/exit0·98.203초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.65·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.
+
+
+### 공개 결과
+
+- [v0.1.65](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.65): release407927818·제목 Contentrium CUT·공개2026-10-09T13:10:42Z·target/tag 474453ee29fc21870369eea39bcc54d73c64a1da·draft/prerelease 아님. [실제 재다운로드](release-0.1.65-proof.json): 익명0.1.64→0.1.65 AVAILABLE·서명·ZIP/CCX/Setup3개 실제 size/SHA 일치. [현재 조회](release-0.1.65-current-proof.json): CURRENT/후보 없음·5자산 ID/size/digest/서명 바이트 일치. [고정 복구](migration-pinned-0.1.1-after-0.1.65-proof.json): latest0.1.65에도 서명v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+- 기획→설계→구현→검증→0.1.65 공개/재검증 완료. 정식 Node626/Python496·독립 검수는 별도 evidence와 집계를 따른다. RED3/native1 및 optional/torchcodec 경고 보존. 실제 Premiere/UXP 화면·편집·기존0.1.0 설치 업데이트 전환·Community-1 품질 미검증. 사용자 설치/활성화·컴퓨터유즈/브라우저/Premiere 조작·provider 동의/토큰/미디어 업로드 없음.
+
+- 최종 공개 업로드 native38967/exit0·실제3다운로드 native60033/exit0·CURRENT/5자산/고정v0.1.1 closeout exit0. 추출 native54932/exit0·98.203초. 공개767파일 비공개 패턴·신뢰 키·52최종raw 입력 불변, 설치0.1.0 해시 동일·서명 키 존재·자동화 ACTIVE15분·모든 helper 종료 뒤 순차 자체 CLI 작업0/native0. 정식626/496·독립 추가78 및 유효패널503(501+정정2)·배포차단0. 최초 root전체624/2/native1·독립501/2/native1·scratch 집계 helper 구문오류/native1·RED3/native1·기존 빌드 경고 원본/tool 증거를 보존하며 각 정정 결과와 구분한다.
+- 다음 회차는 cycle64-next-inspect.cjs/.log/native0에서 재현한 비기준 수동 offset/확인 상태의 inline 안내를 개선한다. both modes blank-offset/unconfirmed는 행/전체 안내가 없고 raw /jobs 제출이 허용된다. 기존 sync_methods의 per-source review/부분 싱크 동작을 확인해 유지하며, 기준0초 안내·제외 행·유효 입력/결과·작업잠금·즉시update와 일관된 안내를 설계/시험한다. 제외된 manual raw 추가영속화·자동 rebasing은 이번 회차에서 변경하지 않았으며 다음 scope와 혼동하지 않는다. 실제 Premiere/UXP·설치 업데이트 전환·Community-1 품질은 미검증이다.

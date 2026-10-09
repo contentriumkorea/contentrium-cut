@@ -3,7 +3,7 @@
 // browser, Adobe, real bootstrap, or user storage. Timers and peer are doubles.
 const assert=require('node:assert/strict'),crypto=require('node:crypto'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 async function attachContinuationPeer(f){
- const bundle={appVersion:'0.1.0',bundleId:'contentrium-cut-0.1.0',protocolVersion:1},id='c'.repeat(32),sid='e'.repeat(64),boot='b'.repeat(32);
+ const bundle={appVersion:'0.1.0',bundleId:'contentrium-cut-0.1.0',protocolVersion:1},id='c'.repeat(32),boot='b'.repeat(32);
  const secret=Buffer.from(Array.from({length:32},(_,i)=>i));
  const bootstrap={schemaVersion:1,productId:'com.contentrium.cut',installationId:'install-test',keyId:'key-test',authProtocol:1,endpoint:'http://127.0.0.1:41737',secret:secret.toString('base64')};
  const keyed=(key,domain,value)=>crypto.createHmac('sha256',key).update(domain+'\n'+value).digest('hex'),hash=value=>crypto.createHash('sha256').update(value).digest('hex');
@@ -11,15 +11,16 @@ async function attachContinuationPeer(f){
  const entry=name=>({name,isFile:true,read:async()=>files.get(name),write:async text=>files.set(name,text)});
  const uxp={storage:{localFileSystem:{getDataFolder:async()=>({getEntries:async()=>[...files.keys()].map(entry),createFile:async name=>{assert.equal(files.has(name),false);files.set(name,'');return entry(name);}})}}};
  const original=f.evaluate('connection'),mockRequest=original.request;
- let transcript,requestKey,responseKey,counter=0,releaseCancel,rejectCancel;
+ let transcript,requestKey,responseKey,counter=0,sessionCount=0,sid,releaseCancel,rejectCancel;
  async function fetch(url,options){
-  const p=new URL(url).pathname,raw=options.body||'';calls.push({path:p,method:options.method,body:raw});let value,status=200;
+  const p=new URL(url).pathname,raw=options.body||'';calls.push({path:p,method:options.method,body:raw,...(options.headers['X-Cut-Session']?{session:options.headers['X-Cut-Session'],counter:Number(options.headers['X-Cut-Counter'])}:{})});let value,status=200;
   if(p==='/auth/challenge'){
    const r=JSON.parse(raw),c={challengeId:'d'.repeat(32),serverNonce:'a'.repeat(64),serverBootId:boot,expiresAt:Math.floor(Date.now()/1000)+30,serverAppVersion:bundle.appVersion,serverBundleId:bundle.bundleId};
    transcript=JSON.stringify([r.installationId,r.keyId,r.instanceId,r.contextId,r.clientNonce,r.appVersion,r.bundleId,1,c.challengeId,c.serverNonce,c.serverBootId,c.expiresAt,c.serverAppVersion,c.serverBundleId]);
    value={...c,serverProof:keyed(secret,'CUT-SERVER-AUTH-1',transcript)};
   }else if(p==='/auth/session'){
    assert.equal(JSON.parse(raw).clientProof,keyed(secret,'CUT-PANEL-AUTH-1',transcript));
+   sid=hash('Owned authenticated peer session '+(++sessionCount));counter=0;
    const r=JSON.parse(transcript),v={sessionId:sid,expiresAt:Math.floor(Date.now()/1000)+1800,serverBootId:boot,instanceId:r[2],diagnosticOnly:false};
    value={...v,sessionProof:keyed(secret,'CUT-SESSION-1',JSON.stringify([v.sessionId,v.expiresAt,v.serverBootId,v.instanceId,v.diagnosticOnly])+'\n'+transcript)};
    requestKey=Buffer.from(keyed(secret,'CUT-REQUEST-KEY-1',transcript+'\n'+sid),'hex');responseKey=Buffer.from(keyed(secret,'CUT-RESPONSE-KEY-1',transcript+'\n'+sid),'hex');

@@ -2336,6 +2336,29 @@ test('held preview cache lock preserves immediate update start and stopped state
   const calls=f.calls.length;await f.click('prune-cache');await f.click('release-cache');assert.equal(f.calls.length,calls);resume(true);for(let i=0;i<100;i++)await Promise.resolve();assert.equal(f.get('prune-cache').disabled,true);assert.equal(f.get('release-cache').disabled,true);assert.equal(f.evaluate('stopped'),true);
  }
 });
+test('preview stop wait hint and progress reflect the real timer owner without replacing guidance',async()=>{
+ for(const mode of ['separate','mixed'])for(const result of [true,false]){
+  const {f,resume}=await heldCachePreviewStop(mode),hint=f.get('preview-stop-info');assert.ok(hint,'dedicated preview stop wait hint exists');assert.equal(hint.getAttribute('role'),'status');assert.equal(hint.getAttribute('aria-live'),'polite');assert.equal(/\bhidden\b/.test(hint.className),false);assert.match(hint.textContent,/종료 요청.*기다리/);assert.equal(f.get('progress').className,'running');assert.equal(f.get('progress').getAttribute('aria-busy'),'true');assert.match(f.get('status').textContent,/단독 발화를 재생/);
+  f.evaluate('say("Owned newer preview guidance")');const before=f.calls.length;await f.click('prune-cache');assert.equal(f.calls.length,before);resume(result);for(let i=0;i<100;i++)await Promise.resolve();
+  assert.equal(/\bhidden\b/.test(hint.className),true);assert.equal(f.get('progress').className,'');assert.equal(f.get('progress').getAttribute('aria-busy'),'false');assert.equal(f.get('status').textContent,'Owned newer preview guidance');assert.equal(f.evaluate('previewPlaying'),!result);
+ }
+});
+test('preview progress remains busy for an outstanding native preview request',async()=>{
+ for(const mode of ['separate','mixed']){
+  const {f,resume}=await heldCachePreviewStop(mode);assert.equal(f.get('progress').className,'running','actual native stop wait remains visibly busy');resume(true);for(let i=0;i<100;i++)await Promise.resolve();assert.equal(f.get('progress').className,'');
+ }
+});
+test('concurrent preview stop owners retain wait hint until every native request settles',async()=>{
+ for(const mode of ['separate','mixed']){
+  const {f,resume}=await heldCachePreviewStop(mode);assert.ok(f.get('preview-stop-info'),'concurrent preview wait hint exists');let second;f.host.ppro.SourceMonitor.play=()=>new Promise(resolve=>{second=resolve;});const run=f.evaluate('stopPreview()');for(let i=0;i<100;i++)await Promise.resolve();assert.equal(typeof second,'function');assert.equal(f.evaluate('previewBusy'),2);
+  second(true);await run;assert.equal(f.evaluate('previewBusy'),1);assert.equal(/\bhidden\b/.test(f.get('preview-stop-info').className),false);assert.equal(f.get('progress').className,'running');resume(true);for(let i=0;i<100;i++)await Promise.resolve();assert.equal(f.evaluate('previewBusy'),0);assert.equal(/\bhidden\b/.test(f.get('preview-stop-info').className),true);assert.equal(f.get('progress').className,'');
+ }
+});
+test('preview stop hint preserves immediate update guidance and locked work after settlement',async()=>{
+ for(const mode of ['separate','mixed']){
+  const {f,resume}=await heldCachePreviewStop(mode);assert.ok(f.get('preview-stop-info'),'update preview wait hint exists');let updateStop;f.host.ppro.SourceMonitor.play=()=>new Promise(resolve=>{updateStop=resolve;});await f.click('update');assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.equal(typeof updateStop,'function');const guide=f.get('status').textContent,info=f.get('update-info').textContent;assert.equal(/\bhidden\b/.test(f.get('preview-stop-info').className),false);resume(true);for(let i=0;i<100;i++)await Promise.resolve();assert.equal(/\bhidden\b/.test(f.get('preview-stop-info').className),false,'update stop is still owned');updateStop(true);for(let i=0;i<100;i++)await Promise.resolve();assert.equal(/\bhidden\b/.test(f.get('preview-stop-info').className),true);assert.equal(f.get('status').textContent,guide);assert.equal(f.get('update-info').textContent,info);assert.equal(f.evaluate('stopped'),true);assert.equal(f.get('prune-cache').disabled,true);
+ }
+});
 test('unsaved resource edits block cache prune and preserve inputs without requests',async()=>{
  for(const mode of ['separate','mixed'])for(const [id,value] of [['cache-budget','2.25'],['cache-budget',''],['cache-budget','-1'],['analysis-device','cuda']]){
   const f=await updatePanel();if(mode==='mixed')await f.click('mode-mixed');await f.click('open-settings');assert.equal(f.get(id).disabled,false);f.get(id).value=value;f.get(id).oninput();

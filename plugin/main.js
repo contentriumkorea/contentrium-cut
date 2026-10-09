@@ -463,13 +463,14 @@ function renderSyncSources(){
     for(const field of [stream,channel])field.setAttribute('aria-describedby',issue.id+' '+selectionHint.id);row.appendChild(issue);row.appendChild(selectionHint);
     const manual=element('div'),offset=number(0),confirmed=checkbox();offset.step='0.001';manual.appendChild(label('기준 대비 오프셋 · 초',offset));manual.appendChild(label('이 오프셋을 확인했습니다',confirmed));row.appendChild(manual);
     const manualHint=element('p','','hint hidden');manualHint.id='sync-manual-hint-'+syncRows.length;manualHint.setAttribute('aria-live','polite');manual.appendChild(manualHint);
+    const manualGuide=element('p','같은 소리가 기준 소스 10초·현재 소스 12초에 있으면 -2초, 기준 소스 12초·현재 소스 10초에 있으면 +2초를 입력하세요.','hint hidden');manualGuide.id='sync-manual-guide-'+syncRows.length;manual.appendChild(manualGuide);
     const clock=element('div'),clockId=element('input'),date=element('input'),fps=element('select'),drop=checkbox(),clockConfirmed=checkbox();date.placeholder='YYYY-MM-DD';clockId.placeholder='같은 동기 장치 또는 시계 이름';
     options(fps,[['24000/1001','23.976'],['24/1','24'],['25/1','25'],['30000/1001','29.97'],['30/1','30'],['50/1','50'],['60000/1001','59.94'],['60/1','60']]);fps.value=connected.snapshot.fps.num+'/'+connected.snapshot.fps.den;
     clock.appendChild(label('공통 시계',clockId));clock.appendChild(label('촬영 날짜',date));clock.appendChild(label('타임코드 FPS',fps));clock.appendChild(label('Drop-frame',drop));clock.appendChild(label('날짜와 시계가 같고 촬영 중 리셋하지 않았습니다',clockConfirmed));row.appendChild(clock);
     const clockHint=element('p','','hint hidden');clockHint.id='sync-clock-hint-'+syncRows.length;clockHint.setAttribute('aria-live','polite');clock.appendChild(clockHint);
-    $('sync-sources').appendChild(row);const syncRow={check,source,displayName:names.get(source.assetId),stream,channel,issue,selectionHint,manual,manualHint,offset,confirmed,clock,clockHint,clockId,date,fps,drop,clockConfirmed};syncRows.push(syncRow);
+    $('sync-sources').appendChild(row);const syncRow={check,source,displayName:names.get(source.assetId),stream,channel,issue,selectionHint,manual,manualHint,manualGuide,offset,confirmed,clock,clockHint,clockId,date,fps,drop,clockConfirmed};syncRows.push(syncRow);
     for(const field of [offset,confirmed,clockId,date,fps,drop,clockConfirmed])field.setAttribute('aria-describedby',selectionHint.id);
-    for(const field of [offset,confirmed])field.setAttribute('aria-describedby',selectionHint.id+' '+manualHint.id);
+    for(const field of [offset,confirmed])field.setAttribute('aria-describedby',selectionHint.id+' '+manualHint.id+' '+manualGuide.id);
     for(const field of [clockId,date,fps,drop,clockConfirmed])field.setAttribute('aria-describedby',selectionHint.id+' '+clockHint.id);
     for(const field of [check,stream,channel,offset,confirmed,clockId,date,fps,drop,clockConfirmed]){field.disabled=workLocked()||!connected;field.oninput=field.onchange=()=>{
       if(!syncRows.includes(syncRow))return;
@@ -490,6 +491,7 @@ function syncManualFeedback(row,locked){
   const reference=syncManualReference(row),active=$('sync-method').value==='manual'&&row.check.checked,text=reference?'기준 소스의 상대 오프셋은 0초입니다. 입력값과 확인 상태는 보관되며 기준 소스를 바꾸면 사용할 수 있습니다.':!active?'':!row.offset.value.trim()?'오프셋을 입력하세요. 입력하지 않은 소스는 싱크 결과에서 확인이 필요합니다.':!row.confirmed.checked?'기준 대비 오프셋을 확인한 뒤 확인 항목을 선택하세요. 미확인 소스는 싱크 결과에서 확인이 필요합니다.':'';
   row.offset.disabled=row.confirmed.disabled=locked||!connected||reference;
   if(row.manualHint.textContent!==text)row.manualHint.textContent=text;row.manualHint.className=text?'hint':'hint hidden';
+  row.manualGuide.className=active&&!reference&&connected?'hint':'hint hidden';
   row.offsetValue=row.offset.value;row.confirmedValue=row.confirmed.checked;
 }
 function syncClockDateValid(value){

@@ -3465,3 +3465,29 @@ test('sync offset context remains stable through raw settings restore work locks
   f.state.update={updateState:'IDLE',checkState:'AVAILABLE',candidate:{candidateId:'release:hash',manifestDigest:'a'.repeat(64),appVersion:'0.1.73'}};await f.tick();await f.click('update');assert.ok(f.calls.some(v=>v.path==='/updates/start'));assert.equal(f.get('sync').disabled,true);
  }
 });
+
+test('manual sync entry example explains both offset signs without replacing input warnings or raw values',async()=>{
+ for(const mode of ['separate','mixed']){
+  const f=await completedSync({mode,method:'manual'}),row=syncRow(f,1);assert.ok(row.manual.children.some(v=>v.textContent.includes('기준 소스 10초')),'Rendered manual row needs a signed correspondence example');const guide=row.manualGuide;
+  assert.match(guide.textContent,/기준 소스 10초.*현재 소스 12초.*-2초/);assert.match(guide.textContent,/기준 소스 12초.*현재 소스 10초.*\+2초/);assert.equal(guide.className,'hint');assert.equal(guide.getAttribute('aria-live'),undefined);for(const field of [row.offset,row.confirmed])assert.ok(field.getAttribute('aria-describedby').split(' ').includes(guide.id));
+  for(const [value,confirmed,warning] of [['',false,/입력/],[' 1.250 ',false,/미확인/],[' -2 ',true,null]]){row.offset.value=value;row.confirmed.checked=confirmed;row.offset.oninput();assert.equal(guide.className,'hint');assert.equal(row.offset.value,value);assert.equal(row.confirmed.checked,confirmed);if(warning)assert.match(row.manualHint.textContent,warning);else assert.equal(row.manualHint.textContent,'');}
+ }
+});
+
+test('manual sync entry example follows selected method reference and connection without changing settings',async()=>{
+ for(const mode of ['separate','mixed']){
+  const f=await completedSync({mode,method:'manual'}),row=syncRow(f,1),reference=syncRow(f,0);assert.ok(row.manual.children.some(v=>v.textContent.includes('기준 소스 10초')));const guide=row.manualGuide;assert.equal(reference.manualGuide.className,'hint hidden');
+  row.check.checked=false;row.check.onchange();assert.equal(guide.className,'hint hidden');row.check.checked=true;row.check.onchange();assert.equal(guide.className,'hint');
+  for(const method of ['audio','timecode']){f.get('sync-method').value=method;f.get('sync-method').onchange();assert.equal(guide.className,'hint hidden');}f.get('sync-method').value='manual';f.get('sync-method').onchange();assert.equal(guide.className,'hint');
+  f.get('sync-reference').value=row.source.assetId;f.get('sync-reference').onchange();assert.equal(guide.className,'hint hidden');assert.equal(row.offset.disabled,true);assert.match(row.manualHint.textContent,/0초/);assert.equal(reference.manualGuide.className,'hint');f.get('sync-reference').value=reference.source.assetId;f.get('sync-reference').onchange();const before=f.evaluate('JSON.stringify(captureSettings())');f.evaluate('toggle()');assert.equal(f.evaluate('JSON.stringify(captureSettings())'),before);f.evaluate('connected=null;toggle()');assert.equal(guide.className,'hint hidden');
+ }
+});
+
+test('manual sync entry example survives restore locks and stale rows while update starts immediately',async()=>{
+ for(const mode of ['separate','mixed']){
+  const f=await completedSync({mode,method:'manual'}),row=syncRow(f,1);assert.ok(row.manual.children.some(v=>v.textContent.includes('기준 소스 10초')));const guide=row.manualGuide;row.offset.value=' -2.000 ';row.offset.oninput();row.confirmed.checked=true;row.confirmed.onchange();const input=f.evaluate('syncInputHash()');await f.click('save-settings');await f.click('load-settings');assert.equal(row.offset.value,' -2.000 ');assert.equal(row.confirmed.checked,true);assert.equal(guide.className,'hint');assert.equal(f.evaluate('syncInputHash()'),input);
+  for(const lock of trackLocks){const locked=await completedSync({mode,method:'manual'}),r=syncRow(locked,1),before=syncState(locked);locked.evaluate(lock+';toggle()');const calls=locked.calls.length;r.offset.oninput();r.confirmed.onchange();assert.equal(syncState(locked),before);assert.equal(locked.calls.length,calls);assert.equal(r.manualGuide.className,lock==='connected=null'?'hint hidden':'hint');}
+  let text=guide.textContent,writes=0;Object.defineProperty(guide,'textContent',{get:()=>text,set:v=>{text=v;writes++;}});f.evaluate('toggle();toggle()');assert.equal(writes,0);f.native=nativeSnapshot('manual-guide-next');await f.click('read-project');const current=syncRow(f,1),before=f.evaluate('JSON.stringify(captureSettings())');row.offset.oninput();assert.equal(f.evaluate('JSON.stringify(captureSettings())'),before);assert.notEqual(current.manualGuide.id,'');
+  f.state.update={updateState:'IDLE',checkState:'AVAILABLE',candidate:{candidateId:'release:hash',manifestDigest:'a'.repeat(64),appVersion:'0.1.74'}};await f.tick();await f.click('update');assert.ok(f.calls.some(v=>v.path==='/updates/start'));assert.equal(current.offset.disabled,true);
+ }
+});

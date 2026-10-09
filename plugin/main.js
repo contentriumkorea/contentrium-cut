@@ -255,7 +255,7 @@ function toggle(){
   for(const id of ['analysis-device','cache-budget'])$(id).disabled=locked;
   for(const id of ['model-token','model-terms'])$(id).disabled=locked||!modelReady();
   for(const id of ['sync-method','sync-reference'])$(id).disabled=locked||!connected;
-  for(const row of syncRows){for(const field of [row.check,row.stream,row.channel,row.offset,row.confirmed,row.clockId,row.date,row.fps,row.drop,row.clockConfirmed])field.disabled=locked||!connected;syncManualFeedback(row,locked);}
+  for(const row of syncRows){for(const field of [row.check,row.stream,row.channel,row.offset,row.confirmed,row.clockId,row.date,row.fps,row.drop,row.clockConfirmed])field.disabled=locked||!connected;syncManualFeedback(row,locked);syncClockFeedback(row);}
   for(const row of selectedRows)selectedSourceFeedback(row,locked);
   $('speaker-count').disabled=workLocked()||mode!=='mixed';$('vad-threshold').disabled=workLocked()||mode!=='separate';
   for(const row of calibrationRows)for(const field of [row.first,row.last])field.disabled=workLocked()||!calibrationActive(row);
@@ -452,9 +452,11 @@ function renderSyncSources(){
     const clock=element('div'),clockId=element('input'),date=element('input'),fps=element('select'),drop=checkbox(),clockConfirmed=checkbox();date.placeholder='YYYY-MM-DD';clockId.placeholder='같은 동기 장치 또는 시계 이름';
     options(fps,[['24000/1001','23.976'],['24/1','24'],['25/1','25'],['30000/1001','29.97'],['30/1','30'],['50/1','50'],['60000/1001','59.94'],['60/1','60']]);fps.value=connected.snapshot.fps.num+'/'+connected.snapshot.fps.den;
     clock.appendChild(label('공통 시계',clockId));clock.appendChild(label('촬영 날짜',date));clock.appendChild(label('타임코드 FPS',fps));clock.appendChild(label('Drop-frame',drop));clock.appendChild(label('날짜와 시계가 같고 촬영 중 리셋하지 않았습니다',clockConfirmed));row.appendChild(clock);
-    $('sync-sources').appendChild(row);const syncRow={check,source,stream,channel,issue,selectionHint,manual,manualHint,offset,confirmed,clock,clockId,date,fps,drop,clockConfirmed};syncRows.push(syncRow);
+    const clockHint=element('p','','hint hidden');clockHint.id='sync-clock-hint-'+syncRows.length;clockHint.setAttribute('aria-live','polite');clock.appendChild(clockHint);
+    $('sync-sources').appendChild(row);const syncRow={check,source,stream,channel,issue,selectionHint,manual,manualHint,offset,confirmed,clock,clockHint,clockId,date,fps,drop,clockConfirmed};syncRows.push(syncRow);
     for(const field of [offset,confirmed,clockId,date,fps,drop,clockConfirmed])field.setAttribute('aria-describedby',selectionHint.id);
     for(const field of [offset,confirmed])field.setAttribute('aria-describedby',selectionHint.id+' '+manualHint.id);
+    for(const field of [clockId,date,fps,drop,clockConfirmed])field.setAttribute('aria-describedby',selectionHint.id+' '+clockHint.id);
     for(const field of [check,stream,channel,offset,confirmed,clockId,date,fps,drop,clockConfirmed]){field.disabled=workLocked()||!connected;field.oninput=field.onchange=()=>{
       if(!syncRows.includes(syncRow))return;
       if((field===offset||field===confirmed)&&syncManualReference(syncRow)){offset.value=syncRow.offsetValue;confirmed.checked=syncRow.confirmedValue;return;}
@@ -475,6 +477,10 @@ function syncManualFeedback(row,locked){
   row.offset.disabled=row.confirmed.disabled=locked||!connected||reference;
   if(row.manualHint.textContent!==text)row.manualHint.textContent=text;row.manualHint.className=text?'hint':'hint hidden';
   row.offsetValue=row.offset.value;row.confirmedValue=row.confirmed.checked;
+}
+function syncClockFeedback(row){
+  const active=$('sync-method').value==='timecode'&&row.check.checked,text=!active?'':!row.clockId.value.trim()?'공통 시계 이름을 입력하세요. 같은 시계의 소스만 타임코드로 연결할 수 있습니다.':!row.date.value.trim()?'촬영 날짜를 입력하세요. 날짜가 없는 소스는 싱크 결과에서 확인이 필요합니다.':!row.clockConfirmed.checked?'날짜와 공통 시계가 같고 촬영 중 리셋하지 않았는지 확인하세요. 미확인 정보는 싱크 결과에서 검토가 필요합니다.':'';
+  if(row.clockHint.textContent!==text)row.clockHint.textContent=text;row.clockHint.className=text?'hint':'hint hidden';
 }
 function syncFeedback(){
   let first='';const selected=syncRows.filter(r=>r.check.checked);

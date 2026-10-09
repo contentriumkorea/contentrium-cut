@@ -12,7 +12,7 @@ const workflow=require('./workflow.js').create({api:(...args)=>api(...args),stor
 let credentials=null,state=null,connected=null,mode='separate',job=null,analysisJob=null,analysis=null,plan=null,syncResult=null,syncJob=null,planCameraRefs=[],applying=false,batchRunning=false,stopped=false,applyId=null,polling=false,pending=false;
 const microphoneRows=[],cameraRows=[],speakerRows=[],calibrationRows=[],overrideRows=[],syncRows=[];
 let microphoneSelectionCustomized=false;
-let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;let projectRead=null,nativePreparation=null,editingSubmission=null;
+let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;let projectRead=null,nativePreparation=null,editingSubmission=null,correctionRequest=null;
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
 let analysisState=null;
 let planInputHash=null,planInvalidated=false;
@@ -482,9 +482,24 @@ function acceptAnalysis(next){
 }
 async function correct(operation){
   await requireCurrent();if(!analysisState)throw new Error('화자 분석을 먼저 실행하세요.');
-  const id=analysisState.analysisId;
-  try{acceptAnalysis(await api('/analyses/'+id+'/correct',{expectedRevision:analysisState.revision,operation,requestId:requestId(),epoch:state.epoch}));scheduleSettings();say('화자 교정을 저장했습니다. 편집안을 다시 만들어 주세요.');}
-  catch(e){if(e.code==='CORRECTION_REVISION_CONFLICT')acceptAnalysis(await api('/analyses/'+id));throw e;}
+  const token={},scopeCurrent=editingResponseGuard(),id=analysisState.analysisId,revision=analysisState.revision,epoch=state.epoch;
+  const current=()=>correctionRequest===token&&scopeCurrent();correctionRequest=token;
+  try{
+    if(!current())throw currentCheckDiscarded;
+    let next;
+    try{next=await api('/analyses/'+id+'/correct',{expectedRevision:revision,operation,requestId:requestId(),epoch});}
+    catch(e){
+      if(!current())throw currentCheckDiscarded;
+      if(e.code==='CORRECTION_REVISION_CONFLICT'){
+        let latest;try{latest=await api('/analyses/'+id);}catch(recoveryError){if(!current())throw currentCheckDiscarded;throw recoveryError;}
+        if(!current())throw currentCheckDiscarded;
+        acceptAnalysis(latest);
+      }
+      throw e;
+    }
+    if(!current())throw currentCheckDiscarded;
+    acceptAnalysis(next);scheduleSettings();say('화자 교정을 저장했습니다. 편집안을 다시 만들어 주세요.');
+  }finally{if(correctionRequest===token)correctionRequest=null;}
 }
 async function stopPreview(current=()=>true){
   if(!current())throw currentCheckDiscarded;
@@ -501,9 +516,13 @@ async function afterEditingPreview(next,nativeToken=null){
   await stopPreview(current);if(!current())throw currentCheckDiscarded;
   return next();
 }
+function editingResponseGuard(){
+  const scope=projectScope(),read=projectRead,selection=projectSelection,capability=inputCapability,rows=selectedRows.slice(),reviewed=plan,reviewedHash=planInputHash,sync=syncResult,syncId=syncJob,syncHash=syncResultInputHash;
+  return ()=>!binding&&!batchRunning&&projectRead===read&&projectScopeCurrent(scope)&&projectSelection===selection&&inputCapability===capability&&selectedRows.length===rows.length&&rows.every((row,index)=>selectedRows[index]===row)&&plan===reviewed&&planInputHash===reviewedHash&&syncResult===sync&&syncJob===syncId&&syncResultInputHash===syncHash;
+}
 async function submitEditingJob(path,body,identity,message,inputsCurrent=()=>true){
-  const token={},scope=projectScope(),read=projectRead,selection=projectSelection,capability=inputCapability,rows=selectedRows.slice(),reviewed=plan,reviewedHash=planInputHash,sync=syncResult,syncId=syncJob,syncHash=syncResultInputHash;
-  const current=()=>editingSubmission===token&&!binding&&!batchRunning&&projectRead===read&&projectScopeCurrent(scope)&&projectSelection===selection&&inputCapability===capability&&selectedRows.length===rows.length&&rows.every((row,index)=>selectedRows[index]===row)&&plan===reviewed&&planInputHash===reviewedHash&&syncResult===sync&&syncJob===syncId&&syncResultInputHash===syncHash&&inputsCurrent();
+  const token={},scopeCurrent=editingResponseGuard();
+  const current=()=>editingSubmission===token&&scopeCurrent()&&inputsCurrent();
   editingSubmission=token;
   try{
     if(!current())throw currentCheckDiscarded;

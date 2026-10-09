@@ -22,7 +22,7 @@ let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,
 let analysisState=null;
 let planInputHash=null,planInvalidated=false;
 let overrideSerial=0,overrideErrorsOnly=false,overrideVisibleRows=new Set();
-let validationCount=0,validationRevision=0,statusRevision=0,heartbeatRequest=null,updateIntent=null;
+let validationCount=0,validationRevision=0,statusRevision=0,heartbeatRequest=null,heartbeatOwner=null,updateIntent=null;
 let reviewPage=0,reviewWindow=null;
 let microphoneIssue='',rangeIssue='',syncIssue='',policyIssue='',syncResultInputHash=null,syncInvalidated=false;
 const selectedRows=[];
@@ -665,7 +665,7 @@ async function readProject({fresh=null,automatic=false,guardFactory=null,onSettl
       if(start>=end){start=0;end=s.range.endFrame;}
     }
     s.range={startFrame:start,endFrame:end};delete s.snapshotHash;s.snapshotHash=ContentriumHost.hash(s);
-    await heartbeat(current);if(!current())return false;
+    if(!await heartbeat(current)||!current())return false;
     await api('/project',{snapshot:s,hostIdentity:null,epoch:scope.epoch});if(!current())return false;
     let saved;
     if(!same){
@@ -846,7 +846,27 @@ async function refresh(current=()=>true,accepted=()=>{}){
   }finally{if(refreshRequest===token)refreshRequest=null;}
 }
 
-async function heartbeat(current=()=>true){if(!credentials||!state)return;const receipt=await api('/heartbeat',{hostIdentity:null,epoch:state.epoch,batchRunning,quiescent:!applying&&!previewPlaying&&!previewBusy,panelVersion:bundle.appVersion,bundleId:bundle.bundleId,protocolVersion:bundle.protocolVersion});if(!current())return;if(!receipt.gateOpen||receipt.stopEpoch!==null&&receipt.stopEpoch!==undefined){stopped=true;plan=null;toggle();}}
+async function heartbeat(current=()=>true){
+  if(!credentials||!state||!current())return false;
+  const token={credential:credentials,scope:refreshScope(),epoch:state.epoch,guidanceRevision:statusRevision};heartbeatOwner=token;
+  const ready=receipt=>{if(heartbeatOwner!==token||credentials!==token.credential)return false;const scope=refreshScope();return token.scope.every((value,index)=>value===scope[index])&&current(receipt);};
+  const failed=e=>{
+    if(!ready())return;
+    const guide=statusRevision===token.guidanceRevision;
+    if(e?.code==='PANEL_CONTEXT_CONFLICT'){contextConflict(guide);return;}
+    stopped=true;setConnection(false,'편집 연결 상태 확인 필요');
+    if(['AUTH_REQUIRED','SESSION_EXPIRED'].includes(e?.code)){credentials=null;connection.reset();retryAt=Date.now()+1000;setConnection(false,'편집 연결 복구 중');}
+    if(guide)say(['AUTH_REQUIRED','SESSION_EXPIRED'].includes(e?.code)?'편집 연결을 복구하고 있습니다. 새로고침으로 상태를 확인하세요.':'편집 연결 상태를 확인하지 못했습니다. 새로고침을 다시 실행하세요.');
+    toggle();
+  };
+  try{
+    let receipt;try{receipt=await api('/heartbeat',{hostIdentity:null,epoch:token.epoch,batchRunning,quiescent:!applying&&!previewPlaying&&!previewBusy,panelVersion:bundle.appVersion,bundleId:bundle.bundleId,protocolVersion:bundle.protocolVersion});}catch(e){failed(e);return false;}
+    if(!ready(receipt))return false;
+    if(!receipt||typeof receipt!=='object'||Array.isArray(receipt)||!Number.isSafeInteger(receipt.epoch)||receipt.epoch<token.epoch||typeof receipt.gateOpen!=='boolean'||!(receipt.stopEpoch===null||Number.isSafeInteger(receipt.stopEpoch)&&receipt.stopEpoch>=0&&receipt.stopEpoch<=receipt.epoch)){failed();return false;}
+    if(receipt.epoch>token.epoch||!receipt.gateOpen||receipt.stopEpoch!==null){stopped=true;plan=null;toggle();}
+    return true;
+  }finally{if(heartbeatOwner===token)heartbeatOwner=null;}
+}
 function periodicHeartbeat(){
   if(!heartbeatRequest){const next=heartbeat();heartbeatRequest=next;const clear=()=>{if(heartbeatRequest===next)heartbeatRequest=null;};next.then(clear,clear);}
   return heartbeatRequest;
@@ -1158,7 +1178,7 @@ handler('apply-sync',async()=>{
 });
 handler('read-selection',async()=>{
   if(!credentials||!state?.gateOpen||stopped||job||applying||localEditPending)throw new Error('현재 작업 상태를 확인하세요.');
-  await heartbeat();projectSelection=null;inputCapability=null;selectedRows.length=0;$('selected-sources').innerHTML='';
+  if(!await heartbeat()||stopped||updateIntent)return;projectSelection=null;inputCapability=null;selectedRows.length=0;$('selected-sources').innerHTML='';
   const selection=await ContentriumHost.selectedSources();
   const bound=await api('/input/sources',{projectRef:selection.projectRef,sources:selection.sources,epoch:state.epoch});
   projectSelection={...selection,...bound};
@@ -1174,7 +1194,7 @@ handler('read-selection',async()=>{
 handler('create-input',async()=>{
   if(!state?.gateOpen||stopped||!projectSelection||!inputCapability)throw new Error('선택 소스 확인을 먼저 마쳐 주세요.');
   const selection=projectSelection,capability=inputCapability,choices=inputSourceChoices();
-  await heartbeat();
+  if(!await heartbeat()||stopped||updateIntent)return;
   await performNative('input',{capabilityId:capability.capabilityId,choices,epoch:state.epoch},(approved,control)=>ContentriumHost.createSelectedInput(selection,choices,control),(approved,result)=>({...result.inputReceipt,planHash:approved.planHash}),'/input/begin');
   projectSelection=inputCapability=null;selectedRows.length=0;$('selected-sources').innerHTML='';connected=null;await readProject();say('입력 시퀀스를 만들었습니다. 트랙 설정에서 싱크와 화자 분석을 시작하세요.');
 });
@@ -1352,7 +1372,7 @@ async function initialize({manual=false}={}){
   try{
     await connection.connect();credentials={};panelContextConflict=false;retryDelay=1000;enrollmentDeadline=0;
     try{localEditPending=!!await workflow.pending();localIntentError=null;}catch(e){if(!isIntentReadError(e))throw e;localEditPending=true;localIntentError=e.code;}
-    if(!await refresh())return;await heartbeat();if(localIntentError)error({code:localIntentError});
+    if(!await refresh()||!await heartbeat())return;if(localIntentError)error({code:localIntentError});
     if(!localEditPending&&!state?.applyRecovery?.blocked){try{await readProject();}catch(e){say(/PROJECT_REQUIRED|SEQUENCE_REQUIRED/.test(String(e))?'Premiere에서 편집할 시퀀스를 열어 주세요.':String(e));}}
     api('/updates/check',{}).then(refresh).catch(()=>{});
   }catch(e){
@@ -1374,7 +1394,7 @@ initialize();
 function pollError(e){if(e.code==='PANEL_CONTEXT_CONFLICT')contextConflict();else{setConnection(false,'편집 연결 복구 중');if(e.code==='AUTH_REQUIRED'||e.code==='SESSION_EXPIRED'||!e.code){credentials=null;connection.reset();retryAt=Date.now()+1000;}if(job||applying){stopped=true;error(e);}toggle();}}
 setInterval(async()=>{
   if(!credentials){if(Date.now()>=retryAt)await initialize();return;}
-  try{await periodicHeartbeat();}catch(e){pollError(e);return;}
+  try{if(!await periodicHeartbeat())return;}catch(e){pollError(e);return;}
   if(polling)return;
   polling=true;
   try{await pollJob();if(!await refresh())return;if(!pending&&!applying&&!job&&!validationCount&&!localEditPending&&!state?.applyRecovery?.blocked&&Date.now()>=sequencePollAt){sequencePollAt=Date.now()+2500;await followSequence();}}

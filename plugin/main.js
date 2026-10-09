@@ -71,6 +71,20 @@ function number(value){const e=element('input');e.type='number';e.value=String(v
 function options(select,values,empty){select.innerHTML='';if(empty){const e=element('option',empty);e.value='';select.appendChild(e);}for(const [value,label] of values){const e=element('option',label);e.value=value;select.appendChild(e);}}
 function label(text,input){const e=element('label',text);e.appendChild(input);return e;}
 function basename(path){return path.split(/[\\/]/).pop();}
+function syncSourceLabels(sources){
+  const entries=sources.map((source,index)=>{const parts=source.canonicalPath.split(/[\\/]/).filter(Boolean);return {source,index,name:basename(source.canonicalPath),folders:parts.slice(0,-1)};}),groups=new Map(),labels=new Map();
+  for(const entry of entries){const key=entry.name.toLowerCase();if(!groups.has(key))groups.set(key,[]);groups.get(key).push(entry);}
+  const occupied=new Set(entries.filter(entry=>groups.get(entry.name.toLowerCase()).length===1).map(entry=>entry.name.toLowerCase()));
+  for(const entry of entries){
+    const group=groups.get(entry.name.toLowerCase());if(group.length===1){labels.set(entry.source.assetId,entry.name);continue;}
+    let folder=null;for(let depth=1;depth<=entry.folders.length;depth++){const suffix=entry.folders.slice(-depth).join('/');if(group.every(other=>other===entry||other.folders.slice(-depth).join('/').toLowerCase()!==suffix.toLowerCase())){folder=suffix;break;}}
+    const base=entry.name+(folder?' ['+folder+']':' · 소스 '+(entry.index+1));let text=base;
+    for(let suffix=1;occupied.has(text.toLowerCase());suffix++)text=base+' · 소스 '+(entry.index+1)+(suffix>1?'-'+suffix:'');
+    occupied.add(text.toLowerCase());labels.set(entry.source.assetId,text);
+  }
+  return labels;
+}
+
 function settingsKey(){return 'cut-settings-'+ContentriumHost.hash({projectRef:connected.snapshot.projectRef,sequenceRef:connected.snapshot.sequenceRef});}
 function settingsWriteReady(){return !!connected&&!!credentials&&!!state?.gateOpen&&!stopped&&!updateIntent&&!updateRecoveryRequest&&!applyRecoveryRequest&&!cancelRequest&&state?.compatible!==false&&!panelContextConflict&&!localEditPending&&!state?.applyRecovery?.blocked&&!binding&&!projectRead&&!applying&&!batchRunning&&(state?.stopEpoch===null||state?.stopEpoch===undefined);}
 function scheduleSettings(){
@@ -440,9 +454,9 @@ function renderSources(){
   if(mode==='mixed')$('speaker-mapping').appendChild(element('p','화자를 분석하면 감지한 목소리를 카메라에 연결할 수 있습니다.','hint'));mappingInputs();
 }
 function renderSyncSources(){
-  const values=[];
+  const values=[],names=syncSourceLabels(connected.snapshot.sources);
   for(const source of connected.snapshot.sources){
-    const row=element('div',undefined,'source-row'),check=checkbox(true),title=element('label',basename(source.canonicalPath));title.insertBefore(check,title.firstChild);row.appendChild(title);
+    const row=element('div',undefined,'source-row'),check=checkbox(true),title=element('label',names.get(source.assetId));title.insertBefore(check,title.firstChild);row.appendChild(title);
     const fields=element('div',undefined,'row'),stream=number(1),channel=number(1);stream.min=channel.min='1';stream.step=channel.step='1';fields.appendChild(label('오디오 스트림',stream));fields.appendChild(label('채널',channel));row.appendChild(fields);
     const issue=element('p','', 'hint input-error hidden');issue.id='sync-source-error-'+syncRows.length;issue.setAttribute('role','status');issue.setAttribute('aria-live','polite');
     const selectionHint=element('p','','hint hidden');selectionHint.id='sync-selection-hint-'+syncRows.length;selectionHint.setAttribute('aria-live','polite');check.setAttribute('aria-describedby',selectionHint.id);
@@ -453,7 +467,7 @@ function renderSyncSources(){
     options(fps,[['24000/1001','23.976'],['24/1','24'],['25/1','25'],['30000/1001','29.97'],['30/1','30'],['50/1','50'],['60000/1001','59.94'],['60/1','60']]);fps.value=connected.snapshot.fps.num+'/'+connected.snapshot.fps.den;
     clock.appendChild(label('공통 시계',clockId));clock.appendChild(label('촬영 날짜',date));clock.appendChild(label('타임코드 FPS',fps));clock.appendChild(label('Drop-frame',drop));clock.appendChild(label('날짜와 시계가 같고 촬영 중 리셋하지 않았습니다',clockConfirmed));row.appendChild(clock);
     const clockHint=element('p','','hint hidden');clockHint.id='sync-clock-hint-'+syncRows.length;clockHint.setAttribute('aria-live','polite');clock.appendChild(clockHint);
-    $('sync-sources').appendChild(row);const syncRow={check,source,stream,channel,issue,selectionHint,manual,manualHint,offset,confirmed,clock,clockHint,clockId,date,fps,drop,clockConfirmed};syncRows.push(syncRow);
+    $('sync-sources').appendChild(row);const syncRow={check,source,displayName:names.get(source.assetId),stream,channel,issue,selectionHint,manual,manualHint,offset,confirmed,clock,clockHint,clockId,date,fps,drop,clockConfirmed};syncRows.push(syncRow);
     for(const field of [offset,confirmed,clockId,date,fps,drop,clockConfirmed])field.setAttribute('aria-describedby',selectionHint.id);
     for(const field of [offset,confirmed])field.setAttribute('aria-describedby',selectionHint.id+' '+manualHint.id);
     for(const field of [clockId,date,fps,drop,clockConfirmed])field.setAttribute('aria-describedby',selectionHint.id+' '+clockHint.id);
@@ -462,7 +476,7 @@ function renderSyncSources(){
       if((field===offset||field===confirmed)&&syncManualReference(syncRow)){offset.value=syncRow.offsetValue;confirmed.checked=syncRow.confirmedValue;return;}
       syncInputEdited();
     };}
-    values.push([source.assetId,basename(source.canonicalPath)]);
+    values.push([source.assetId,names.get(source.assetId)]);
   }
   options($('sync-reference'),values);syncMethodChanged();
 }
@@ -498,7 +512,7 @@ function syncFeedback(){
     const invalidChannel=row.check.checked&&(!row.channel.value.trim()||!Number.isSafeInteger(Number(row.channel.value))||Number(row.channel.value)<1);
     for(const [field,invalid] of [[row.stream,invalidStream],[row.channel,invalidChannel]]){const value=invalid?'true':'false';if(field.getAttribute('aria-invalid')!==value)field.setAttribute('aria-invalid',value);}
     const errors=[];if(invalidStream)errors.push('오디오 스트림은 1 이상의 정수로 입력하세요.');if(invalidChannel)errors.push('채널은 1 이상의 정수로 입력하세요.');
-    const text=errors.length?basename(row.source.canonicalPath)+' · '+errors.join(' '):'';
+    const text=errors.length?row.displayName+' · '+errors.join(' '):'';
     if(row.issue.textContent!==text)row.issue.textContent=text;row.issue.className='hint input-error'+(text?'':' hidden');if(text&&!first)first=text;
   }
   const issue=!connected?'':first|| (selected.length<2?'싱크할 소스를 2개 이상 선택하세요.':!selected.some(r=>r.source.assetId===$('sync-reference').value)?'기준 소스를 선택한 싱크 소스 중에서 지정하세요.':'');
@@ -1054,7 +1068,7 @@ function syncReviewReason(result,id,evidence){
 function stagedSyncDisplay(result,assets,connection){
   const record=value=>!!value&&typeof value==='object'&&!Array.isArray(value);
   if(!record(result)||!record(result.sources)||!record(result.offsets)||Object.keys(result.sources).length!==assets.length||assets.some(id=>!record(result.sources[id])||typeof result.sources[id].status!=='string'))throw Object.assign(new Error('싱크 결과를 확인하지 못했습니다. 싱크를 다시 분석하세요.'),{code:'SYNC_RESULT_INVALID'});
-  const sources=new Map(connection.snapshot.sources.map(s=>[s.assetId,basename(s.canonicalPath)]));
+  const sources=syncSourceLabels(connection.snapshot.sources);
   return assets.map(id=>{const evidence=result.sources[id],offset=result.offsets[id];if(evidence.status==='accepted'&&(!['number','string'].includes(typeof offset)||typeof offset==='string'&&!offset.trim()||!Number.isFinite(Number(offset))))throw Object.assign(new Error('싱크 시간 정보를 확인하지 못했습니다. 싱크를 다시 분석하세요.'),{code:'SYNC_RESULT_INVALID'});return sources.get(id)+' · '+(evidence.status==='accepted'?Number(offset).toFixed(3)+'초':'확인 필요 · '+syncReviewReason(result,id,evidence));}).join('\n');
 }
 async function pollSyncJob(active){
@@ -1202,7 +1216,7 @@ async function pollJob(){
     }else if(active.kind==='sync'){
       if(active.inputHash!==syncInputHash()){invalidateSyncResult();return;}
       syncJob=value.jobId;syncResult=value.result;syncResultInputHash=active.inputHash;
-      const sources=new Map(connected.snapshot.sources.map(s=>[s.assetId,basename(s.canonicalPath)]));
+      const sources=syncSourceLabels(connected.snapshot.sources);
       $('sync-result').textContent=Object.entries(syncResult.sources).map(([id,evidence])=>sources.get(id)+' · '+(evidence.status==='accepted'?(Number(syncResult.offsets[id]).toFixed(3)+'초'):'확인 필요 · '+syncReviewReason(syncResult,id,evidence))).join('\n');
       say('싱크 분석 완료 · 확인이 필요한 소스를 검토하세요.');
     }else if(active.kind==='input-probe'){

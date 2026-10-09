@@ -1852,3 +1852,89 @@ test('validation ABA and same job progress keep newer guidance after settings wr
   const before=f.get('status').textContent;if(outcome==='success')resume(true);else reject(new Error('Owned superseded save failure'));await run;assert.equal(f.get('status').textContent,before,[mode,automatic,outcome,change].join('/'));
  }
 });
+
+
+async function heldResourceSettings(mode,stage='post',kind='save'){
+ let resume,reject,entered=false;
+ const f=await updatePanel({request:async(path,body)=>{if(path==='/resources'&&((stage==='post'&&body?.settings)||(stage==='get'&&!body))){entered=true;return new Promise((a,b)=>{resume=()=>a(body?.settings?{}:{settings:{device:'cuda',cacheBudgetBytes:3*1073741824},status:{cacheBytes:1073741824,freeDiskBytes:10*1073741824}});reject=b;});}}});
+ if(mode==='mixed')await f.click('mode-mixed');await f.click('analyze');await f.tick();f.get('cache-budget').value=' 2 ';f.get('cache-info').textContent='Owned existing cache';
+ const run=f.click(kind==='save'?'save-resources':'open-settings');for(let i=0;i<100&&!entered;i++)await Promise.resolve();assert.equal(entered,true);return {f,run,resume,reject};
+}
+function resourceState(f){return JSON.stringify({result:JSON.parse(resultState(f)),device:f.get('analysis-device').value,budget:f.get('cache-budget').value,cache:f.get('cache-info').textContent,loaded:f.evaluate('resourceLoaded'),status:f.get('status').textContent,timer:f.evaluate('settingsTimer')});}
+test('resource settings save and initial read discard late success and failure after immediate update',async()=>{
+ for(const mode of ['separate','mixed'])for(const [kind,stage] of [['save','post'],['save','get'],['open','get']])for(const outcome of ['success','error']){
+  const {f,run,resume,reject}=await heldResourceSettings(mode,stage,kind);await f.click('update');const before=resourceState(f),calls=f.calls.length;
+  if(outcome==='success')resume();else reject(new Error('Owned late resource failure'));await run;for(let i=0;i<20;i++)await Promise.resolve();
+  assert.equal(resourceState(f),before,[mode,kind,stage,outcome].join('/'));assert.equal(f.calls.length,calls);assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);
+ }
+});
+
+
+test('resource settings responses retain current UI across editing scope ownership and raw changes',async()=>{
+ const changes=['stopped=true','state.gateOpen=false','updateIntent={inFlight:true}','state.stopEpoch=0','state.epoch++','credentials={...credentials}','connected={...connected}','connected.snapshot.snapshotHash="new hash"','mode=mode==="mixed"?"separate":"mixed"','analysisState={...analysisState,revision:1}','analysisState.revision++','plan={owned:true};planInputHash=planInputsHash()','syncResult={owned:true}','projectSelection={owned:true}','inputCapability={owned:true}','binding=true','projectRead={}','job={owned:true}','validationCount=1','localEditPending=true','state.applyRecovery.blocked=true','state.compatible=false','state.appVersion="other"','resourceRequest={newOwner:true}','$("cache-budget").value=" 3 "','$("analysis-device").value="cuda"','view.show("tracks");view.show("settings")'];
+ for(const mode of ['separate','mixed'])for(const [kind,stage] of [['save','post'],['save','get'],['open','get']])for(const outcome of ['success','error'])for(const change of changes){
+  const {f,run,resume,reject}=await heldResourceSettings(mode,stage,kind);f.evaluate(change+';say("Owned resource scope")');const before=resourceState(f),calls=f.calls.length;
+  if(outcome==='success')resume();else reject(new Error('Owned obsolete resource scope error'));await run;assert.equal(resourceState(f),before,[mode,kind,stage,outcome,change].join('/'));assert.equal(f.calls.length,calls);
+  if(change.startsWith('resourceRequest='))assert.equal(f.evaluate('resourceRequest.newOwner'),true);else assert.equal(f.evaluate('resourceRequest'),null);
+ }
+});
+test('resource input view and validation ABA prevent old initial reads from replacing newer settings',async()=>{
+ for(const mode of ['separate','mixed'])for(const outcome of ['success','error'])for(const change of ['input','view','validation']){
+  const {f,run,resume,reject}=await heldResourceSettings(mode,'get','open');
+  if(change==='input'){f.get('cache-budget').value='4';f.get('cache-budget').oninput();f.get('cache-budget').value=' 2 ';f.get('cache-budget').onchange();}else if(change==='view')f.evaluate('view.show("tracks");view.show("settings")');else{f.validation(1);f.validation(0);}
+  const before=resourceState(f),calls=f.calls.length;if(outcome==='success')resume();else reject(new Error('Owned resource ABA'));await run;assert.equal(resourceState(f),before);assert.equal(f.calls.length,calls);
+ }
+});
+test('normal resource settings save and initial read keep exact request and current errors visible',async()=>{
+ for(const mode of ['separate','mixed'])for(const [kind,stage] of [['save','post'],['save','get'],['open','get']])for(const outcome of ['success','error']){
+  const {f,run,resume,reject}=await heldResourceSettings(mode,stage,kind);
+  if(outcome==='error'){reject(new Error('Owned current resource error'));await run;assert.match(f.get('status').textContent,/Owned current resource error/);assert.equal(f.get('cache-budget').value,' 2 ');assert.equal(f.get('cache-info').textContent,'Owned existing cache');}
+  else{resume();await run;if(stage==='post'){assert.equal(f.get('analysis-device').value,'cpu');assert.equal(f.get('cache-budget').value,'1');}else{assert.equal(f.get('analysis-device').value,'cuda');assert.equal(f.get('cache-budget').value,'3');}assert.equal(f.evaluate('resourceLoaded'),true);if(kind==='save')assert.match(f.get('status').textContent,/자원 설정을 저장/);}
+  if(kind==='save'){const posted=f.calls.find(c=>c.path==='/resources'&&c.body?.settings);assert.deepEqual(JSON.parse(JSON.stringify(posted.body)),{settings:{device:'cpu',cacheBudgetBytes:2*1073741824},epoch:0});}assert.equal(f.evaluate('resourceRequest'),null);
+ }
+ for(const bad of ['0','-1','NaN','Infinity','9007199254740991']){const f=await updatePanel();f.get('cache-budget').value=bad;await f.click('save-resources');assert.match(f.get('status').textContent,/양수/);assert.equal(f.calls.some(c=>c.path==='/resources'),false);}
+});
+test('resource initial read failure during response staging leaves inputs untouched and reports current error',async()=>{
+ const f=await updatePanel({request:async path=>path==='/resources'?{settings:{device:'cuda',cacheBudgetBytes:3*1073741824}}:undefined});f.get('cache-budget').value=' 2 ';await f.click('open-settings');assert.equal(f.get('analysis-device').value,'cpu');assert.equal(f.get('cache-budget').value,' 2 ');assert.equal(f.evaluate('resourceLoaded'),false);assert.match(f.get('status').textContent,/작업 오류/);
+});
+
+
+test('unsaved resource input survives a discarded initial read and closing then reopening settings',async()=>{
+ let resume,reads=0;const f=await updatePanel({request:async(path,body)=>{if(path==='/resources'&&!body&&++reads===1)return new Promise(resolve=>{resume=()=>resolve({settings:{device:'cpu',cacheBudgetBytes:1073741824},status:{cacheBytes:0,freeDiskBytes:10*1073741824}});});}});const first=f.click('open-settings');for(let i=0;i<30&&!resume;i++)await Promise.resolve();assert.equal(typeof resume,'function');f.get('cache-budget').value=' 2.25 ';f.get('cache-budget').oninput();resume();await first;assert.equal(f.get('cache-budget').value,' 2.25 ');await f.click('open-settings');await f.click('open-settings');assert.equal(reads,1);assert.equal(f.get('cache-budget').value,' 2.25 ');await f.click('save-resources');assert.equal(f.get('cache-budget').value,'1');assert.equal(f.evaluate('resourceInputDirty'),false);
+});
+test('resource requests cannot revive after cancel and a locally reopened gate',async()=>{
+ for(const mode of ['separate','mixed'])for(const [kind,stage] of [['save','post'],['save','get'],['open','get']])for(const outcome of ['success','error']){
+  const {f,run,resume,reject}=await heldResourceSettings(mode,stage,kind);await f.click('cancel');f.evaluate('stopped=false;state.gateOpen=true;updateIntent=null;say("Owned new resource session")');const before=resourceState(f),calls=f.calls.length;if(outcome==='success')resume();else reject(new Error('Owned canceled resource failure'));await run;assert.equal(resourceState(f),before);assert.equal(f.calls.length,calls);
+ }
+});
+
+
+test('resource reading remains available in stable recovery and busy states while saving stays locked',async()=>{
+ for(const lock of ['localEditPending=true','state.applyRecovery.blocked=true','job={jobId:"stable"}','validationCount=1','state.gateOpen=false;stopped=true;state.maintenance={canRelease:true}']){
+  const f=await updatePanel();f.evaluate(lock+';toggle()');assert.equal(f.get('save-resources').disabled,true,lock);await f.click('open-settings');assert.equal(f.evaluate('resourceLoaded'),true,lock);assert.equal(f.get('cache-budget').value,'1');const calls=f.calls.length;await f.click('save-resources');assert.equal(f.calls.length,calls,lock);
+  const revision=f.evaluate('resourceInputRevision'),dirty=f.evaluate('resourceInputDirty');for(const id of ['cache-budget','analysis-device']){f.get(id).oninput();f.get(id).onchange();}assert.equal(f.evaluate('resourceInputRevision'),revision);assert.equal(f.evaluate('resourceInputDirty'),dirty);
+ }
+});
+test('resource responses and local errors cannot overwrite a newer guidance revision',async()=>{
+ for(const mode of ['separate','mixed'])for(const [kind,stage] of [['save','post'],['save','get'],['open','get']])for(const outcome of ['success','error']){
+  const {f,run,resume,reject}=await heldResourceSettings(mode,stage,kind);f.evaluate('say("Owned temporary guidance");say("Owned current guidance")');if(outcome==='success')resume();else reject(new Error('Owned earlier resource error'));await run;assert.equal(f.get('status').textContent,'Owned current guidance');
+ }
+});
+test('resource initial read supersession retains the newer token and only its UI receipt',async()=>{
+ for(const mode of ['separate','mixed'])for(const outcome of ['success','error']){
+  const {f,run,resume,reject}=await heldResourceSettings(mode,'get','open');let resumeNew;const request=f.evaluate('connection.request');f.evaluate('connection').request=(path,...args)=>path==='/resources'&&!args[0]?new Promise(resolve=>{resumeNew=()=>resolve({settings:{device:'cpu',cacheBudgetBytes:5*1073741824},status:{cacheBytes:0,freeDiskBytes:10*1073741824}});}):request(path,...args);
+  await f.click('open-settings');const next=f.click('open-settings');for(let i=0;i<30&&!resumeNew;i++)await Promise.resolve();assert.equal(typeof resumeNew,'function');const token=f.evaluate('resourceRequest'),before=resourceState(f);
+  if(outcome==='success')resume();else reject(new Error('Owned superseded initial read'));await run;assert.equal(f.evaluate('resourceRequest'),token);assert.equal(resourceState(f),before);resumeNew();await next;assert.equal(f.get('cache-budget').value,'5');assert.equal(f.evaluate('resourceRequest'),null);
+ }
+});
+test('resource GET receipt and error stay current across asynchronous continuation microtasks',async()=>{
+ for(const mode of ['separate','mixed'])for(const kind of ['save','open'])for(const outcome of ['success','error'])for(const depth of [0,1,2,3,4,5]){
+  const {f,run,resume,reject}=await heldResourceSettings(mode,'get',kind);let before;
+  if(outcome==='success')resume();else reject(new Error('Owned microtask resource error'));const change=(async()=>{for(let i=0;i<depth;i++)await Promise.resolve();f.evaluate('stopped=true;say("Owned microtask resource scope")');before=resourceState(f);})();await run;await change;assert.equal(resourceState(f),before,[mode,kind,outcome,depth].join('/'));
+ }
+});
+test('failed update and cancel preserve resource settings during pending POST and GET',async()=>{
+ for(const mode of ['separate','mixed'])for(const [kind,stage] of [['save','post'],['save','get'],['open','get']])for(const outcome of ['success','error'])for(const action of ['cancel','failed-update']){
+  const {f,run,resume,reject}=await heldResourceSettings(mode,stage,kind);if(action==='failed-update'){let starts=0;const request=f.evaluate('connection.request');f.evaluate('connection').request=(path,...args)=>{if(path==='/updates/start'){starts++;return Promise.reject(Object.assign(new Error('Owned update failure'),{code:'UPDATE_CANDIDATE'}));}return request(path,...args);};await f.click('update');assert.equal(starts,1);}else await f.click('cancel');const before=resourceState(f),calls=f.calls.length;if(outcome==='success')resume();else reject(new Error('Owned stopped resource request'));await run;assert.equal(resourceState(f),before);assert.equal(f.calls.length,calls);
+ }
+});

@@ -2052,9 +2052,24 @@ async function heldResourceSettings(mode,stage='post',kind='save'){
  let resume,reject,entered=false;
  const f=await updatePanel({request:async(path,body)=>{if(path==='/resources'&&((stage==='post'&&body?.settings)||(stage==='get'&&!body))){entered=true;return new Promise((a,b)=>{resume=()=>a(body?.settings?{}:{settings:{device:'cuda',cacheBudgetBytes:3*1073741824},status:{cacheBytes:1073741824,freeDiskBytes:10*1073741824}});reject=b;});}}});
  if(mode==='mixed')await f.click('mode-mixed');await f.click('analyze');await f.tick();f.get('cache-budget').value=' 2 ';f.get('cache-info').textContent='Owned existing cache';
- const run=f.click(kind==='save'?'save-resources':'open-settings');for(let i=0;i<100&&!entered;i++)await Promise.resolve();assert.equal(entered,true);return {f,run,resume,reject};
+ assert.equal(f.get(kind==='save'?'save-resources':'open-settings').disabled,false,'resource button admitted');const run=f.click(kind==='save'?'save-resources':'open-settings');for(let i=0;i<100&&!entered;i++)await Promise.resolve();assert.equal(entered,true);return {f,run,resume,reject};
 }
 function resourceState(f){return JSON.stringify({result:JSON.parse(resultState(f)),device:f.get('analysis-device').value,budget:f.get('cache-budget').value,cache:f.get('cache-info').textContent,loaded:f.evaluate('resourceLoaded'),status:f.get('status').textContent,timer:f.evaluate('settingsTimer')});}
+test('resource progress identifies save and result query waits and resets on completion or failure',async()=>{
+ for(const mode of ['separate','mixed'])for(const stage of ['post','get'])for(const outcome of ['success','error']){
+  const h=await heldResourceSettings(mode,stage),f=h.f;assert.equal(f.get('save-resources').disabled,true);assert.equal(f.get('save-resources').getAttribute('aria-busy'),'true');assert.match(f.get('save-resources').textContent,stage==='post'?/저장 중/:/결과 확인 중/);assert.match(f.get('status').textContent,stage==='post'?/자원 설정을 저장하고/:/자원 설정과 캐시 상태를 확인하고/);assert.equal(f.get('progress').className,'running');const calls=f.calls.length;await f.click('save-resources');assert.equal(f.calls.length,calls);
+  if(outcome==='success')h.resume();else h.reject(new Error('Owned resource error'));await h.run;assert.equal(f.get('save-resources').getAttribute('aria-busy'),'false');assert.equal(f.get('save-resources').textContent,'자원 설정 저장');assert.equal(f.get('progress').className,'');assert.match(f.get('status').textContent,outcome==='success'?/자원 설정을 저장했습니다/:/Owned resource error/);
+ }
+});
+test('resource progress preserves newer guidance and immediate update while queries settle',async()=>{
+ for(const mode of ['separate','mixed'])for(const stage of ['post','get'])for(const action of ['guide','update'])for(const outcome of ['success','error']){
+  const h=await heldResourceSettings(mode,stage),f=h.f;if(action==='update'){assert.equal(f.get('update').disabled,false);await f.click('update');assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);}else f.evaluate('say("Owned newer resource guidance")');const before=f.get('status').textContent;
+  if(outcome==='success')h.resume();else h.reject(new Error('Owned earlier resource error'));await h.run;assert.equal(f.get('status').textContent,before);assert.equal(f.get('save-resources').getAttribute('aria-busy'),'false');if(action==='update')assert.equal(f.evaluate('stopped'),true);
+ }
+});
+test('resource progress initial settings read retains existing guidance and save label',async()=>{
+ for(const mode of ['separate','mixed']){const h=await heldResourceSettings(mode,'get','open'),f=h.f;assert.equal(f.get('save-resources').getAttribute('aria-busy'),'false');assert.equal(f.get('save-resources').textContent,'자원 설정 저장');assert.match(f.get('status').textContent,/화자 분석이 끝났습니다/);const before=f.get('status').textContent;h.resume();await h.run;assert.equal(f.get('status').textContent,before);assert.equal(f.get('analysis-device').value,'cuda');}
+});
 test('resource settings save and initial read discard late success and failure after immediate update',async()=>{
  for(const mode of ['separate','mixed'])for(const [kind,stage] of [['save','post'],['save','get'],['open','get']])for(const outcome of ['success','error']){
   const {f,run,resume,reject}=await heldResourceSettings(mode,stage,kind);await f.click('update');const before=resourceState(f),calls=f.calls.length;

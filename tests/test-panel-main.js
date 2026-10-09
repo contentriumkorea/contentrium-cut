@@ -2103,6 +2103,33 @@ test('normal resource settings save and initial read keep exact request and curr
  }
  for(const bad of ['0','-1','NaN','Infinity','9007199254740991']){const f=await updatePanel();f.get('cache-budget').value=bad;await f.click('save-resources');assert.match(f.get('status').textContent,/양수/);assert.equal(f.calls.some(c=>c.path==='/resources'),false);}
 });
+test('cache budget immediately marks invalid input and blocks save without changing guidance',async()=>{
+ for(const mode of ['separate','mixed'])for(const raw of ['0','-1','1e20','0.0000000001']){
+  const f=await updatePanel();if(mode==='mixed')await f.click('mode-mixed');await f.click('analyze');await f.tick();await f.click('open-settings');
+  assert.equal(f.get('cache-budget').disabled,false);const guide=f.get('status').textContent,calls=f.calls.length;
+  f.get('cache-budget').value=raw;f.get('cache-budget').oninput();
+  assert.equal(f.get('cache-budget').attrs['aria-invalid'],'true');assert.equal(f.get('cache-budget').attrs['aria-describedby'],'cache-budget-error');
+  assert.match(f.get('cache-budget-error').textContent,/양수/);assert.equal(/\bhidden\b/.test(f.get('cache-budget-error').className),false);assert.equal(f.get('save-resources').disabled,true);
+  assert.equal(f.get('status').textContent,guide);assert.equal(f.calls.length,calls);assert.equal(f.get('prune-cache').disabled,false);
+ }
+});
+test('cache budget corrections restore save and preserve exact rounded bytes and blank omission',async()=>{
+ for(const mode of ['separate','mixed'])for(const raw of ['','   ',' 2.25 ','0.0000000006','8388607.999999999']){
+  const f=await updatePanel();if(mode==='mixed')await f.click('mode-mixed');await f.click('analyze');await f.tick();await f.click('open-settings');
+  f.get('cache-budget').value='-1';f.get('cache-budget').oninput();assert.equal(f.get('save-resources').disabled,true);
+  f.get('cache-budget').value=raw;f.get('cache-budget').onchange();assert.equal(f.get('cache-budget').attrs['aria-invalid'],'false');assert.equal(/\bhidden\b/.test(f.get('cache-budget-error').className),true);assert.equal(f.get('cache-budget-error').textContent,'');assert.equal(f.get('save-resources').disabled,false);
+  const count=f.calls.length;await f.click('save-resources');const post=f.calls.slice(count).find(c=>c.path==='/resources'&&c.body?.settings);assert.ok(post);
+  assert.deepEqual(JSON.parse(JSON.stringify(post.body)),{settings:{device:'cpu',...(raw.trim()?{cacheBudgetBytes:Math.round(Number(raw)*1073741824)}:{})},epoch:0});assert.equal(f.get('cache-budget').attrs['aria-invalid'],'false');assert.equal(f.get('save-resources').attrs['aria-busy'],'false');
+ }
+});
+test('invalid cache budget keeps programmatic save rejection and clears progress without requests',async()=>{
+ const f=await updatePanel();f.get('cache-budget').value='1e20';f.get('cache-budget').oninput();const before=f.calls.length;await f.click('save-resources');assert.equal(f.calls.length,before);assert.match(f.get('status').textContent,/양수/);assert.equal(f.get('save-resources').attrs['aria-busy'],'false');assert.equal(f.get('save-resources').disabled,true);assert.equal(f.evaluate('resourceRequest'),null);
+});
+test('corrected cache budget respects work locks and preserves current plan and sync objects',async()=>{
+ const f=await updatePanel();await f.click('analyze');await f.tick();await f.click('plan');const planBefore=f.evaluate('plan');assert.ok(planBefore);f.evaluate('syncResult={owned:"budget"};syncJob=null');
+ for(const raw of ['-1','2']){f.get('cache-budget').value=raw;f.get('cache-budget').oninput();assert.equal(f.evaluate('plan'),planBefore);assert.equal(f.evaluate('syncResult.owned'),'budget');}
+ for(const lock of ['stopped=true','updateIntent={version:"new"}','localEditPending=true','state.applyRecovery.blocked=true']){f.evaluate(lock+';toggle()');assert.equal(f.get('save-resources').disabled,true);assert.equal(f.get('cache-budget').disabled,true);f.evaluate('stopped=false;updateIntent=null;localEditPending=false;state.applyRecovery.blocked=false;toggle()');}
+});
 test('resource initial read failure during response staging leaves inputs untouched and reports current error',async()=>{
  const f=await updatePanel({request:async path=>path==='/resources'?{settings:{device:'cuda',cacheBudgetBytes:3*1073741824}}:undefined});f.get('cache-budget').value=' 2 ';await f.click('open-settings');assert.equal(f.get('analysis-device').value,'cpu');assert.equal(f.get('cache-budget').value,' 2 ');assert.equal(f.evaluate('resourceLoaded'),false);assert.match(f.get('status').textContent,/작업 오류/);
 });

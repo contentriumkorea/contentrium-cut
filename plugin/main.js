@@ -507,6 +507,8 @@ function syncClockFeedback(row){
   if(row.clockHint.textContent!==text)row.clockHint.textContent=text;row.clockHint.className=text?'hint':'hint hidden';
 }
 function syncFeedback(){
+  const method=$('sync-method').value,methodText=!connected||!syncRows.length?'':method==='audio'?'같은 소리가 녹음된 소스를 선택하세요. 공통 녹음이 없으면 수동 오프셋이나 타임코드를 사용하세요.':method==='manual'?'기준 소스와 같은 소리의 시점을 비교해 오프셋을 입력하고 확인하세요. 기준 소스의 상대 오프셋은 0초입니다.':method==='timecode'?'같은 공통 시계·촬영 날짜와 올바른 타임코드 FPS를 입력하세요. 촬영 중 시계를 리셋하지 않았는지 확인하세요.':'';
+  const methodHint=$('sync-method-hint');if(methodHint.textContent!==methodText)methodHint.textContent=methodText;methodHint.className=methodText?'hint':'hint hidden';
   let first='';const selected=syncRows.filter(r=>r.check.checked),referenceField=$('sync-reference');
   const count=$('sync-selection-count'),countText=connected&&syncRows.length?'싱크 소스 '+selected.length+'/'+syncRows.length+'개 선택 · 최소 2개':'';
   if(count.textContent!==countText)count.textContent=countText;count.className=countText?'hint':'hint hidden';

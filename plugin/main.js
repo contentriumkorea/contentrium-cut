@@ -124,7 +124,7 @@ function restoreSettings(settings){
   for(const r of microphoneRows){const v=settings.microphones.find(v=>v.key===r.clip.instanceKey);if(v){r.check.checked=v.checked;if(typeof v.checked==='boolean')microphoneSelectionCustomized=true;r.speaker.value=v.speaker;r.channel.value=v.channel;if(r.stream)r.stream.value=v.stream;}}
   const mappingScope=currentSpeakerMappingScope(),restoreMappings=sameSpeakerMappingScope(settings.speakerMappingScope,mappingScope);
   for(const r of cameraRows){const assets=connected.snapshot.clips.filter(c=>c.trackRef===r.id).map(c=>c.assetId).sort();const v=settings.cameras.find(v=>v.id===r.id&&ContentriumHost.hash(v.assets)===ContentriumHost.hash(assets));if(v){r.role.value=v.role;r.covered.value=mode==='mixed'&&!restoreMappings?'':v.covered;}}
-  for(const r of calibrationRows){const v=settings.calibration?.find(v=>v.key===r.instanceKey);if(v){r.first.value=v.first;r.last.value=v.last;}}
+  for(const r of calibrationRows){r.resetBackup=null;const v=settings.calibration?.find(v=>v.key===r.instanceKey);if(v){r.first.value=v.first;r.last.value=v.last;}}
   savedSpeakerMappings=restoreMappings?Object.fromEntries(settings.speakers.filter(v=>cameraValues().some(c=>c[0]===v.camera)).map(v=>[v.id,v.camera])):{};
   savedSpeakerMappingScope=restoreMappings?mappingScope:null;speakerRowsScope=null;
   renderSpeakers(mode==='mixed'?(analysisState?.analysis.sessionSpeakerIds||[]):microphoneRows.filter(r=>r.check.checked).map(r=>r.speaker.value));mappingInputs();
@@ -291,6 +291,7 @@ function toggle(){
   for(const row of microphoneRows)if(row.jump)row.jump.disabled=locked||!connected;
   for(const row of calibrationRows)for(const button of [row.startJump,row.endJump])if(button)button.disabled=!calibrationJumpReady(row);
   for(const row of calibrationRows)if(row.resetButton)row.resetButton.disabled=!calibrationResetReady(row);
+  for(const row of calibrationRows)if(row.restoreButton)row.restoreButton.disabled=!calibrationRestoreReady(row);
   $('add-override').disabled=locked||!connected;for(const row of overrideRows)row.remove.disabled=locked||!connected;
   for(const row of overrideRows)for(const field of [row.first,row.last,row.camera])field.disabled=locked||!connected;
   $('override-filter').disabled=locked||!overrideRows.some(r=>r.error.textContent);
@@ -370,6 +371,7 @@ function analysisOptionChanged(id){
 }
 function calibrationActive(row){return mode==='separate'&&row.check.checked;}
 function calibrationResetReady(row){return !workLocked()&&!!connected&&calibrationRows.includes(row)&&calibrationActive(row)&&!(row.first.value.trim()!==''&&row.last.value.trim()!==''&&Number(row.first.value)===0&&Number(row.last.value)===0);}
+function calibrationRestoreReady(row){return !workLocked()&&!!connected&&calibrationRows.includes(row)&&calibrationActive(row)&&row.first.value==='0'&&row.last.value==='0'&&!!row.resetBackup&&row.resetBackup.current();}
 function calibrationJumpTicks(row,edge){
   if(!connected||!calibrationActive(row))return null;
   const a=row.first.value.trim(),b=row.last.value.trim(),first=Number(a),last=Number(b);
@@ -390,6 +392,7 @@ function calibrationFeedback(){
   let firstIssue='';
   for(const row of calibrationRows){
     const active=calibrationActive(row),a=row.first.value.trim(),b=row.last.value.trim(),first=Number(a),last=Number(b);
+    if(row.resetBackup&&(!active||row.first.value!=='0'||row.last.value!=='0'||!row.resetBackup.current()))row.resetBackup=null;
     const unused=a!==''&&b!==''&&first===0&&last===0;
     let text='';
     if(active&&connected&&!unused){
@@ -409,7 +412,7 @@ function calibrationFeedback(){
   return firstIssue;
 }
 function calibrationOptions(legacy=false){return calibrationRows.filter(r=>(legacy||calibrationActive(r))&&Number(r.last.value)>Number(r.first.value)).map(r=>({speakerId:r.speaker.value.trim(),inputKey:ContentriumHost.hash({instanceKey:r.instanceKey,streamIndex:Number(r.stream.value)-1,channelIndex:Number(r.channel.value)-1}),startFrame:Number(r.first.value),endFrame:Number(r.last.value)}));}
-function calibrationChanged(row){if(!calibrationRows.includes(row)||workLocked()||!connected)return;if(calibrationActive(row))invalidateAnalysis();else {scheduleSettings();toggle();}}
+function calibrationChanged(row){if(!calibrationRows.includes(row)||workLocked()||!connected)return;row.resetBackup=null;if(calibrationActive(row))invalidateAnalysis();else {scheduleSettings();toggle();}}
 function microphoneFeedback(){
   const scalarIssue=analysisOptionsFeedback();
   const calibrationIssue=calibrationFeedback();
@@ -474,7 +477,8 @@ function renderSources(){
     for(const [edge,text,key] of [['start','시작 확인','startJump'],['end','끝 확인','endJump']]){
       const jump=element('button',text);jump.setAttribute('data-work','true');jump.setAttribute('data-calibration-jump',edge);jump.setAttribute('aria-describedby',calibrationIssue.id+' '+calibrationHint.id+' '+jumpHint.id+(positionGuide?' '+positionGuide.id:''));jump.setAttribute('aria-label',(edge==='start'?'단독 발화 시작 확인':'단독 발화 마지막 포함 프레임 확인')+' · '+calibrationRow.title);jump.disabled=!calibrationJumpReady(calibrationRow);jump.onclick=()=>{if(!calibrationJumpReady(calibrationRow))return;return runAction(()=>seekCalibration(calibrationRow,edge));};jumps.appendChild(jump);calibrationRow[key]=jump;
     }
-    const reset=element('button','미사용으로 초기화');reset.setAttribute('type','button');reset.setAttribute('data-work','true');reset.setAttribute('data-calibration-reset','true');reset.setAttribute('aria-label','단독 발화 구간 미사용으로 초기화 · '+calibrationRow.title);reset.setAttribute('aria-describedby',calibrationIssue.id+' '+calibrationHint.id+(positionGuide?' '+positionGuide.id:''));reset.disabled=!calibrationResetReady(calibrationRow);reset.onclick=()=>{if(!calibrationResetReady(calibrationRow))return;first.value=last.value='0';calibrationChanged(calibrationRow);};jumps.appendChild(reset);calibrationRow.resetButton=reset;
+    const reset=element('button','미사용으로 초기화');reset.setAttribute('type','button');reset.setAttribute('data-work','true');reset.setAttribute('data-calibration-reset','true');reset.setAttribute('aria-label','단독 발화 구간 미사용으로 초기화 · '+calibrationRow.title);reset.setAttribute('aria-describedby',calibrationIssue.id+' '+calibrationHint.id+(positionGuide?' '+positionGuide.id:''));reset.disabled=!calibrationResetReady(calibrationRow);reset.onclick=()=>{if(!calibrationResetReady(calibrationRow))return;const backup={first:first.value,last:last.value};first.value=last.value='0';calibrationChanged(calibrationRow);const current=editingResponseGuard(),input=JSON.stringify([speaker.value,stream.value,channel.value]);backup.current=()=>current()&&JSON.stringify([speaker.value,stream.value,channel.value])===input;calibrationRow.resetBackup=backup;toggle();};jumps.appendChild(reset);calibrationRow.resetButton=reset;
+    const restore=element('button','초기화 되돌리기');restore.setAttribute('type','button');restore.setAttribute('data-work','true');restore.setAttribute('data-calibration-restore','true');restore.setAttribute('aria-label','단독 발화 초기화 되돌리기 · '+calibrationRow.title);restore.setAttribute('aria-describedby',calibrationIssue.id+' '+calibrationHint.id+(positionGuide?' '+positionGuide.id:''));restore.disabled=!calibrationRestoreReady(calibrationRow);restore.onclick=()=>{if(!calibrationRestoreReady(calibrationRow))return;const backup=calibrationRow.resetBackup;first.value=backup.first;last.value=backup.last;calibrationChanged(calibrationRow);};jumps.appendChild(restore);calibrationRow.restoreButton=restore;
     calibration.appendChild(jumps);
     for(const field of [first,last]){field.min='0';field.step='1';field.setAttribute('aria-describedby',calibrationIssue.id+' '+calibrationHint.id+(positionGuide?' '+positionGuide.id:''));field.disabled=workLocked()||!connected||!calibrationActive(calibrationRow);field.oninput=field.onchange=()=>calibrationChanged(calibrationRow);}
   }

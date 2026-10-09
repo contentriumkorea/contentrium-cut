@@ -3,24 +3,27 @@ const INTENT_KEY='cut-native-edit-intent-1';
 function fail(code){const e=new Error(code);e.code=code;return e;}
 function create({api,storage,randomId,onBatch=()=>{},onResult=()=>{},stopped=()=>false}){
   let running=false;
-  async function pending(){
-    let raw;
+  async function readIntent(){
     try{
       if(typeof storage.key==='function'&&Number.isSafeInteger(storage.length)){
         let present=false;for(let i=0;i<storage.length;i++)if(storage.key(i)===INTENT_KEY)present=true;
         if(!present)return null;
       }
-      raw=await storage.getItem(INTENT_KEY);
-    }catch(e){
-      throw fail('EDIT_INTENT_STORAGE_UNAVAILABLE');
-    }
-    if(raw===undefined||raw===null)return null;
+      const raw=await storage.getItem(INTENT_KEY);
+      if(raw==null)return null;
+      if(typeof raw==='string')return {identity:'text:'+raw,text:raw};
+      const bytes=new Uint8Array(raw);return {identity:'bytes:'+Array.from(bytes).join(','),text:new TextDecoder().decode(bytes)};
+    }catch(e){throw fail('EDIT_INTENT_STORAGE_UNAVAILABLE');}
+  }
+  function parseIntent(raw){
+    if(raw===null)return null;
     try{
-      const value=JSON.parse(typeof raw==='string'?raw:new TextDecoder().decode(raw));
+      const value=JSON.parse(raw);
       if(value.schemaVersion!==1||typeof value.requestId!=='string'||!value.requestId||!['edit','sync','input'].includes(value.kind))throw new Error();
       return value;
     }catch(_){throw fail('EDIT_INTENT_CORRUPT');}
   }
+  async function pending(){return parseIntent((await readIntent())?.text??null);}
   async function save(value){await storage.setItem(INTENT_KEY,JSON.stringify(value));}
   async function clear(){await storage.removeItem(INTENT_KEY);}
   async function run({kind,body,beginPath='/apply/begin',native,receipt}){
@@ -66,14 +69,24 @@ function create({api,storage,randomId,onBatch=()=>{},onResult=()=>{},stopped=()=
       throw e;
     }finally{running=false;onBatch(false);}
   }
-  async function recover(){
+  async function recover({current=()=>true}={}){
     if(running)throw fail('APPLY_BUSY');
-    let intent=null,unreadable=false;
-    try{intent=await pending();}catch(e){if(!['EDIT_INTENT_STORAGE_UNAVAILABLE','EDIT_INTENT_CORRUPT'].includes(e.code))throw e;unreadable=true;}
-    const result=await api('/apply/recover',{requestId:intent?.requestId||null,applyId:intent?.applyId||null,acknowledged:true});
-    if(result.resolved!==true)throw fail('APPLY_RECOVERY_REQUIRED');
-    if(intent||unreadable)await clear();
-    return result;
+    running=true;
+    const check=()=>{if(!current())throw fail('CANCELED');};
+    const unavailable=Symbol('unavailable');
+    const capture=async()=>{try{return await readIntent();}catch(e){if(e.code!=='EDIT_INTENT_STORAGE_UNAVAILABLE')throw e;return unavailable;}};
+    try{
+      check();const raw=await capture();check();let intent=null;
+      if(raw!==unavailable){try{intent=parseIntent(raw?.text??null);}catch(e){if(e.code!=='EDIT_INTENT_CORRUPT')throw e;}}
+      const result=await api('/apply/recover',{requestId:intent?.requestId||null,applyId:intent?.applyId||null,acknowledged:true});check();
+      if(result?.resolved!==true)throw fail('APPLY_RECOVERY_REQUIRED');
+      const live=await capture();check();
+      if(raw===unavailable?live!==unavailable:live===unavailable||raw?.identity!==live?.identity)throw fail('EDIT_INTENT_CHANGED');
+      // secureStorage has no atomic compare/remove or cancellation. Protect
+      // observed replacements and serialize this instance, not other panels.
+      if(raw!==null){check();await clear();check();}
+      return result;
+    }finally{running=false;}
   }
   return {run,pending,recover};
 }

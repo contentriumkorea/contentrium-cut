@@ -839,3 +839,13 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 현재 단계: 기획·설계·구현·전체 회귀·독립 검수 완료. 0.1.34 소스 고정·엔진/CCX/Setup 빌드 → 별도 owned 패키지 실행 → 공개/익명 발견·서명·실제 다운로드 해시·고정 v0.1.1 검증으로 진행한다. 다음 회차 cache prune/release actual-main 두 모드 × success/error 8/8 늦은 안내 덮기 및 성공 시 추가 조회·prune budget 덮기 증거를 보존했다(cycle33-next-inspect.js/.log). 실제 캐시/host 변경 없음. 컴퓨터유즈/브라우저/Premiere/재설치 금지 유지.
 
 - [0.1.34 패키지 증거](package-0.1.34-proof.json): 엔진/CCX·Setup 빌드 exit 0, 고정 입력 52개 해시 유지. ZIP/CCX CRC·경로/크기·비공개 자료 제외·최종 CCX 소스·Silero 해시, frozen 엔진 29개/설치기 26개 제품 모듈과 진입점 2개가 검증 소스와 일치한다. 추출 엔진 runtimeReady=true/0.1.34 및 Setup help exit 0, 53.281초. 기존 선택적 모듈/torchcodec 등 경고는 보존하며 Community-1 실제 품질 판정으로 확대하지 않는다. 현재 단계: 기획·설계·구현·전체 회귀·독립 검수·패키지 실행 완료. 0.1.34 공개 → 익명 발견/서명·실제 다운로드 해시·고정 v0.1.1 확인으로 진행한다. 활성 사용자 설치·원본·서명 키는 그대로 유지한다.
+
+
+### 공개 결과
+
+- [v0.1.34](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.34): release `407404653`, 제목 `Contentrium CUT`, draft/prerelease 아님. 공개 시각 2026-10-09 10:26:17 KST (`2026-10-09T01:26:17Z`), target/tag commit `353180b8ec2072933c844e507295a8d8685e76b3`를 확인했다.
+- [공개 실제 재다운로드](release-0.1.34-proof.json): 익명 제품 경로에서 0.1.33 → 0.1.34 AVAILABLE. 서명과 실제 ZIP/CCX/Setup 3개의 크기·SHA-256 일치.
+- [현재 버전](release-0.1.34-current-proof.json): 빈 상태에서 0.1.34 CURRENT / 후보 없음. 공개 자산 5개 ID·크기·digest와 서명 문서 실제 바이트가 로컬과 일치.
+- [고정 복구 조회](migration-pinned-0.1.1-after-0.1.34-proof.json): latest 0.1.34에서도 정확한 서명 v0.1.1 / release `404226839` / commit `268d27e6665c8b1f0753a634f8021dfa86935b37` AVAILABLE. 설치 전환은 하지 않았다.
+- 현재 단계: 기획 → 설계 → 구현 → 검증 → 0.1.34 공개 및 공개 재검증 완료. 다음 회차는 캐시 정리·해제 POST와 후속 조회/refresh의 중단·응답 소유권을 별도 설계한다. actual-main 두 모드 × prune-cache/release-cache 대기 success/error 8/8에서 update 즉시 시작 후 안내 덮기를 재현했고 성공에서는 추가 /resources 또는 /state 조회, prune 성공에서는 budget 덮기도 확인했다(cycle33-next-inspect.js/.log). 캐시 continuation/maintenance gate의 정상 잠금/재개와 실제 drain 이후 명시적 해제를 유지해야 한다. 이번 자원 설정 수정은 캐시/모델/전체 refresh lifetime을 보호하지 않는다. 재현·설계·독립 검수·회귀·패키지/공개 검증 없이 버전만 올리지 않는다.
+- 활성 설치 0.1.0의 active/journal/first-install 해시는 배포 전후 동일함을 읽기 전용 확인하고, 서명 키 존재·기존 ACTIVE/15분 자동화와 기존 공개 파일·설정·실패 증거를 보존했다. 컴퓨터유즈·브라우저·Premiere 조작·재설치·제공자 접근 없음. 실제 UXP/Premiere 편집·설치 전환·Community-1 품질 미검증. 이번 초기 fixture 문법 오류·독립 fixture 가정 오류와 복구 중 조회 차단 회귀·응답 부분 반영·중단 ABA/미저장 입력 RED는 위 기록대로 보존했다. 검수한 자원 설정 범위의 남은 C/I/M 0/0/0이며 다른 action 전체가 해결됐다고 주장하지 않는다.

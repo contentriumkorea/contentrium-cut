@@ -15,7 +15,7 @@ let microphoneSelectionCustomized=false;
 let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;let projectRead=null,nativePreparation=null,editingSubmission=null,correctionRequest=null,settingsRestore=null,settingsSave=null;
 let settingsWriteTail=Promise.resolve();
 let modelRequest=null,modelInputRevision=0,modelPoll=null;
-let cacheRequest=null,syncPoll=null,examplePoll=null;
+let cacheRequest=null,syncPoll=null,examplePoll=null,refreshRequest=null;
 let previewBusy=0,previewGeneration=0;
 let resourceRequest=null,resourceInputRevision=0,resourceViewRevision=0,resourceInputDirty=false,stopRevision=0;
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
@@ -65,7 +65,7 @@ Object.assign(messages,{
 const currentCheckDiscarded=new Error('Discarded superseded timeline check');
 function error(e){if(e===currentCheckDiscarded)return;say(messages[e.code]||((e.code||'작업 오류')+' · '+(e.message||String(e))));}
 function isIntentReadError(e){return ['EDIT_INTENT_STORAGE_UNAVAILABLE','EDIT_INTENT_CORRUPT'].includes(e.code);}
-function contextConflict(){panelContextConflict=true;credentials=null;stopped=true;plan=null;setConnection(false,'다른 CUT 패널이 제어 중');$('boot-status').className='notice';$('boot-status').querySelector('p').textContent=messages.PANEL_CONTEXT_CONFLICT;say(messages.PANEL_CONTEXT_CONFLICT);toggle();}
+function contextConflict(showGuide=true){panelContextConflict=true;credentials=null;stopped=true;plan=null;setConnection(false,'다른 CUT 패널이 제어 중');$('boot-status').className='notice';$('boot-status').querySelector('p').textContent=messages.PANEL_CONTEXT_CONFLICT;if(showGuide)say(messages.PANEL_CONTEXT_CONFLICT);toggle();}
 function element(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;}
 function number(value){const e=element('input');e.type='number';e.value=String(value);return e;}
 function options(select,values,empty){select.innerHTML='';if(empty){const e=element('option',empty);e.value='';select.appendChild(e);}for(const [value,label] of values){const e=element('option',label);e.value=value;select.appendChild(e);}}
@@ -783,8 +783,38 @@ function updateGuidance(update){
   }
   return {CURRENT:'최신 버전입니다.',NO_RELEASE:'게시된 업데이트가 없습니다.',CHECKING:'업데이트 확인 중'}[update.checkState]||'업데이트 상태를 확인하지 못했습니다. 업데이트 확인을 다시 누르세요.';
 }
+function refreshScope(){
+  return [credentials,state,state?.epoch,state?.gateOpen,state?.stopEpoch,state?.compatible,state?.appVersion,state?.bundleId,state?.protocolVersion,JSON.stringify([state?.models,state?.update,state?.applyRecovery,state?.maintenance]),stopRevision,stopped,updateIntent,JSON.stringify(updateIntent),panelContextConflict,mode,connected,connected?.snapshot.snapshotHash,connected?.snapshot.hostSnapshotHash,analysisState,analysisState?.revision,plan,planInputHash,job,applying,batchRunning,previewPlaying,previewBusy,localEditPending,localIntentError,binding,projectRead,projectSelection,inputCapability,validationRevision,validationCount];
+}
+function validStateReceipt(receipt,prior){
+  const record=value=>!!value&&typeof value==='object'&&!Array.isArray(value),integer=value=>Number.isSafeInteger(value)&&value>=0,text=value=>typeof value==='string'&&!!value.trim();
+  if(!record(receipt)||!integer(receipt.epoch)||typeof receipt.gateOpen!=='boolean'||typeof receipt.compatible!=='boolean'||!text(receipt.appVersion)||!text(receipt.bundleId)||!integer(receipt.protocolVersion)||receipt.protocolVersion===0||!(receipt.stopEpoch==null||integer(receipt.stopEpoch)&&receipt.stopEpoch<=receipt.epoch))return false;
+  if(prior&&receipt.appVersion===prior.appVersion&&receipt.bundleId===prior.bundleId&&receipt.protocolVersion===prior.protocolVersion&&receipt.epoch<prior.epoch)return false;
+  if(!record(receipt.models)||['silero','community-1'].some(id=>!record(receipt.models[id])||!text(receipt.models[id].status)))return false;
+  const update=receipt.update,recovery=receipt.applyRecovery;
+  if(!record(update)||!text(update.updateState)||!text(update.checkState)||update.updateEpoch!==undefined&&!integer(update.updateEpoch)||!(update.candidate==null||record(update.candidate)&&text(update.candidate.candidateId)&&text(update.candidate.appVersion))||update.candidate?.releaseNotes!==undefined&&typeof update.candidate.releaseNotes!=='string')return false;
+  return record(recovery)&&typeof recovery.blocked==='boolean'&&(recovery.records===undefined||Array.isArray(recovery.records))&&(receipt.maintenance==null||record(receipt.maintenance));
+}
 async function refresh(current=()=>true,accepted=()=>{}){
-  if(!credentials||!current())return false;const receipt=await api('/state');if(!current(receipt))return false;state=receipt;accepted();
+  if(!credentials||!current())return false;
+  const token={credential:credentials,prior:state,scope:refreshScope(),guidanceRevision:statusRevision};refreshRequest=token;
+  const owned=()=>refreshRequest===token&&credentials===token.credential;
+  const scopeCurrent=()=>{if(!owned())return false;const scope=refreshScope();return token.scope.every((value,index)=>value===scope[index]);};
+  const ready=receipt=>scopeCurrent()&&current(receipt);
+  const failed=e=>{
+    if(!ready())return;
+    const guide=statusRevision===token.guidanceRevision;
+    if(e?.code==='PANEL_CONTEXT_CONFLICT'){contextConflict(guide);return;}
+    stopped=true;setConnection(false,'편집 상태 확인 필요');
+    if(['AUTH_REQUIRED','SESSION_EXPIRED'].includes(e?.code)){credentials=null;connection.reset();retryAt=Date.now()+1000;setConnection(false,'편집 연결 복구 중');}
+    if(guide)say(e?.code==='AUTH_REQUIRED'||e?.code==='SESSION_EXPIRED'?'편집 연결을 복구하고 있습니다. 새로고침으로 상태를 확인하세요.':'편집 상태를 확인하지 못했습니다. 새로고침을 다시 실행하세요.');
+    toggle();
+  };
+  try{
+    let receipt;try{receipt=await api('/state');}catch(e){failed(e);return false;}
+    if(!ready(receipt))return false;
+    if(!validStateReceipt(receipt,token.prior)){failed();return false;}
+    state=receipt;token.scope=refreshScope();accepted();if(!ready())return false;
   if(updateIntent&&state.gateOpen&&state.update.updateEpoch>updateIntent.epoch&&['COMPLETE','CANCELED','FAILED_BEFORE_REPLACE','ROLLED_BACK'].includes(state.update.updateState))updateIntent=null;
   if(updateIntent||!state.gateOpen||state.stopEpoch!==null&&state.stopEpoch!==undefined){stopped=true;plan=null;}else if(!applying)stopped=false;
   $('boot-status').className='hidden';
@@ -805,9 +835,17 @@ async function refresh(current=()=>true,accepted=()=>{}){
   $('apply-recovery-text').textContent=localIntentError?messages[localIntentError]:localEditPending||recovery?.blocked?'이전 편집이 중단되었습니다. 기록을 확인한 뒤 새 작업을 시작할 수 있습니다.':'';
   $('cache-maintenance').className=state.maintenance?'':'hidden';
   $('cache-maintenance-text').textContent=state.maintenance?.canRelease?'정리 작업이 종료됐습니다. 편집을 계속할 수 있습니다.':'캐시 정리 작업이 종료되는 것을 기다리고 있습니다.';
-  toggle();if(!state.gateOpen&&!state.maintenance&&!applying&&!batchRunning&&!previewPlaying&&!previewBusy){if(current())await api('/updates/ack',{epoch:state.epoch,quiescent:true,batchRunning:false}).catch(()=>{});}
-  return current();
+
+    toggle();token.scope=refreshScope();
+    if(!ready())return false;
+    if(!state.gateOpen&&!state.maintenance&&!applying&&!batchRunning&&!previewPlaying&&!previewBusy){
+      const epoch=receipt.epoch;
+      if(ready())await api('/updates/ack',{epoch,quiescent:true,batchRunning:false}).catch(()=>{});
+    }
+    return ready();
+  }finally{if(refreshRequest===token)refreshRequest=null;}
 }
+
 async function heartbeat(current=()=>true){if(!credentials||!state)return;const receipt=await api('/heartbeat',{hostIdentity:null,epoch:state.epoch,batchRunning,quiescent:!applying&&!previewPlaying&&!previewBusy,panelVersion:bundle.appVersion,bundleId:bundle.bundleId,protocolVersion:bundle.protocolVersion});if(!current())return;if(!receipt.gateOpen||receipt.stopEpoch!==null&&receipt.stopEpoch!==undefined){stopped=true;plan=null;toggle();}}
 function periodicHeartbeat(){
   if(!heartbeatRequest){const next=heartbeat();heartbeatRequest=next;const clear=()=>{if(heartbeatRequest===next)heartbeatRequest=null;};next.then(clear,clear);}
@@ -1156,7 +1194,7 @@ handler('cancel',async()=>{
   // must never clear an outstanding Adobe transaction from the side.
   say('중단 요청 · 진행 중인 트랜잭션 뒤 추가 편집을 멈춥니다.');
 });
-handler('recover-apply',async()=>{await workflow.recover();localEditPending=false;localIntentError=null;await refresh();say('중단 작업 기록을 확인했습니다. 결과 시퀀스를 검토한 뒤 새 작업을 시작하세요.');});
+handler('recover-apply',async()=>{await workflow.recover();localEditPending=false;localIntentError=null;if(!await refresh())return;say('중단 작업 기록을 확인했습니다. 결과 시퀀스를 검토한 뒤 새 작업을 시작하세요.');});
 handler('check-update',async()=>{await api('/updates/check',{});await refresh();});
 handler('update',async()=>{
   if(updateIntent?.inFlight||updateIntent?.accepted)return;
@@ -1312,9 +1350,9 @@ async function initialize({manual=false}={}){
   toggle();
   if(manual)enrollmentDeadline=0;
   try{
-    await connection.connect();credentials=true;panelContextConflict=false;retryDelay=1000;enrollmentDeadline=0;
+    await connection.connect();credentials={};panelContextConflict=false;retryDelay=1000;enrollmentDeadline=0;
     try{localEditPending=!!await workflow.pending();localIntentError=null;}catch(e){if(!isIntentReadError(e))throw e;localEditPending=true;localIntentError=e.code;}
-    await refresh();await heartbeat();if(localIntentError)error({code:localIntentError});
+    if(!await refresh())return;await heartbeat();if(localIntentError)error({code:localIntentError});
     if(!localEditPending&&!state?.applyRecovery?.blocked){try{await readProject();}catch(e){say(/PROJECT_REQUIRED|SEQUENCE_REQUIRED/.test(String(e))?'Premiere에서 편집할 시퀀스를 열어 주세요.':String(e));}}
     api('/updates/check',{}).then(refresh).catch(()=>{});
   }catch(e){
@@ -1339,7 +1377,7 @@ setInterval(async()=>{
   try{await periodicHeartbeat();}catch(e){pollError(e);return;}
   if(polling)return;
   polling=true;
-  try{await pollJob();await refresh();if(!pending&&!applying&&!job&&!validationCount&&!localEditPending&&!state?.applyRecovery?.blocked&&Date.now()>=sequencePollAt){sequencePollAt=Date.now()+2500;await followSequence();}}
+  try{await pollJob();if(!await refresh())return;if(!pending&&!applying&&!job&&!validationCount&&!localEditPending&&!state?.applyRecovery?.blocked&&Date.now()>=sequencePollAt){sequencePollAt=Date.now()+2500;await followSequence();}}
   catch(e){pollError(e);}
   finally{polling=false;}
 },1000);

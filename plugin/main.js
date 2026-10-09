@@ -507,6 +507,8 @@ function syncClockFeedback(row){
 }
 function syncFeedback(){
   let first='';const selected=syncRows.filter(r=>r.check.checked);
+  const count=$('sync-selection-count'),countText=connected&&syncRows.length?'싱크 소스 '+selected.length+'/'+syncRows.length+'개 선택 · 최소 2개':'';
+  if(count.textContent!==countText)count.textContent=countText;count.className=countText?'hint':'hint hidden';
   for(const row of syncRows){
     row.selectionHint.textContent=row.check.checked?'':'이 소스는 싱크에서 제외되어 있습니다. 다시 선택하면 입력한 설정을 사용합니다.';
     row.selectionHint.className=row.check.checked?'hint hidden':'hint';

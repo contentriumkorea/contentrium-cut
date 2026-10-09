@@ -3491,3 +3491,26 @@ test('manual sync entry example survives restore locks and stale rows while upda
   f.state.update={updateState:'IDLE',checkState:'AVAILABLE',candidate:{candidateId:'release:hash',manifestDigest:'a'.repeat(64),appVersion:'0.1.74'}};await f.tick();await f.click('update');assert.ok(f.calls.some(v=>v.path==='/updates/start'));assert.equal(current.offset.disabled,true);
  }
 });
+
+
+test('sync source selection count shows current totals for all methods while retaining warning priority',async()=>{
+ for(const mode of ['separate','mixed'])for(const method of ['audio','manual','timecode']){
+  const f=await namedSyncPanel(mode);f.get('sync-method').value=method;f.get('sync-method').onchange();const count=f.get('sync-selection-count');assert.ok(count,'Rendered sync settings need a selected-source count');assert.equal(count.textContent,'싱크 소스 2/2개 선택 · 최소 2개');assert.equal(count.className,'hint');assert.equal(count.getAttribute('role'),'status');assert.equal(count.getAttribute('aria-live'),'polite');assert.equal(count.getAttribute('aria-atomic'),'true');
+  const snapshot=f.evaluate('JSON.stringify(connected.snapshot)'),row=syncRow(f,0);row.check.checked=false;row.check.onchange();assert.equal(count.textContent,'싱크 소스 1/2개 선택 · 최소 2개');assert.equal(f.get('sync-error').textContent,'싱크할 소스를 2개 이상 선택하세요.');syncRow(f,1).check.checked=false;syncRow(f,1).check.onchange();assert.equal(count.textContent,'싱크 소스 0/2개 선택 · 최소 2개');assert.equal(f.get('sync-error').textContent,'싱크할 소스를 2개 이상 선택하세요.');row.check.checked=true;row.check.onchange();row.stream.value='0';row.stream.oninput();assert.match(f.get('sync-error').textContent,/오디오 스트림은 1 이상의 정수/);assert.equal(count.textContent,'싱크 소스 1/2개 선택 · 최소 2개');assert.equal(f.evaluate('JSON.stringify(connected.snapshot)'),snapshot);
+ }
+});
+
+test('sync source selection count survives raw restore locks and replacement without extra text writes',async()=>{
+ for(const mode of ['separate','mixed']){
+  const f=await namedSyncPanel(mode),count=f.get('sync-selection-count');assert.ok(count);const row=syncRow(f,1);row.check.checked=false;row.check.onchange();const raw=f.evaluate('JSON.stringify(captureSettings())'),input=f.evaluate('syncInputHash()');await f.click('save-settings');row.check.checked=true;row.check.onchange();await f.click('load-settings');assert.equal(count.textContent,'싱크 소스 1/2개 선택 · 최소 2개');assert.equal(f.evaluate('JSON.stringify(captureSettings())'),raw);assert.equal(f.evaluate('syncInputHash()'),input);
+  let text=count.textContent,writes=0;Object.defineProperty(count,'textContent',{get:()=>text,set:v=>{text=v;writes++;}});f.evaluate('toggle();toggle()');assert.equal(writes,0);f.native=nativeSnapshot('selection-count-next');await f.click('read-project');assert.equal(count.textContent,'싱크 소스 2/2개 선택 · 최소 2개');const current=f.evaluate('JSON.stringify(captureSettings())');row.check.onchange();assert.equal(f.evaluate('JSON.stringify(captureSettings())'),current);assert.equal(count.textContent,'싱크 소스 2/2개 선택 · 최소 2개');f.evaluate('connected=null;toggle()');assert.equal(count.textContent,'');assert.equal(count.className,'hint hidden');
+  for(const lock of trackLocks){const locked=await namedSyncPanel(mode),node=locked.get('sync-selection-count'),before=syncState(locked);locked.evaluate(lock+';toggle()');const calls=locked.calls.length;for(const field of syncControls(locked)){field.oninput?.();field.onchange?.();}assert.equal(syncState(locked),before);assert.equal(locked.calls.length,calls);assert.equal(node.textContent,lock==='connected=null'?'':'싱크 소스 2/2개 선택 · 최소 2개');assert.equal(node.className,lock==='connected=null'?'hint hidden':'hint');}
+ }
+});
+
+test('sync source selection count preserves accepted result and input identity while update starts immediately',async()=>{
+ for(const mode of ['separate','mixed']){
+  const result={sources:{camera:{status:'accepted'},mic:{status:'accepted'}},offsets:{camera:0,mic:2},reviews:[]},f=await completedSync({mode,request:async path=>path==='/jobs/job-1'?syncReviewReceipt(structuredClone(result)):undefined}),count=f.get('sync-selection-count');assert.ok(count);const before=syncState(f),raw=f.evaluate('JSON.stringify(captureSettings())'),input=f.evaluate('syncInputHash()'),calls=f.calls.length;f.evaluate('syncFeedback();toggle();toggle()');assert.equal(count.textContent,'싱크 소스 2/2개 선택 · 최소 2개');assert.equal(syncState(f),before);assert.equal(f.evaluate('JSON.stringify(captureSettings())'),raw);assert.equal(f.evaluate('syncInputHash()'),input);assert.equal(f.calls.length,calls);
+  f.state.update={updateState:'IDLE',checkState:'AVAILABLE',candidate:{candidateId:'release:hash',manifestDigest:'a'.repeat(64),appVersion:'0.1.75'}};await f.tick();await f.click('update');assert.ok(f.calls.some(v=>v.path==='/updates/start'));assert.equal(f.get('sync').disabled,true);assert.equal(count.textContent,'싱크 소스 2/2개 선택 · 최소 2개');f.evaluate('syncRows.length=0;syncFeedback()');assert.equal(count.textContent,'');assert.equal(count.className,'hint hidden');
+ }
+});

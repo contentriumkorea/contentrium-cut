@@ -255,7 +255,7 @@ function toggle(){
   for(const id of ['analysis-device','cache-budget'])$(id).disabled=locked;
   for(const id of ['model-token','model-terms'])$(id).disabled=locked||!modelReady();
   for(const id of ['sync-method','sync-reference'])$(id).disabled=locked||!connected;
-  for(const row of syncRows)for(const field of [row.check,row.stream,row.channel,row.offset,row.confirmed,row.clockId,row.date,row.fps,row.drop,row.clockConfirmed])field.disabled=locked||!connected;
+  for(const row of syncRows){for(const field of [row.check,row.stream,row.channel,row.offset,row.confirmed,row.clockId,row.date,row.fps,row.drop,row.clockConfirmed])field.disabled=locked||!connected;syncManualFeedback(row,locked);}
   for(const row of selectedRows)selectedSourceFeedback(row,locked);
   $('speaker-count').disabled=workLocked()||mode!=='mixed';$('vad-threshold').disabled=workLocked()||mode!=='separate';
   for(const row of calibrationRows)for(const field of [row.first,row.last])field.disabled=workLocked()||!calibrationActive(row);
@@ -448,12 +448,18 @@ function renderSyncSources(){
     const selectionHint=element('p','','hint hidden');selectionHint.id='sync-selection-hint-'+syncRows.length;selectionHint.setAttribute('aria-live','polite');check.setAttribute('aria-describedby',selectionHint.id);
     for(const field of [stream,channel])field.setAttribute('aria-describedby',issue.id+' '+selectionHint.id);row.appendChild(issue);row.appendChild(selectionHint);
     const manual=element('div'),offset=number(0),confirmed=checkbox();offset.step='0.001';manual.appendChild(label('기준 대비 오프셋 · 초',offset));manual.appendChild(label('이 오프셋을 확인했습니다',confirmed));row.appendChild(manual);
+    const manualHint=element('p','','hint hidden');manualHint.id='sync-manual-hint-'+syncRows.length;manualHint.setAttribute('aria-live','polite');manual.appendChild(manualHint);
     const clock=element('div'),clockId=element('input'),date=element('input'),fps=element('select'),drop=checkbox(),clockConfirmed=checkbox();date.placeholder='YYYY-MM-DD';clockId.placeholder='같은 동기 장치 또는 시계 이름';
     options(fps,[['24000/1001','23.976'],['24/1','24'],['25/1','25'],['30000/1001','29.97'],['30/1','30'],['50/1','50'],['60000/1001','59.94'],['60/1','60']]);fps.value=connected.snapshot.fps.num+'/'+connected.snapshot.fps.den;
     clock.appendChild(label('공통 시계',clockId));clock.appendChild(label('촬영 날짜',date));clock.appendChild(label('타임코드 FPS',fps));clock.appendChild(label('Drop-frame',drop));clock.appendChild(label('날짜와 시계가 같고 촬영 중 리셋하지 않았습니다',clockConfirmed));row.appendChild(clock);
-    $('sync-sources').appendChild(row);const syncRow={check,source,stream,channel,issue,selectionHint,manual,offset,confirmed,clock,clockId,date,fps,drop,clockConfirmed};syncRows.push(syncRow);
+    $('sync-sources').appendChild(row);const syncRow={check,source,stream,channel,issue,selectionHint,manual,manualHint,offset,confirmed,clock,clockId,date,fps,drop,clockConfirmed};syncRows.push(syncRow);
     for(const field of [offset,confirmed,clockId,date,fps,drop,clockConfirmed])field.setAttribute('aria-describedby',selectionHint.id);
-    for(const field of [check,stream,channel,offset,confirmed,clockId,date,fps,drop,clockConfirmed]){field.disabled=workLocked()||!connected;field.oninput=field.onchange=()=>{if(syncRows.includes(syncRow))syncInputEdited();};}
+    for(const field of [offset,confirmed])field.setAttribute('aria-describedby',selectionHint.id+' '+manualHint.id);
+    for(const field of [check,stream,channel,offset,confirmed,clockId,date,fps,drop,clockConfirmed]){field.disabled=workLocked()||!connected;field.oninput=field.onchange=()=>{
+      if(!syncRows.includes(syncRow))return;
+      if((field===offset||field===confirmed)&&syncManualReference(syncRow)){offset.value=syncRow.offsetValue;confirmed.checked=syncRow.confirmedValue;return;}
+      syncInputEdited();
+    };}
     values.push([source.assetId,basename(source.canonicalPath)]);
   }
   options($('sync-reference'),values);syncMethodChanged();
@@ -463,6 +469,13 @@ function syncInputsChanged(){clearSyncResult();scheduleSettings();toggle();}
 function syncMethodChanged(){for(const r of syncRows){r.manual.className=$('sync-method').value==='manual'?'':'hidden';r.clock.className=$('sync-method').value==='timecode'?'':'hidden';}syncInputsChanged();}
 function syncInputEdited(){if(workLocked()||!connected)return;if(syncResultMatches()){scheduleSettings();toggle();}else syncInputsChanged();}
 function syncMethodEdited(){if(!workLocked()&&connected)syncMethodChanged();}
+function syncManualReference(row){return $('sync-method').value==='manual'&&row.source.assetId===$('sync-reference').value;}
+function syncManualFeedback(row,locked){
+  const reference=syncManualReference(row),text=reference?'기준 소스의 상대 오프셋은 0초입니다. 입력값과 확인 상태는 보관되며 기준 소스를 바꾸면 사용할 수 있습니다.':'';
+  row.offset.disabled=row.confirmed.disabled=locked||!connected||reference;
+  if(row.manualHint.textContent!==text)row.manualHint.textContent=text;row.manualHint.className=reference?'hint':'hint hidden';
+  row.offsetValue=row.offset.value;row.confirmedValue=row.confirmed.checked;
+}
 function syncFeedback(){
   let first='';const selected=syncRows.filter(r=>r.check.checked);
   for(const row of syncRows){

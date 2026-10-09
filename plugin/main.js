@@ -265,7 +265,7 @@ function toggle(){
   const budgetIssue=cacheBudgetFeedback();$('save-resources').disabled=locked||!!budgetIssue;
   const suggestion=Number.isSafeInteger(resourceSuggestedBudget)&&resourceSuggestedBudget>0?'권장 캐시 예산 '+String(resourceSuggestedBudget/1073741824)+' GB · 입력 후 자원 설정을 저장해야 적용됩니다.':'';
   if($('cache-suggestion-info').textContent!==suggestion)$('cache-suggestion-info').textContent=suggestion;$('cache-suggestion-info').className='hint'+(suggestion?'':' hidden');$('use-cache-suggestion').disabled=!cacheSuggestionReady();
-  $('prune-cache').disabled=locked||resourceInputDirty||resourceBudgetMissing;
+  $('prune-cache').disabled=locked||!cacheReady(false);
   const saveInfo=!resourceRequest?.save&&!resourceRequest?.discard?(resourceInputDirty?'변경한 분석 자원 설정을 먼저 저장하세요. 캐시 정리는 저장된 예산을 사용합니다.':resourceBudgetMissing?'캐시 예산이 설정되지 않았습니다. 캐시 예산을 입력하고 자원 설정을 저장하면 정리할 수 있습니다.':''):'';
   if($('resource-save-info').textContent!==saveInfo)$('resource-save-info').textContent=saveInfo;$('resource-save-info').className='hint'+(saveInfo?'':' hidden');
   const savingResources=!!resourceRequest?.save;$('save-resources').textContent=savingResources?(resourceRequest.phase==='checking'?'저장 결과 확인 중…':'자원 설정 저장 중…'):'자원 설정 저장';$('save-resources').setAttribute('aria-busy',savingResources?'true':'false');
@@ -1482,7 +1482,7 @@ async function runResourceSettings(save=false,discard=false){
 handler('save-resources',()=>runResourceSettings(true));
 handler('discard-resources',()=>runResourceSettings(false,true));
 function cacheReady(release=false){
-  return !!credentials&&!!state&&!updateIntent&&!panelContextConflict&&state.compatible!==false&&state.stopEpoch==null&&!binding&&!projectRead&&!job&&!validationCount&&!applying&&!batchRunning&&!localEditPending&&!state.applyRecovery?.blocked&&(release?state.maintenance?.canRelease===true&&state.maintenance.drained===true&&!state.gateOpen:state.gateOpen&&!stopped&&!state.maintenance&&!resourceInputDirty&&!resourceBudgetMissing);
+  return !!credentials&&!!state&&!updateIntent&&!panelContextConflict&&state.compatible!==false&&state.stopEpoch==null&&!binding&&!projectRead&&!job&&!validationCount&&!applying&&!batchRunning&&!previewBusy&&!localEditPending&&!state.applyRecovery?.blocked&&(release?state.maintenance?.canRelease===true&&state.maintenance.drained===true&&!state.gateOpen:state.gateOpen&&!stopped&&!state.maintenance&&!resourceInputDirty&&!resourceBudgetMissing);
 }
 function cacheValidation(count,descriptors){
   const token=cacheRequest;if(!token)return false;

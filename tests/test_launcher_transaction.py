@@ -22,7 +22,9 @@ class LauncherTests(unittest.TestCase):
                  assets=[dict(role='installer',assetId=33,sha256=hashlib.sha256(launcher.read_bytes()).hexdigest(),size=launcher.stat().st_size)])
         raw=json.dumps(old).encode();sig=json.dumps(dict(algorithm='Ed25519',keyId=old['signingKeyId'],signature=base64.b64encode(self.key.sign(raw)).decode())).encode()
         (self.root/'updates'/'first-install.json').write_text(json.dumps(dict(manifest=base64.b64encode(raw).decode(),signature=base64.b64encode(sig).decode())))
-        manifest,assets=self.payload('0.2.0','new');path=self.inputs/'new-setup.exe';path.write_bytes(b'new signed setup')
+        # This inert fixture is never executed. Its former 16-byte text payload
+        # triggers Windows ERROR_VIRUS_INFECTED (225) even with a .bin suffix.
+        manifest,assets=self.payload('0.2.0','new');path=self.inputs/'new-setup.exe';path.write_bytes(b'updated mock installer payload')
         assets['installer']=path;manifest['signingKeyId']='contentrium-cut-2026-01'
         manifest['assets'].append(dict(role='installer',assetId=34,name=path.name,sha256=hashlib.sha256(path.read_bytes()).hexdigest(),size=path.stat().st_size))
         raw=json.dumps(manifest).encode();sig=json.dumps(dict(algorithm='Ed25519',keyId=manifest['signingKeyId'],signature=base64.b64encode(self.key.sign(raw)).decode())).encode()

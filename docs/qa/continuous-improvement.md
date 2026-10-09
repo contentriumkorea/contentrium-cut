@@ -2442,3 +2442,13 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 최종정식 Node719/719/native44234/exit0/96999.8561ms·fail/cancel/skip/todo0. Python496고유/native24811/exit0/87.484초·fail/error/skip/excluded0·import중복41만제거. 신규4 최종pass/첫4중3pass1helper오류→실패1만교정pass·관련21/21/native0/1265.0461ms. 별도matrix는정식집계가산없음·실제Community품질근거아님.
 
 - [0.1.92 패키지 검증](package-0.1.92-proof.json): runtime/CCX native15035/exit0·Setup native70588/exit0·추출 proof native80563/exit0·56.797초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.92·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.
+
+
+### 공개 결과
+
+- [v0.1.92](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.92): release408379536·제목 Contentrium CUT·공개2026-10-09T21:58:22Z·target/tag a69aa94beb889c4a87d989632a50f376635a0672·draft/prerelease 아님. [실제 재다운로드](release-0.1.92-proof.json): 익명0.1.91→0.1.92 AVAILABLE·서명·ZIP/CCX/Setup3개 실제 size/SHA 일치. [현재 조회](release-0.1.92-current-proof.json): CURRENT/후보 없음·5자산 ID/size/digest/서명 바이트 일치. [고정 복구](migration-pinned-0.1.1-after-0.1.92-proof.json): latest0.1.92에도 서명v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+- 기획→설계→구현→검증→0.1.92 공개/재검증 완료. 정식 Node719/Python496·독립 검수는 별도 evidence와 집계를 따른다. 신규4 RED/native1→최종4pass(첫3pass/1helper오류·실패1만교정/native0)·관련21/21 native0. 실제 Premiere/UXP 화면·편집·기존0.1.0 설치 업데이트 전환·Community-1 품질 미검증. 사용자 설치/활성화·컴퓨터유즈/브라우저/Premiere 조작·provider 동의/토큰/미디어 업로드 없음.
+
+- 종료근거: 업로드 native43606/exit0·실제3다운로드 native26070/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native15035/exit0·Setup native70588/exit0·추출패키지 native80563/exit0/56.797초. 공개875파일 비공개패턴검사·신뢰키불변·최종52raw일치·설치0.1.0 hash동일·서명키존재만확인·자동화ACTIVE15분·자체CLI0. Node719/native44234/exit0/96999.8561ms·Python496고유/native24811/exit0/87.484초. 독립 native596 정확히1회·추가105고유/107raw·미해결0·source52/peer10/hash seal 확인.
+- 실패원인보존: 신규4 RED/native1은복원대상오류안내문부재4fail. 첫GREEN3pass/1helperfail은두번째 반복 마이크100–200클립에2–7을유효대상으로기대한시험fixture오류. 실제클립안의102–107로시험만교정하고실패1개만pass, 통과3반복0·원본시험/log/native보존·기존본문기대변경0. 관련21/21/native0/1265.0461ms. optional/torchcodec/Silero-SAPI는Community-1품질근거아님. 독립/수집helper오류 발생시 원본로그/native/seal과교정내용별도보존.
+- 이어갈 단계: actual-main 유효7–19 초기화 뒤 복원 raw미리보기/restore사용가능하고 오류안내없음·현재0/0길이안내빈값. 복원할 구간의12프레임/0.400초 길이는 클릭전확인할수없음·raw/hash불변·probe native0. 다음회차복원대상길이사전안내를기획→설계·유효대상만표시/유리fps·큰정수·정확반올림/blank무효클립경계/맥락·행수명/worklocks/반복live쓰기/설정·분석·plan불변/update즉시차단 수용조건→실패재현부터진행. 이번동결뒤추가제품변경없음·probe/독립matrix는정식집계가산없음. 실제Premiere/UXP 화면·편집·스크린리더·기존0.1.0 업데이트설치전환·Community-1품질미검증. CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/결제/token/media외부업로드없음.

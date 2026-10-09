@@ -289,6 +289,7 @@ function toggle(){
   }
   for(const el of document.querySelectorAll('[data-work]'))el.disabled=locked;
   for(const row of microphoneRows)if(row.jump)row.jump.disabled=locked||!connected;
+  for(const row of calibrationRows)for(const button of [row.startJump,row.endJump])if(button)button.disabled=!calibrationJumpReady(row);
   $('add-override').disabled=locked||!connected;for(const row of overrideRows)row.remove.disabled=locked||!connected;
   for(const row of overrideRows)for(const field of [row.first,row.last,row.camera])field.disabled=locked||!connected;
   $('override-filter').disabled=locked||!overrideRows.some(r=>r.error.textContent);
@@ -367,6 +368,15 @@ function analysisOptionChanged(id){
   else {scheduleSettings();toggle();}
 }
 function calibrationActive(row){return mode==='separate'&&row.check.checked;}
+function calibrationJumpTicks(row,edge){
+  if(!connected||!calibrationActive(row))return null;
+  const a=row.first.value.trim(),b=row.last.value.trim(),first=Number(a),last=Number(b);
+  if(!a||!b||!Number.isSafeInteger(first)||!Number.isSafeInteger(last)||first<0||last<=first)return null;
+  const frame=BigInt(connected.perFrame),start=BigInt(first)*frame,end=BigInt(last)*frame;
+  if(start<BigInt(row.clip.startTicks)||end>BigInt(row.clip.endTicks))return null;
+  return String(edge==='start'?start:end-frame);
+}
+function calibrationJumpReady(row){return !workLocked()&&calibrationRows.includes(row)&&calibrationJumpTicks(row,'start')!==null;}
 function calibrationFeedback(){
   let firstIssue='';
   for(const row of calibrationRows){
@@ -449,6 +459,11 @@ function renderSources(){
     bounds.appendChild(label('단독 발화 시작 · 프레임',first));bounds.appendChild(label('종료 · 프레임',last));calibration.appendChild(bounds);
     const calibrationHint=element('p','','hint'),calibrationIssue=element('p','','hint input-error hidden');calibrationHint.id='calibration-guide-'+calibrationRows.length;calibrationIssue.id='calibration-error-'+calibrationRows.length;calibrationIssue.setAttribute('aria-live','polite');calibration.appendChild(calibrationHint);calibration.appendChild(calibrationIssue);$('calibration').appendChild(calibration);
     const calibrationRow={instanceKey:clip.instanceKey,clip,check,speaker,first,last,stream,channel,hint:calibrationHint,issue:calibrationIssue,title:'A'+(track.index+1)+' · '+track.name+' · '+microphoneNames.get(clip.assetId)+(position?' · '+position:'')};calibrationRows.push(calibrationRow);
+    const jumpHint=element('p','끝 확인은 종료 직전의 마지막 포함 프레임으로 이동합니다.','hint'),jumps=element('div',undefined,'row');jumpHint.id='calibration-jump-guide-'+(calibrationRows.length-1);calibration.appendChild(jumpHint);
+    for(const [edge,text,key] of [['start','시작 확인','startJump'],['end','끝 확인','endJump']]){
+      const jump=element('button',text);jump.setAttribute('data-work','true');jump.setAttribute('data-calibration-jump',edge);jump.setAttribute('aria-describedby',calibrationIssue.id+' '+calibrationHint.id+' '+jumpHint.id+(positionGuide?' '+positionGuide.id:''));jump.setAttribute('aria-label',(edge==='start'?'단독 발화 시작 확인':'단독 발화 마지막 포함 프레임 확인')+' · '+calibrationRow.title);jump.disabled=!calibrationJumpReady(calibrationRow);jump.onclick=()=>{if(!calibrationJumpReady(calibrationRow))return;return runAction(()=>seekCalibration(calibrationRow,edge));};jumps.appendChild(jump);calibrationRow[key]=jump;
+    }
+    calibration.appendChild(jumps);
     for(const field of [first,last]){field.min='0';field.step='1';field.setAttribute('aria-describedby',calibrationIssue.id+' '+calibrationHint.id+(positionGuide?' '+positionGuide.id:''));field.disabled=workLocked()||!connected||!calibrationActive(calibrationRow);field.oninput=field.onchange=()=>calibrationChanged(calibrationRow);}
   }
   for(const track of s.tracks.filter(t=>t.mediaType==='video'&&s.clips.some(c=>c.trackRef===t.trackRef))){
@@ -835,6 +850,16 @@ async function seekMicrophone(row){
   let moved;try{moved=await connected.sequence.setPlayerPosition(ContentriumHost.time(row.clip.startTicks));}catch(e){if(!current())throw currentCheckDiscarded;throw e;}
   if(!current())throw currentCheckDiscarded;
   if(!moved)throw new Error('클립 시작 위치로 이동하지 못했습니다.');
+}
+async function seekCalibration(row,edge){
+  const ticks=calibrationJumpTicks(row,edge),first=row.first.value,last=row.last.value,scopeCurrent=editingResponseGuard();
+  const current=()=>scopeCurrent()&&calibrationRows.includes(row)&&calibrationActive(row)&&row.first.value===first&&row.last.value===last;
+  if(ticks===null||!current())throw currentCheckDiscarded;
+  await requireCurrent({responseCurrent:current});if(!current())throw currentCheckDiscarded;
+  await stopPreview(current);if(!current())throw currentCheckDiscarded;
+  let moved;try{moved=await connected.sequence.setPlayerPosition(ContentriumHost.time(ticks));}catch(e){if(!current())throw currentCheckDiscarded;throw e;}
+  if(!current())throw currentCheckDiscarded;
+  if(!moved)throw new Error('단독 발화 구간으로 이동하지 못했습니다.');
 }
 const cutReasons={START_CAMERA:'시작 카메라',START_SPEAKER:'첫 발화 화자',SPEAKER_TURN:'화자 전환',speech:'발화',speaker:'화자',MANUAL_OVERRIDE:'수동 카메라 지정',OVERRIDE_END:'수동 지정 종료',OVERLAP_SUSTAINED:'지속된 동시 발화',OVERLAP_HOLD:'동시 발화 중 카메라 유지',MIN_SHOT_HOLD:'최소 샷 길이 유지',VIDEO_GAP_FALLBACK:'영상 공백으로 대체 카메라',MIN_SHOT_EXCEPTION_OVERRIDE:'수동 지정으로 최소 샷 길이 예외',MIN_SHOT_EXCEPTION_OVERRIDE_END:'수동 지정 종료로 최소 샷 길이 예외',MIN_SHOT_EXCEPTION_OVERLAP:'동시 발화로 최소 샷 길이 예외',MIN_SHOT_EXCEPTION_COVERAGE:'영상 공백으로 최소 샷 길이 예외',RANGE_END_SHORT:'분석 범위 끝의 짧은 샷'};
 Object.assign(cutReasons,{HOLD:'카메라 유지',UNKNOWN_HOLD:'화자 불확실로 카메라 유지'});

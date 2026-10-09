@@ -423,7 +423,7 @@ class CutService:
     def _public_job(self, value, result=False):
         allowed = ['jobId', 'kind', 'status', 'epoch', 'createdAt', 'finishedAt']
         public = {key: value[key] for key in allowed if key in value}
-        if value.get('kind') == 'model-setup':
+        if value.get('kind') in {'model-setup', 'sync'}:
             # Terminal messages can precede native descendant/process cleanup.
             with self.jobs.lock:
                 public['drained'] = value['jobId'] not in self.jobs.processes

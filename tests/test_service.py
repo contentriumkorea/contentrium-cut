@@ -193,6 +193,18 @@ class ServiceTests(unittest.TestCase):
             self.assertIs(self.service._public_job(value)['drained'], True)
         self.assertNotIn('drained', self.service._public_job(dict(jobId='other', kind='analysis', status='completed')))
 
+    def test_sync_public_receipt_requires_owned_process_drain_after_terminal_message(self):
+        for status in ['completed', 'canceled', 'failed', 'interrupted']:
+            value = dict(jobId='owned-sync', kind='sync', status=status, epoch=0)
+            with self.service.jobs.lock:
+                self.service.jobs.processes[value['jobId']] = {'owned': True}
+            try:
+                self.assertIs(self.service._public_job(value)['drained'], False)
+            finally:
+                with self.service.jobs.lock:
+                    self.service.jobs.processes.pop(value['jobId'])
+            self.assertIs(self.service._public_job(value)['drained'], True)
+
     def test_job_read_cancel_and_plan_are_owned_by_authenticated_session(self):
         args = self.bind()
         job = self.completed_analysis(args)

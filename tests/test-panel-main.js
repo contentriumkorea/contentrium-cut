@@ -47,7 +47,7 @@ async function panel(extra={}){
     if(path==='/heartbeat')return {gateOpen:true,stopEpoch:null};
     if(path==='/project'){f.bound=structuredClone(body.snapshot);return {snapshotHash:body.snapshot.snapshotHash};}
     if(path==='/jobs'){f.jobKind=body.kind;return {jobId:'job-1',kind:body.kind,status:'running'};}
-    if(path==='/jobs/job-1')return {jobId:'job-1',kind:f.jobKind,status:f.jobStatus,result:{}};
+    if(path==='/jobs/job-1')return {jobId:'job-1',kind:f.jobKind,status:f.jobStatus,...(f.jobKind==='sync'?{epoch:0,drained:!['running','canceling'].includes(f.jobStatus)}:{}),result:{}};
     if(path==='/analyses/register'||path==='/analyses/'+'a'.repeat(64))return analysis();
     if(path.endsWith('/correct')){f.analysisRevision++;return analysis();}
     if(path==='/plan')return f.planResult||{planHash:'p'.repeat(64),snapshotHash:f.bound.snapshotHash,segments:[{startFrame:0,endFrame:300,cameraId:'video:0',reason:'speech'}],reviews:[]};
@@ -655,7 +655,7 @@ test('unchanged cut duration errors do not repeatedly rewrite live-region text',
 async function completedSync(extra={}){
   const f=await panel({request:async(path,body,fixture)=>{
     if(extra.request){const value=await extra.request(path,body,fixture);if(value!==undefined)return value;}
-    if(path==='/jobs/job-1')return {jobId:'job-1',kind:'sync',status:fixture.jobStatus,result:{sources:{camera:{status:'accepted'},mic:{status:'accepted'}},offsets:{camera:0,mic:0}}};
+    if(path==='/jobs/job-1')return {jobId:'job-1',kind:'sync',epoch:0,drained:!['running','canceling'].includes(fixture.jobStatus),status:fixture.jobStatus,result:{sources:{camera:{status:'accepted'},mic:{status:'accepted'}},offsets:{camera:0,mic:0}}};
     if(path==='/sync-plan')throw Object.assign(new Error('Owned fixture stops before native mutation'),{code:'OWNED_FIXTURE_STOP'});
   }});
   if(extra.mode==='mixed')await f.click('mode-mixed');
@@ -2124,4 +2124,68 @@ test('current model poll auth failure reconnects without exposing details or tre
 
 test('reconnected model job interrupted by engine restart releases only after confirmed drain',async()=>{
  for(const drained of [false,true]){const h=await heldModelPoll('mixed');h.resume(modelReceipt('interrupted',{drained,error:{code:'INTERRUPTED',message:'private old process'}}));await h.run;assert.equal(h.f.evaluate('job'),drained?null:h.active);if(drained){assert.match(h.f.get('model-install-status').textContent,/이전 연결.*중단.*토큰.*다시/);assert.equal(h.f.get('install-model').disabled,false);}else assert.equal(h.f.get('install-model').disabled,true);assert.doesNotMatch(h.f.get('status').textContent+h.f.get('model-install-status').textContent,/private old/);}
+});
+
+function syncReceipt(status='completed',extra={}){return {jobId:'job-1',kind:'sync',epoch:0,drained:!['running','canceling'].includes(status),status,result:{sources:{camera:{status:'accepted'},mic:{status:'accepted'}},offsets:{camera:0,mic:0}},...extra};}
+async function heldSyncPoll(mode='separate',stage='query'){
+ let hold=false,resume,reject,hosts=0;const f=await updatePanel({request:p=>{if(hold&&!resume&&p==='/jobs/job-1'&&stage==='query')return new Promise((a,z)=>{resume=a;reject=z;});if(p==='/jobs/job-1')return syncReceipt();}});if(mode==='mixed')await f.click('mode-mixed');await f.click('sync');const native=f.host.snapshot;f.host.snapshot=()=>{hosts++;if(stage==='snapshot'&&!resume)return new Promise((a,z)=>{resume=a;reject=z;});return native();};hold=true;const run=f.evaluate('pollJob()');for(let i=0;i<50&&!resume;i++)await Promise.resolve();assert.ok(resume);return {f,run,resume,reject,hosts:()=>hosts,active:f.evaluate('job'),snapshot:native};
+}
+test('sync poll stop preserves new guidance results and native-call boundary',async()=>{
+ for(const mode of ['separate','mixed'])for(const action of ['update','cancel'])for(const stage of ['query','snapshot'])for(const outcome of ['success','error']){const h=await heldSyncPoll(mode,stage);assert.equal(h.f.get(action).disabled,false);await h.f.click(action);const before=syncState(h.f),guidance=h.f.get('status').textContent,hosts=h.hosts();if(outcome==='error')h.reject(Object.assign(new Error('private late worker'),{code:'AUTH_REQUIRED'}));else h.resume(stage==='query'?syncReceipt():await h.snapshot());await h.run;assert.equal(syncState(h.f),before);assert.equal(h.f.get('status').textContent,guidance);assert.equal(h.hosts(),hosts);assert.equal(h.f.evaluate('job'),outcome==='success'||stage==='snapshot'?null:h.active);if(action==='update')assert.equal(h.f.calls.filter(c=>c.path==='/updates/start').length,1);}
+});
+test('sync progress canceling and transport errors never release a live job or overwrite stop',async()=>{
+ for(const mode of ['separate','mixed'])for(const action of ['update','cancel'])for(const status of ['running','canceling','error']){const h=await heldSyncPoll(mode);await h.f.click(action);const text=h.f.get('status').textContent;if(status==='error')h.reject(Object.assign(new Error('private old response'),{code:'WORKER_FAILED'}));else h.resume(syncReceipt(status));await h.run;assert.equal(h.f.get('status').textContent,text);assert.equal(h.f.evaluate('job'),h.active);assert.equal(h.f.get('sync').disabled,true);assert.equal(h.hosts(),0);}
+});
+test('sync poll rejects stale scopes and preserves new owners jobs and same-id cancel markers',async()=>{
+ const changes=['state.epoch++','credentials=null','credentials={...credentials}','connected=null','connected={...connected}','connected.snapshot.snapshotHash="new"','connected.snapshot.hostSnapshotHash="new"','mode=mode==="mixed"?"separate":"mixed"','syncRows[0].stream.value=" 1 "','syncRows.reverse()','syncResult={newResult:true}','syncJob="new"','syncResultInputHash="new"','analysisState={analysisId:"new",revision:2}','planInputHash="new"','state.gateOpen=false','state.stopEpoch=0','state.compatible=false','localEditPending=true','state.applyRecovery.blocked=true','projectRead={}','stopRevision++','validationRevision+=2','syncPoll={newOwner:true}','job={...job};canceledJobs.add(job.jobId)'];
+ for(const stage of ['query','snapshot'])for(const change of changes)for(const outcome of ['success','error']){const h=await heldSyncPoll('mixed',stage);h.f.evaluate(change+';sequencePollAt=Date.now()+100000;say("New sync guidance");toggle()');const before=syncState(h.f),owner=h.f.evaluate('syncPoll'),active=h.f.evaluate('job'),hosts=h.hosts();if(outcome==='error')h.reject(Object.assign(new Error('private old response'),{code:'WORKER_FAILED'}));else h.resume(stage==='query'?syncReceipt():await h.snapshot());await h.run;assert.equal(syncState(h.f),before,stage+change);assert.equal(h.f.get('status').textContent,'New sync guidance');assert.equal(h.f.evaluate('job'),active);assert.equal(h.hosts(),hosts);if(change==='syncPoll={newOwner:true}')assert.equal(h.f.evaluate('syncPoll'),owner);if(change.startsWith('job='))assert.equal(h.f.evaluate('canceledJobs.has(job.jobId)'),true);}
+});
+test('sync own source validation can finish but foreign continuation and validation ABA discard response',async()=>{
+ for(const kind of ['own','foreign','wrong-epoch','wrong-id','ABA']){const h=await heldSyncPoll();const d={id:'a'.repeat(32),path:kind==='foreign'?'/analyses/register':'/jobs/job-1',epoch:kind==='wrong-epoch'?1:0};if(kind==='wrong-id')d.id='bad';h.f.validation(1,[d]);h.f.validation(0,[]);if(kind==='ABA'){h.f.validation(1,[{id:'b'.repeat(32),path:'/jobs/job-1',epoch:0}]);h.f.validation(0,[]);}h.f.evaluate('say("Owned later validation guidance")');h.resume(syncReceipt());await h.run;assert.equal(h.f.get('status').textContent,'Owned later validation guidance');assert.equal(!!h.f.evaluate('syncResult'),kind==='own');assert.equal(h.hosts(),kind==='own'?1:0);}
+});
+test('sync duplicate query coalesces and current transient failure retries without unsafe cleanup',async()=>{
+ const h=await heldSyncPoll();const count=h.f.calls.length;await h.f.evaluate('pollJob()');assert.equal(h.f.calls.length,count);h.reject(Object.assign(new Error('private transient'),{code:'WORKER_FAILED'}));await h.run;assert.equal(h.f.evaluate('job'),h.active);assert.match(h.f.get('status').textContent,/싱크.*상태.*다시 조회/);assert.doesNotMatch(h.f.get('status').textContent,/private/);await h.f.evaluate('pollJob()');assert.equal(h.f.evaluate('job'),null);assert.equal(h.f.evaluate('syncJob'),'job-1');assert.equal(h.f.evaluate('syncResultMatches()'),true);
+});
+test('sync malformed receipts retain job while confirmed malformed payload is atomic',async()=>{
+ for(const bad of [null,{},syncReceipt('unknown'),syncReceipt('completed',{drained:false}),syncReceipt('completed',{drained:undefined}),syncReceipt('completed',{jobId:'other'}),syncReceipt('completed',{kind:'analysis'}),syncReceipt('completed',{epoch:1})]){const h=await heldSyncPoll();h.resume(bad);await h.run;assert.equal(h.f.evaluate('job'),h.active);assert.equal(h.f.evaluate('syncResult'),null);assert.equal(h.hosts(),0);}
+ for(const result of [null,{}, {sources:{camera:{status:'accepted'},mic:null},offsets:{camera:0,mic:0}},{sources:{camera:{status:'accepted'}},offsets:{camera:0}},{sources:{camera:{status:'accepted'},mic:{status:'accepted'}},offsets:{camera:0,mic:'bad'}}]){const h=await heldSyncPoll();const before=syncState(h.f);h.resume(syncReceipt('completed',{result}));await h.run;assert.equal(syncState(h.f),before);assert.equal(h.f.evaluate('job'),null);assert.match(h.f.get('status').textContent,/SYNC_RESULT_INVALID/);}
+});
+test('sync stopped terminal waits for real drain and engine interruption enables retry',async()=>{
+ for(const status of ['completed','failed','canceled','interrupted']){const h=await heldSyncPoll();await h.f.click('cancel');h.resume(syncReceipt(status,{drained:false}));await h.run;assert.equal(h.f.evaluate('job'),h.active);assert.equal(h.f.get('sync').disabled,true);h.f.evaluate('api=async()=>('+JSON.stringify(syncReceipt(status))+')');await h.f.evaluate('pollJob()');assert.equal(h.f.evaluate('job'),null);assert.equal(h.f.evaluate('syncResult'),null);}
+ const h=await heldSyncPoll();h.resume(syncReceipt('interrupted'));await h.run;assert.equal(h.f.evaluate('job'),null);assert.match(h.f.get('status').textContent,/이전 연결.*중단.*다시/);assert.equal(h.f.get('sync').disabled,false);
+});
+test('sync current auth failure recovers connection while late auth never resets it',async()=>{
+ const h=await heldSyncPoll();const resets=h.f.resetCalls;h.reject(Object.assign(new Error('private URL'),{code:'SESSION_EXPIRED'}));await h.run;assert.equal(h.f.evaluate('credentials'),null);assert.equal(h.f.resetCalls,resets+1);assert.equal(h.f.evaluate('job'),h.active);assert.doesNotMatch(h.f.get('status').textContent,/private/);
+});
+
+test('sync confirmed completion preserves newer main guidance while accepting staged result',async()=>{
+ for(const stage of ['query','snapshot']){const h=await heldSyncPoll('separate',stage);h.f.evaluate('say("New main guidance")');h.resume(stage==='query'?syncReceipt():await h.snapshot());await h.run;assert.equal(h.f.get('status').textContent,'New main guidance');assert.equal(h.f.evaluate('job'),null);assert.equal(h.f.evaluate('syncJob'),'job-1');assert.equal(h.f.evaluate('syncResultMatches()'),true);}
+});
+test('sync current host changes and host errors clear confirmed completed job without partial result',async()=>{
+ for(const kind of ['change','error']){const h=await heldSyncPoll('separate','snapshot');if(kind==='change')h.resume(nativeSnapshot('new-timeline'));else h.reject(Object.assign(new Error('Owned snapshot failure'),{code:'OWNED_HOST_FAILURE'}));await h.run;assert.equal(h.f.evaluate('job'),null);assert.equal(h.f.evaluate('syncResult'),null);assert.match(h.f.get('status').textContent,kind==='change'?/싱크.*타임라인.*변경/:/OWNED_HOST_FAILURE.*Owned snapshot failure/);if(kind==='change')assert.equal(h.f.evaluate('connected'),null);}
+});
+test('sync staged display accepts decimal strings and unresolved sources without fabricating offsets',async()=>{
+ const h=await heldSyncPoll();h.resume(syncReceipt('completed',{result:{sources:{camera:{status:'accepted'},mic:{status:'unresolved',reason:'확인 필요'}},offsets:{camera:'0.000'}}}));await h.run;assert.equal(h.f.evaluate('syncResultMatches()'),true);assert.equal(h.f.evaluate('syncJob'),'job-1');assert.match(h.f.get('sync-result').textContent,/0.000초.*\n.*확인 필요/);assert.equal(h.f.evaluate('Object.hasOwn(syncResult.offsets,"mic")'),false);
+});
+
+test('sync source validation failure consumes fresh authenticated state drain proof without applying result',async()=>{
+ for(const mode of ['separate','mixed']){const h=await heldSyncPoll(mode);h.f.state.jobs=[syncReceipt()];h.f.validation(1,[{id:'a'.repeat(32),path:'/jobs/job-1',epoch:0}]);h.f.validation(0,[]);h.reject(Object.assign(new Error('private source path'),{code:'SOURCE_CHANGED'}));await h.run;assert.equal(h.f.evaluate('job'),null);assert.equal(h.f.evaluate('syncResult'),null);assert.match(h.f.get('status').textContent,/원본.*다시/);assert.doesNotMatch(h.f.get('status').textContent,/private source/);assert.equal(h.f.get('sync').disabled,false);}
+});
+test('sync canceled or updating query can consume fresh state terminal drain while preserving main guidance',async()=>{
+ for(const action of ['cancel','update']){const h=await heldSyncPoll();await h.f.click(action);h.reject(Object.assign(new Error('old query'),{code:'UPDATE_IN_PROGRESS'}));await h.run;const guidance=h.f.get('status').textContent,receipt=structuredClone(h.f.state);receipt.jobs=[syncReceipt()];h.f.evaluate('api=async p=>{if(p==="/state")return '+JSON.stringify(receipt)+';throw Object.assign(new Error("private gate"),{code:"UPDATE_IN_PROGRESS"});}');await h.f.evaluate('pollJob()');assert.equal(h.f.evaluate('job'),null);assert.equal(h.f.evaluate('syncResult'),null);assert.equal(h.f.get('status').textContent,guidance);}
+});
+
+async function heldSyncDrainProof(){
+ const h=await heldSyncPoll('mixed');let resume,reject;h.f.host.syncDrainProof=()=>new Promise((a,z)=>{resume=a;reject=z;});h.f.evaluate('const beforeSyncDrainApi=api;api=async(...args)=>args[0]==="/state"?ContentriumHost.syncDrainProof():beforeSyncDrainApi(...args)');h.reject(Object.assign(new Error('private original path'),{code:'SOURCE_CHANGED'}));for(let i=0;i<50&&!resume;i++)await Promise.resolve();assert.ok(resume);const receipt=structuredClone(h.f.state);receipt.jobs=[syncReceipt()];return {...h,resumeState:resume,rejectState:reject,receipt};
+}
+test('sync state drain proof rejects late ownership admission and newer guidance changes',async()=>{
+ for(const change of ['stopRevision++','state.epoch++','credentials=null','credentials={...credentials}','connected={...connected}','syncRows[0].stream.value="2"','syncResult={newResult:true}','validationRevision++','syncPoll={newOwner:true}','job={...job};canceledJobs.add(job.jobId)'])for(const outcome of ['success','error']){const h=await heldSyncDrainProof();h.f.evaluate(change+';say("New drain guidance");toggle()');const before=syncState(h.f),job=h.f.evaluate('job'),owner=h.f.evaluate('syncPoll');if(outcome==='error')h.rejectState(Object.assign(new Error('private old state failure'),{code:'AUTH_REQUIRED'}));else h.resumeState(h.receipt);await h.run;assert.equal(h.f.get('status').textContent,'New drain guidance');assert.equal(syncState(h.f),before);assert.equal(h.f.evaluate('job'),job);assert.equal(h.hosts(),0);if(change==='syncPoll={newOwner:true}')assert.equal(h.f.evaluate('syncPoll'),owner);if(change.startsWith('job='))assert.equal(h.f.evaluate('canceledJobs.has(job.jobId)'),true);}
+});
+test('sync state recovery requires exact component epoch terminal job and true drain receipt',async()=>{
+ for(const change of ['delete receipt.jobs','receipt.epoch=1','receipt.appVersion="new"','receipt.bundleId="new"','receipt.protocolVersion=2','receipt.jobs[0].jobId="new"','receipt.jobs[0].kind="analysis"','receipt.jobs[0].epoch=1','receipt.jobs[0].status="running"','receipt.jobs[0].drained=false','receipt.jobs[0].drained="true"','delete receipt.jobs[0].drained']){const h=await heldSyncDrainProof();const receipt=h.receipt;Function('receipt',change)(receipt);h.resumeState(receipt);await h.run;assert.equal(h.f.evaluate('job'),h.active);assert.equal(h.f.evaluate('syncResult'),null);assert.equal(h.hosts(),0);assert.equal(h.f.get('sync').disabled,true);}
+ const h=await heldSyncDrainProof();h.resumeState(h.receipt);await h.run;assert.equal(h.f.evaluate('job'),null);assert.equal(h.f.evaluate('syncResult'),null);assert.match(h.f.get('status').textContent,/원본.*다시/);assert.equal(h.hosts(),0);
+});
+
+test('sync null and malformed state drain receipts remain untrusted without global poll errors',async()=>{
+ for(const receipt of [null,undefined,{}, {jobs:[null]}, {epoch:0,jobs:[null,{}]}]){const h=await heldSyncDrainProof();h.resumeState(receipt);await h.run;assert.equal(h.f.evaluate('job'),h.active);assert.equal(h.f.evaluate('syncResult'),null);assert.doesNotMatch(h.f.get('status').textContent,/private|TypeError/);}
 });

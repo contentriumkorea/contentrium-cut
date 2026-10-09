@@ -1938,3 +1938,89 @@ test('failed update and cancel preserve resource settings during pending POST an
   const {f,run,resume,reject}=await heldResourceSettings(mode,stage,kind);if(action==='failed-update'){let starts=0;const request=f.evaluate('connection.request');f.evaluate('connection').request=(path,...args)=>{if(path==='/updates/start'){starts++;return Promise.reject(Object.assign(new Error('Owned update failure'),{code:'UPDATE_CANDIDATE'}));}return request(path,...args);};await f.click('update');assert.equal(starts,1);}else await f.click('cancel');const before=resourceState(f),calls=f.calls.length;if(outcome==='success')resume();else reject(new Error('Owned stopped resource request'));await run;assert.equal(resourceState(f),before);assert.equal(f.calls.length,calls);
  }
 });
+
+
+async function heldCache(mode,action,stage='post',setup=null){
+ let resume,reject,hold=false;
+ const f=await updatePanel({request:async(p,b,f)=>{
+  if(hold&&!resume&&p===(stage==='post'?'/resources/prune':action==='prune-cache'?'/resources':'/state'))return new Promise((a,z)=>{resume=a;reject=z;});
+  if(p==='/resources/prune')return b?.action==='release'?{released:true}:{removed:['owned-fixture'],budgetMet:true};
+ }});
+ if(mode==='mixed')await f.click('mode-mixed');
+ f.get('cache-budget').value='2';
+ if(action==='release-cache'){f.state.gateOpen=false;f.state.maintenance={id:'c'.repeat(32),status:'canceled',drained:true,canRelease:true};await f.evaluate('refresh()');}
+ if(setup)f.evaluate(setup);hold=true;const run=f.click(action);for(let i=0;i<40&&!resume;i++)await Promise.resolve();assert.equal(typeof resume,'function');
+ return {f,run,resume,reject,value:stage==='post'?(action==='release-cache'?{released:true}:{removed:['owned-fixture'],budgetMet:true}):action==='prune-cache'?{settings:{device:'cpu',cacheBudgetBytes:1073741824},status:{cacheBytes:0,freeDiskBytes:10737418240}}:{...structuredClone(f.state),gateOpen:true,maintenance:null}};
+}
+function cacheState(f){return JSON.stringify({resource:resourceState(f),state:f.evaluate('JSON.stringify(state)'),connection:f.get('connection').textContent,maintenance:f.get('cache-maintenance').className});}
+test('cache prune and release discard late POST and follow-up GET after immediate update or cancel',async()=>{
+ for(const mode of ['separate','mixed'])for(const action of ['prune-cache','release-cache'])for(const stage of ['post','get'])for(const stop of ['update','cancel'])for(const outcome of ['success','error']){
+  const h=await heldCache(mode,action,stage);await h.f.click(stop);const before=cacheState(h.f),calls=h.f.calls.length;
+  if(outcome==='success')h.resume(h.value);else h.reject(new Error('Owned obsolete cache response'));await h.run;
+  assert.equal(cacheState(h.f),before,[mode,action,stage,stop,outcome].join('/'));assert.equal(h.f.calls.length,calls);if(stop==='update')assert.equal(h.f.calls.filter(c=>c.path==='/updates/start').length,1);
+ }
+});
+
+
+test('cache response scope rejects changed owner inputs validation and maintenance in both modes',async()=>{
+ const changes=['state.epoch++','credentials=null','credentials={...credentials}','connected=null','connected={...connected}','connected.snapshot.snapshotHash="new"','connected.snapshot.hostSnapshotHash="new"','mode=mode==="mixed"?"separate":"mixed"','analysisState={analysisId:"new",revision:2}','localEditPending=true','state.applyRecovery.blocked=true','binding=true','projectRead={}','job={jobId:"new"}','applying=true','batchRunning=true','projectSelection={}','inputCapability={}','syncResult={}','syncJob="new"','planInvalidated=!planInvalidated','planInputHash="new"','resourceInputRevision++','resourceViewRevision++','resourceRequest={}','cacheRequest={}','validationCount=1','validationRevision+=2','state.compatible=false','state.stopEpoch=0','state.gateOpen=false;state.maintenance=null','state.maintenance={id:"new"};state.gateOpen=false','stopRevision++','$("cache-budget").value="3"'];
+ for(const mode of ['separate','mixed'])for(const action of ['prune-cache','release-cache'])for(const stage of ['post','get'])for(const outcome of ['success','error'])for(const change of changes){
+  const h=await heldCache(mode,action,stage);h.f.evaluate(change+';say("New owned scope");toggle()');const before=cacheState(h.f),calls=h.f.calls.length;
+  if(outcome==='success')h.resume(h.value);else h.reject(new Error('Old cache scope'));await h.run;assert.equal(cacheState(h.f),before,change);assert.equal(h.f.calls.length,calls,change);
+ }
+});
+test('own cache validation allows maintenance gate transitions and visible current failure then drain release',async()=>{
+ for(const mode of ['separate','mixed'])for(const outcome of ['success','error']){
+  const h=await heldCache(mode,'prune-cache'),id='c'.repeat(32);h.f.validation(1,[{id,path:'/resources/prune',epoch:0}]);
+  assert.match(h.f.get('status').textContent,/캐시/);
+  h.f.state.gateOpen=false;h.f.state.maintenance={id,status:'pending',drained:false,canRelease:false};await h.f.evaluate('refresh()');assert.equal(h.f.evaluate('stopped'),true);
+  h.f.validation(0,[]);
+  if(outcome==='success'){h.f.state.gateOpen=true;h.f.state.maintenance=null;await h.f.evaluate('refresh()');h.resume(h.value);}
+  else{h.f.state.maintenance={id,status:'failed',drained:true,canRelease:true};await h.f.evaluate('refresh()');h.reject(new Error('Owned current cache failure'));}
+  await h.run;assert.equal(h.f.evaluate('cacheRequest'),null);
+  if(outcome==='success'){assert.match(h.f.get('status').textContent,/완료된 캐시 1/);assert.equal(h.f.get('cache-budget').value,'1');}
+  else{assert.match(h.f.get('status').textContent,/Owned current cache failure/);assert.equal(h.f.get('release-cache').disabled,false);}
+ }
+});
+test('foreign validation lifecycle permanently discards cache replies including validation ABA',async()=>{
+ for(const action of ['prune-cache','release-cache'])for(const descriptors of [undefined,[{id:'d'.repeat(32),path:'/plan',epoch:0}],[{id:'d'.repeat(32),path:'/resources/prune',epoch:1}]]){
+  const h=await heldCache('separate',action);h.f.validation(1,descriptors);h.f.validation(0,[]);const before=cacheState(h.f),calls=h.f.calls.length;h.resume(h.value);await h.run;assert.equal(cacheState(h.f),before);assert.equal(h.f.calls.length,calls);
+ }
+ const h=await heldCache('mixed','prune-cache');h.f.validation(1,[{id:'c'.repeat(32),path:'/resources/prune',epoch:0}]);h.f.validation(0,[]);h.f.validation(1,[{id:'d'.repeat(32),path:'/resources/prune',epoch:0}]);h.f.validation(0,[]);const before=cacheState(h.f);h.resume(h.value);await h.run;assert.equal(cacheState(h.f),before);
+});
+test('cache current successes errors newer guidance and malformed receipts remain useful and atomic',async()=>{
+ for(const action of ['prune-cache','release-cache'])for(const stage of ['post','get'])for(const outcome of ['success','error']){
+  const h=await heldCache('separate',action,stage);if(outcome==='success')h.resume(h.value);else h.reject(new Error('Owned current cache error'));await h.run;
+  assert.match(h.f.get('status').textContent,outcome==='error'?/Owned current cache error/:action==='prune-cache'?/완료된 캐시 1/:/편집.*계속/);
+ }
+ for(const action of ['prune-cache','release-cache']){const h=await heldCache('mixed',action);h.f.evaluate('say("Newer user guidance")');h.resume(h.value);await h.run;assert.equal(h.f.get('status').textContent,'Newer user guidance');}
+ const h=await heldCache('separate','prune-cache');const before=h.f.get('cache-budget').value,calls=h.f.calls.length;h.resume({removed:[]});await h.run;assert.equal(h.f.get('cache-budget').value,before);assert.equal(h.f.calls.length,calls);assert.match(h.f.get('status').textContent,/결과.*확인/);
+});
+test('cache explicit release requires actual drain and respects update recovery and work locks',async()=>{
+ for(const change of ['state.maintenance.drained=false','state.maintenance.canRelease=false','updateIntent={epoch:0}','state.applyRecovery.blocked=true','localEditPending=true','job={jobId:"new"}','validationCount=1','state.stopEpoch=0','state.compatible=false']){
+  const f=await panel();f.evaluate('state.gateOpen=false;stopped=true;state.maintenance={id:"'+'c'.repeat(32)+'",canRelease:true,drained:true};'+change+';toggle()');assert.equal(f.get('release-cache').disabled,true,change);const calls=f.calls.length;await f.click('release-cache');assert.equal(f.calls.length,calls,change);
+ }
+});
+test('cache follow-up receipt never publishes a different maintenance or reopened update state',async()=>{
+ for(const change of [v=>v.maintenance={id:'d'.repeat(32)},v=>v.epoch++,v=>v.stopEpoch=0,v=>v.applyRecovery.blocked=true,v=>v.update.updateState='STOP_REQUESTED']){
+  const h=await heldCache('separate','release-cache','get');const before=cacheState(h.f);change(h.value);h.resume(h.value);await h.run;assert.equal(cacheState(h.f),before);
+ }
+});
+
+
+test('cache successful own continuation can clear its prior plan while preserving analysis and input hash',async()=>{
+ let resume,hold=false;const f=await panel({request:async p=>p==='/resources/prune'&&hold?new Promise(a=>{resume=a;}):undefined});await f.click('analyze');await f.tick();f.evaluate('speakerRows[0].select.value="video:0";cameraRows[0].covered.value="A"');await f.click('plan');assert.ok(f.evaluate('plan'));const analysis=f.evaluate('analysisState'),hash=f.evaluate('planInputHash');
+ hold=true;const run=f.click('prune-cache');for(let i=0;i<30&&!resume;i++)await Promise.resolve();const id='c'.repeat(32);f.validation(1,[{id,path:'/resources/prune',epoch:0}]);f.state.gateOpen=false;f.state.maintenance={id,status:'pending',drained:false,canRelease:false};await f.evaluate('refresh()');assert.equal(f.evaluate('plan'),null);f.validation(0,[]);f.state.gateOpen=true;f.state.maintenance=null;await f.evaluate('refresh()');resume({removed:[],budgetMet:false});await run;assert.equal(f.evaluate('analysisState'),analysis);assert.equal(f.evaluate('planInputHash'),hash);assert.match(f.get('status').textContent,/예산.*초과/);
+});
+test('cache self-accepted GET continuation honors new stop and replacement request cleanup',async()=>{
+ for(const action of ['prune-cache','release-cache']){
+  const h=await heldCache('separate',action,'get',action==='prune-cache'?'const ownedLoad=loadResources;loadResources=async(...args)=>{const value=await ownedLoad(...args);stopRevision++;stopped=true;say("New stop after owned GET");return value;}':'const ownedRefresh=refresh;refresh=async(...args)=>{const value=await ownedRefresh(...args);stopRevision++;stopped=true;say("New stop after owned GET");return value;}');h.resume(h.value);await h.run;assert.equal(h.f.get('status').textContent,'New stop after owned GET');
+  const n=await heldCache('mixed',action);const newer=n.f.evaluate('cacheRequest={newOwner:true};say("New owner stays");cacheRequest');n.resume(n.value);await n.run;assert.equal(n.f.evaluate('cacheRequest'),newer);assert.equal(n.f.get('status').textContent,'New owner stays');
+ }
+});
+
+test('release cache preserves newer update candidate and model metadata at staged state receipt',async()=>{
+ for(const change of ['state.update.candidate={candidateId:"new",appVersion:"0.1.99"}','state.update.checkState="CHECKING"','state.models.silero.status="error"','state.applyRecovery.records=[{id:"new-record"}]']){
+  const h=await heldCache('separate','release-cache','get');h.f.evaluate(change+';say("New server metadata")');const before=cacheState(h.f);h.resume(h.value);await h.run;assert.equal(cacheState(h.f),before,change);
+ }
+});

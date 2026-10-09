@@ -77,7 +77,7 @@ function create(uxp,bundle,options={}) {
   let installed=null, instanceId=null, contextId=null, session=null, connecting=null, generation=0, contextLost=false;
   let requests=Promise.resolve();
   const validations=new Map();
-  function notifyValidation(){try{options.onValidation?.(validations.size);}catch(_){}}
+  function notifyValidation(){try{options.onValidation?.(validations.size,[...validations.values()].map(({id,path,epoch})=>({id,path,epoch})));}catch(_){}}
   function sameScope(scope){return scope.generation===generation&&scope.session===session;}
   async function initialize() {
     if(installed&&instanceId&&contextId)return;
@@ -177,7 +177,7 @@ function create(uxp,bundle,options={}) {
       !textMatches(info.id,HEX16)||info.status!=='pending'||!Number.isSafeInteger(info.epoch)||info.epoch<0||
       !Number.isSafeInteger(info.pollAfterMs)||info.pollAfterMs<50||info.pollAfterMs>1000||
       !Number.isSafeInteger(info.expiresInMs)||info.expiresInMs<1||info.expiresInMs>1800000||validations.has(info.id))throw fail('AUTH_REQUIRED');
-    const pending={id:info.id,scope:initial.scope,canceled:false,deadline:Date.now()+info.expiresInMs};
+    const pending={id:info.id,path,epoch:info.epoch,scope:initial.scope,canceled:false,deadline:Date.now()+info.expiresInMs};
     validations.set(info.id,pending);notifyValidation();
     function current(){if(!sameScope(pending.scope))throw fail('SESSION_EXPIRED');if(pending.canceled)throw fail('CANCELED');if(Date.now()>=pending.deadline)throw fail('CONTINUATION_EXPIRED');}
     const endpoint='/continuations/'+info.id;

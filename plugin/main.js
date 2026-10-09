@@ -262,6 +262,7 @@ function toggle(){
   for(const id of ['analyze','sync','plan','apply-sync','apply','save-settings','load-settings'])$(id).disabled=locked||!connected||(id==='plan'&&!analysisState)||(id==='apply'&&!plan)||(id==='apply-sync'&&!syncResult);
   for(const [id,active,idle,label] of [['save-settings',settingsSave&&!settingsSave.automatic,'저장','저장 중…'],['load-settings',settingsRestore,'불러오기','불러오는 중…']]){$(id).textContent=active?label:idle;$(id).setAttribute('aria-busy',active?'true':'false');}
   for(const id of ['read-project','read-selection','install-model','save-resources','prune-cache'])$(id).disabled=locked;
+  const savingResources=!!resourceRequest?.save;$('save-resources').textContent=savingResources?(resourceRequest.phase==='checking'?'저장 결과 확인 중…':'자원 설정 저장 중…'):'자원 설정 저장';$('save-resources').setAttribute('aria-busy',savingResources?'true':'false');
   for(const el of document.querySelectorAll('[data-work]'))el.disabled=locked;
   $('add-override').disabled=locked||!connected;for(const row of overrideRows)row.remove.disabled=locked||!connected;
   for(const row of overrideRows)for(const field of [row.first,row.last,row.camera])field.disabled=locked||!connected;
@@ -1443,17 +1444,19 @@ async function loadResources(current=()=>true,accepted=()=>{}){
 }
 async function runResourceSettings(save=false){
   if(!resourceSettingsReady(save))return;
-  const token={},guidanceRevision=statusRevision;resourceRequest=token;let current=resourceResponseGuard(token,save);
+  const token={save,phase:'saving'};resourceRequest=token;let current=resourceResponseGuard(token,save);
+  if(save)say('분석 자원 설정을 저장하고 있습니다.');let guidanceRevision=statusRevision;toggle();
   try{
     if(save){
       const settings={device:$('analysis-device').value},raw=$('cache-budget').value.trim();
       if(raw){const bytes=Math.round(Number(raw)*1073741824);if(!Number.isSafeInteger(bytes)||bytes<=0)throw new Error('캐시 예산을 양수로 입력하세요.');settings.cacheBudgetBytes=bytes;}
       await api('/resources',{settings,epoch:state.epoch});if(!current())return;
+      token.phase='checking';if(statusRevision===guidanceRevision){say('저장된 분석 자원 설정과 캐시 상태를 확인하고 있습니다.');guidanceRevision=statusRevision;}toggle();
     }
     if(!await loadResources(current,()=>{current=resourceResponseGuard(token,save);})||!current())return;
     if(save&&statusRevision===guidanceRevision)say('분석 자원 설정을 저장했습니다.');
   }catch(e){if(current()&&statusRevision===guidanceRevision)error(e);}
-  finally{if(resourceRequest===token)resourceRequest=null;}
+  finally{if(resourceRequest===token){resourceRequest=null;toggle();}}
 }
 handler('save-resources',()=>runResourceSettings(true));
 function cacheReady(release=false){

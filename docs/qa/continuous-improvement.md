@@ -2373,3 +2373,20 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 종료근거: 업로드 native78192/exit0·실제3다운로드 native44920/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native93277/exit0·Setup native73941/exit0·추출패키지 native35271/exit0/52.000초. 공개863파일 비공개패턴검사·신뢰키불변·최종52raw일치·설치0.1.0 hash동일·서명키존재만확인·자동화ACTIVE15분·자체CLI0. Node707/native49208/exit0/123953.7606ms·Python496고유/native78418/exit0/100.922초. 독립 native584 정확히1회·추가57고유/58raw·미해결0·source52/peer10/hash seal 확인.
 - 실패원인보존: 신규4 RED/native1은reset버튼부재4fail. GREEN4/4/native0/239.9303ms·관련12/12/native0/884.4238ms·기존시험기대/제품추가수정없음. 문서준비helper의한단락언어오기는검수시작전한국어로정정·제품/시험재실행없음. optional/torchcodec/Silero-SAPI는Community-1품질근거아님. 독립helper실패가있으면해당검수보고서/raw seal에보존.
 - 이어갈 단계: actual-main 미사용초기화뒤0 / 0으로변경되며현재행에는start/end/reset3개만있고복원action없음·raw/hash불변·probe native0. 다음회차명시적초기화직전raw구간을현재행에서되돌리는기능을기획→설계·행수명/입력추가수정/설정로드·연결·모드·작업잠금/accepted결과자동부활금지/즉시update보존수용조건→실패재현부터진행. 이번동결뒤제품추가변경없음·probe/독립matrix는정식집계가산없음. 실제Premiere/UXP 화면·편집·스크린리더·기존0.1.0 업데이트설치전환·Community-1품질미검증. CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/결제/token/media외부업로드없음.
+
+
+## 89회차: 단독 발화 미사용 초기화 되돌리기 — 0.1.90
+
+- 시작 cleanHEAD07b0194f4a87dbd3e16b80ec82777e6418b950c1/latestv0.1.89/release408345189/제목Contentrium CUT/target2d9963ca920715daf826d0df01862ad67f87def6·자체CLI0. 직전actual-main초기화뒤복원action없음확인.
+- 기획/설계: 기존mono단일패널calibration버튼행에native '초기화 되돌리기' 추가. 명시적reset직전 first/last raw를현재행메모리에만보관, reset완료뒤 editingResponseGuard 및현재speaker/stream/channel raw를묶어맥락검증. 현재행/선택/개별녹음/connected/작업허용/현재literal0 / 0 및backup맥락일치시한번만복원. 복원은기존calibrationChanged경로로accepted분석/plan무효화·설정저장/feedback·결과자동부활없음. 새구간입력callback/설정불러오기/행교체/제외/mixed/연결·snapshot/credential/분석·plan맥락변경은backup폐기. 일반잠금은버튼차단하고맥락검증실패는backup폐기. backup은captureSettings나영구저장에포함하지않음.
+- 수용: valid/blank/invalid/scientific/space raw정확복원·다른행/입력보존·단발복원/중복클릭무해·input·loadSettings even0 / 0·새시퀀스/oldrow·마이크변경·모드·선택·worklocks/즉시update차단·분석/plan부활없음·기존start/end/length/reset동작유지. 실패재현→회귀→정식Node/Python→독립검수→추출패키지→공개AVAILABLE/CURRENT/서명/3download/고정v0.1.1. 승인범위자율진행; CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/결제/token/media외부업로드 금지. 실제UXP/host/screenreader/설치전환/Community-1품질미검증.
+
+- 신규4 RED/native1은복원버튼부재4fail. GREEN4/4/native0·258.6719ms·기존시험기대변경없음. 관련회귀16은별도로그보존·정식집계에가산하지않음. metadata5를0.1.90으로갱신하고최종52입력동결.
+
+- 최종정식 Node711/711/native29137/exit0·70798.6524ms·fail/cancel/skip/todo0. Python496고유/native62344/exit0·90.172초·fail/error/skip/excluded0·import중복41만제거. 신규4 RED/native1→GREEN4/native0/258.6719ms·관련16/native0/956.9136ms. 별도matrix는정식집계에가산하지않음·실제Community품질근거아님.
+
+- 독립 C/I/M/미해결 0. native 588 정확히 1회/session 33914/PID 115504/parent 177880/exit 0/78947.5464ms. 추가 86고유/87raw: 첫84 중83pass/1helper실패(설정 load pending 중 복원버튼 사용가능으로 잘못 기대), 실패사례만1pass 교정, 새 지연실패2pass, 통과83 재실행0. 정상 적용된 설정 load는 backup 제거; 현재 범위의 load 실패는 pending 해제 뒤 유효 memory 유지, 낡은 연결 범위 실패는 복원불가. 첫 helper/raw 및 수정본 포함 봉인55개 root SHA/size확인. report SHA cba8ea78d801cfde1f14140bca7f94dd4ee1d281981989d0aa54ec094e2393e1/seal SHA 9477ef0b78402fe3c43c5074ad722596ba28ea4b89b43dfd117dc5b4a00453c2. 11고유 freeze 단계 HEAD/index/status/peer10/packaging52불변, 현재52+10일치. 제품추가수정없음. 정식집계가산없음. package/public은root별도검증. 실제UXP/Premiere/스크린리더/설치/Community품질미검증.
+
+- [0.1.90 패키지 검증](package-0.1.90-proof.json): runtime/CCX native66205/exit0·Setup native89560/exit0·추출 proof native95933/exit0·53.078초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.90·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.
+
+- root 리뷰 수집 helper 실패 2건 보존: 첫 native1 packaging_count 필드 불일치, 둘째 native1 per-case id/pass 필드 불일치. 실제 sealed schema packaging 배열 길이·packaging_expected_mismatches 및 name/status를 사용하도록 reader만 교정, 최종 native0·55 seal hash/size·11 freeze·86 최종/87raw·실패1개만 retry 및 새2개 ledger 직접검증. 제품/시험 수정이나 통과 시험 반복없음; 첫/둘째 script/log/native는 owned scratch에 보존.

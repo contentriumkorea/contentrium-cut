@@ -445,13 +445,15 @@ function renderSyncSources(){
     const row=element('div',undefined,'source-row'),check=checkbox(true),title=element('label',basename(source.canonicalPath));title.insertBefore(check,title.firstChild);row.appendChild(title);
     const fields=element('div',undefined,'row'),stream=number(1),channel=number(1);stream.min=channel.min='1';stream.step=channel.step='1';fields.appendChild(label('오디오 스트림',stream));fields.appendChild(label('채널',channel));row.appendChild(fields);
     const issue=element('p','', 'hint input-error hidden');issue.id='sync-source-error-'+syncRows.length;issue.setAttribute('role','status');issue.setAttribute('aria-live','polite');
-    for(const field of [stream,channel])field.setAttribute('aria-describedby',issue.id);row.appendChild(issue);
+    const selectionHint=element('p','','hint hidden');selectionHint.id='sync-selection-hint-'+syncRows.length;selectionHint.setAttribute('aria-live','polite');check.setAttribute('aria-describedby',selectionHint.id);
+    for(const field of [stream,channel])field.setAttribute('aria-describedby',issue.id+' '+selectionHint.id);row.appendChild(issue);row.appendChild(selectionHint);
     const manual=element('div'),offset=number(0),confirmed=checkbox();offset.step='0.001';manual.appendChild(label('기준 대비 오프셋 · 초',offset));manual.appendChild(label('이 오프셋을 확인했습니다',confirmed));row.appendChild(manual);
     const clock=element('div'),clockId=element('input'),date=element('input'),fps=element('select'),drop=checkbox(),clockConfirmed=checkbox();date.placeholder='YYYY-MM-DD';clockId.placeholder='같은 동기 장치 또는 시계 이름';
     options(fps,[['24000/1001','23.976'],['24/1','24'],['25/1','25'],['30000/1001','29.97'],['30/1','30'],['50/1','50'],['60000/1001','59.94'],['60/1','60']]);fps.value=connected.snapshot.fps.num+'/'+connected.snapshot.fps.den;
     clock.appendChild(label('공통 시계',clockId));clock.appendChild(label('촬영 날짜',date));clock.appendChild(label('타임코드 FPS',fps));clock.appendChild(label('Drop-frame',drop));clock.appendChild(label('날짜와 시계가 같고 촬영 중 리셋하지 않았습니다',clockConfirmed));row.appendChild(clock);
-    $('sync-sources').appendChild(row);syncRows.push({check,source,stream,channel,issue,manual,offset,confirmed,clock,clockId,date,fps,drop,clockConfirmed});
-    for(const field of [check,stream,channel,offset,confirmed,clockId,date,fps,drop,clockConfirmed]){field.disabled=workLocked()||!connected;field.oninput=field.onchange=syncInputEdited;}
+    $('sync-sources').appendChild(row);const syncRow={check,source,stream,channel,issue,selectionHint,manual,offset,confirmed,clock,clockId,date,fps,drop,clockConfirmed};syncRows.push(syncRow);
+    for(const field of [offset,confirmed,clockId,date,fps,drop,clockConfirmed])field.setAttribute('aria-describedby',selectionHint.id);
+    for(const field of [check,stream,channel,offset,confirmed,clockId,date,fps,drop,clockConfirmed]){field.disabled=workLocked()||!connected;field.oninput=field.onchange=()=>{if(syncRows.includes(syncRow))syncInputEdited();};}
     values.push([source.assetId,basename(source.canonicalPath)]);
   }
   options($('sync-reference'),values);syncMethodChanged();
@@ -459,11 +461,13 @@ function renderSyncSources(){
 function clearSyncResult(){syncResult=syncJob=syncResultInputHash=null;syncInvalidated=false;$('sync-result').textContent='';}
 function syncInputsChanged(){clearSyncResult();scheduleSettings();toggle();}
 function syncMethodChanged(){for(const r of syncRows){r.manual.className=$('sync-method').value==='manual'?'':'hidden';r.clock.className=$('sync-method').value==='timecode'?'':'hidden';}syncInputsChanged();}
-function syncInputEdited(){if(!workLocked()&&connected)syncInputsChanged();}
+function syncInputEdited(){if(workLocked()||!connected)return;if(syncResultMatches()){scheduleSettings();toggle();}else syncInputsChanged();}
 function syncMethodEdited(){if(!workLocked()&&connected)syncMethodChanged();}
 function syncFeedback(){
   let first='';const selected=syncRows.filter(r=>r.check.checked);
   for(const row of syncRows){
+    row.selectionHint.textContent=row.check.checked?'':'이 소스는 싱크에서 제외되어 있습니다. 다시 선택하면 입력한 설정을 사용합니다.';
+    row.selectionHint.className=row.check.checked?'hint hidden':'hint';
     const invalidStream=row.check.checked&&(!row.stream.value.trim()||!Number.isSafeInteger(Number(row.stream.value))||Number(row.stream.value)<1);
     const invalidChannel=row.check.checked&&(!row.channel.value.trim()||!Number.isSafeInteger(Number(row.channel.value))||Number(row.channel.value)<1);
     for(const [field,invalid] of [[row.stream,invalidStream],[row.channel,invalidChannel]]){const value=invalid?'true':'false';if(field.getAttribute('aria-invalid')!==value)field.setAttribute('aria-invalid',value);}

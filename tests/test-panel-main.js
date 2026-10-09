@@ -967,7 +967,7 @@ test('sync input autosave preserves invalid values after automatic same-sequence
 });
 
 test('direct sync analysis rejects bad indices without events and input typing updates row accessibility',async()=>{
-  const f=await panel(),row=syncRow(f);row.stream.value='1.5';await f.click('sync');assert.equal(f.calls.some(c=>c.path==='/jobs'),false);assert.equal(row.stream.getAttribute('aria-invalid'),'true');assert.equal(row.stream.getAttribute('aria-describedby'),row.issue.id);
+  const f=await panel(),row=syncRow(f);row.stream.value='1.5';await f.click('sync');assert.equal(f.calls.some(c=>c.path==='/jobs'),false);assert.equal(row.stream.getAttribute('aria-invalid'),'true');assert.equal(row.stream.getAttribute('aria-describedby'),row.issue.id+' '+row.selectionHint.id);
   row.stream.value='2';row.stream.oninput();assert.equal(row.stream.getAttribute('aria-invalid'),'false');assert.equal(row.issue.textContent,'');assert.equal(f.get('sync').disabled,false);
 });
 
@@ -3165,5 +3165,46 @@ test('protected coverage starts disabled for muted tracks and obsolete camera ca
   const f=await panel({native});if(mode==='mixed')await f.click('mode-mixed');const old=f.evaluate('cameraRows[1]');assert.equal(old.role.value,'protected');assert.equal(old.covered.disabled,true);assert.match(old.hint.textContent,/보호/);
   await f.click('read-project');const current=f.evaluate('cameraRows[1]');assert.notEqual(current,old);const before=syncState(f),timer=f.evaluate('settingsTimer'),calls=f.calls.length,raw=f.evaluate('JSON.stringify(cameraRows.map(r=>[r.role.value,r.covered.value,r.hint.textContent]))');
   old.role.value='speaker';old.role.onchange();old.covered.value='B';old.covered.oninput();old.covered.onchange();assert.equal(syncState(f),before);assert.equal(f.evaluate('settingsTimer'),timer);assert.equal(f.calls.length,calls);assert.equal(f.evaluate('JSON.stringify(cameraRows.map(r=>[r.role.value,r.covered.value,r.hint.textContent]))'),raw);
+ }
+});
+
+async function excludedSyncResult(mode='separate',method='audio'){
+ const f=await updatePanel({native:threeMicNative(),request:(p,body,f)=>p==='/jobs/job-1'&&f.jobKind==='sync'?{jobId:'job-1',kind:'sync',epoch:0,drained:true,status:'completed',result:{sources:Object.fromEntries(f.evaluate('syncRows.filter(r=>r.check.checked).map(r=>[r.source.assetId,{status:"accepted"}])')),offsets:Object.fromEntries(f.evaluate('syncRows.filter(r=>r.check.checked).map(r=>[r.source.assetId,0])'))}}:undefined});
+ if(mode==='mixed')await f.click('mode-mixed');const excluded=syncRow(f,1);excluded.check.checked=false;excluded.check.onchange();f.get('sync-method').value=method;f.get('sync-method').onchange();
+ for(const row of f.evaluate('syncRows')){row.confirmed.checked=true;row.clockConfirmed.checked=true;row.clockId.value='owned clock';row.date.value='2026-10-09';}
+ await f.click('sync');await f.tick();assert.ok(f.evaluate('syncResult'));assert.equal(f.evaluate('syncResultMatches()'),true);
+ await f.click('analyze');await f.tick();f.evaluate('cameraRows[0].covered.value="A";speakerRows[0].select.value="video:0";speakerRows[0].select.onchange()');await f.click('plan');assert.ok(f.evaluate('analysisState'));assert.ok(f.evaluate('plan'));assert.ok(f.evaluate('syncResult'));return {f,excluded};
+}
+test('excluded sync edits preserve effective result and accepted plan while saving exact raw settings',async()=>{
+ for(const mode of ['separate','mixed'])for(const method of ['audio','manual','timecode']){
+  const {f,excluded:r}=await excludedSyncResult(mode,method),result=f.evaluate('syncResult'),job=f.evaluate('syncJob'),hash=f.evaluate('syncResultInputHash'),analysis=f.evaluate('analysisState'),plan=f.evaluate('plan'),calls=f.calls.length;
+  for(const [name,value] of [['stream',' 02 '],['channel',''],['offset',' 1.25 '],['confirmed',false],['clockId',' next clock '],['date',''],['fps','25/1'],['drop',true],['clockConfirmed',false]]){const field=r[name];if(typeof value==='boolean')field.checked=value;else field.value=value;field.oninput();field.onchange();assert.equal(f.evaluate('syncResult'),result,name);assert.equal(f.evaluate('syncJob'),job);assert.equal(f.evaluate('syncResultInputHash'),hash);assert.equal(f.evaluate('analysisState'),analysis);assert.equal(f.evaluate('plan'),plan);assert.equal(f.calls.length,calls);}
+  assert.match(r.selectionHint.textContent,/제외/);assert.match(r.selectionHint.textContent,/다시 선택/);assert.equal(r.channel.disabled,false);assert.match(r.channel.getAttribute('aria-describedby'),new RegExp(r.selectionHint.id));assert.equal(r.channel.getAttribute('aria-invalid'),'false');await f.click('save-settings');const saved=JSON.parse(f.saved.rows.get(f.evaluate('settingsKey()'))),stored=saved.syncInput.find(v=>v.assetId===r.source.assetId);assert.equal(stored.channel,'');assert.equal(stored.stream,' 02 ');
+  r.channel.value='9';r.channel.oninput();await f.click('load-settings');const restored=syncRow(f,1);assert.equal(restored.check.checked,false);assert.equal(restored.channel.value,'');assert.equal(restored.stream.value,' 02 ');assert.match(restored.selectionHint.textContent,/제외/);
+ }
+});
+test('unused sync method inputs and equivalent numeric edits preserve current results but effective edits clear them',async()=>{
+ for(const mode of ['separate','mixed'])for(const method of ['audio','manual','timecode']){
+  const {f}=await excludedSyncResult(mode,method),row=syncRow(f,2),reference=syncRow(f),result=f.evaluate('syncResult');row.stream.value='01';row.stream.oninput();assert.equal(f.evaluate('syncResult'),result);
+  if(method!=='manual'){row.offset.value='1.25';row.offset.oninput();}else{reference.offset.value='1.25';reference.offset.oninput();}assert.equal(f.evaluate('syncResult'),result);
+  if(method!=='timecode'){row.clockId.value='unused clock';row.clockId.oninput();assert.equal(f.evaluate('syncResult'),result);}
+  row.channel.value='2';row.channel.oninput();assert.equal(f.evaluate('syncResult'),null);assert.equal(f.evaluate('syncJob'),null);assert.equal(f.get('apply-sync').disabled,true);
+ }
+});
+test('excluded sync result callbacks obey work locks and update starts during raw autosave wait',async()=>{
+ for(const mode of ['separate','mixed']){
+  const {f,excluded:r}=await excludedSyncResult(mode);for(const lock of ['pending','localEditPending','applying']){f.evaluate(lock+'=true;toggle()');const before=syncState(f),calls=f.calls.length;for(const field of [r.check,r.stream,r.channel,r.offset,r.clockId]){assert.equal(field.disabled,true);field.oninput();field.onchange();}assert.equal(syncState(f),before);assert.equal(f.calls.length,calls);f.evaluate(lock+'=false;toggle()');}
+  let resume;const previous=f.saved.setItem;f.saved.setItem=(key,value)=>new Promise(resolve=>{resume=async()=>{await previous(key,value);resolve();};});const result=f.evaluate('syncResult');r.channel.value='2';r.channel.oninput();assert.equal(f.evaluate('syncResult'),result);const saving=f.timeouts[f.evaluate('settingsTimer')-1]();for(let i=0;i<100&&!resume;i++)await Promise.resolve();assert.equal(typeof resume,'function');await f.click('update');assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.equal(f.evaluate('syncResult'),result);const before=syncState(f);r.channel.oninput();r.check.onchange();assert.equal(syncState(f),before);await resume();await saving;assert.equal(r.channel.disabled,true);
+ }
+});
+test('obsolete sync row callbacks cannot erase a newly completed result or enqueue settings',async()=>{
+ for(const mode of ['separate','mixed']){
+  const {f,excluded:old}=await excludedSyncResult(mode);await f.click('read-project');await f.click('sync');await f.tick();assert.ok(f.evaluate('syncResult'));assert.notEqual(syncRow(f,1),old);const before=syncState(f),calls=f.calls.length;
+  old.check.checked=true;old.stream.value='9';old.channel.value='9';for(const field of [old.check,old.stream,old.channel,old.offset,old.clockId]){field.oninput();field.onchange();}assert.equal(syncState(f),before);assert.equal(f.calls.length,calls);
+ }
+});
+test('reselected sync source invalidates old result and exposes preserved invalid channel without reviving it',async()=>{
+ for(const mode of ['separate','mixed'])for(const method of ['audio','manual','timecode']){
+  const {f,excluded:r}=await excludedSyncResult(mode,method),result=f.evaluate('syncResult');r.channel.value='';r.channel.oninput();assert.equal(f.evaluate('syncResult'),result);assert.equal(r.channel.getAttribute('aria-invalid'),'false');r.check.checked=true;r.check.onchange();assert.equal(f.evaluate('syncResult'),null);assert.equal(r.channel.value,'');assert.equal(r.channel.getAttribute('aria-invalid'),'true');assert.equal(r.selectionHint.textContent,'');assert.equal(f.get('apply-sync').disabled,true);r.check.checked=false;r.check.onchange();assert.equal(f.evaluate('syncResult'),null);assert.equal(r.channel.getAttribute('aria-invalid'),'false');assert.match(r.selectionHint.textContent,/제외/);
  }
 });

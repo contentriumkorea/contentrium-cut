@@ -2185,10 +2185,41 @@ async function heldCache(mode,action,stage='post',setup=null){
  if(mode==='mixed')await f.click('mode-mixed');
  f.get('cache-budget').value='2';
  if(action==='release-cache'){f.state.gateOpen=false;f.state.maintenance={id:'c'.repeat(32),status:'canceled',drained:true,canRelease:true};await f.evaluate('refresh()');}
- if(setup)f.evaluate(setup);hold=true;const run=f.click(action);for(let i=0;i<40&&!resume;i++)await Promise.resolve();assert.equal(typeof resume,'function');
+ if(setup)f.evaluate(setup);hold=true;assert.equal(f.get(action).disabled,false,'actual cache action admission');const run=f.click(action);for(let i=0;i<40&&!resume;i++)await Promise.resolve();assert.equal(typeof resume,'function');
  return {f,run,resume,reject,value:stage==='post'?(action==='release-cache'?{released:true}:{removed:['owned-fixture'],budgetMet:true}):action==='prune-cache'?{settings:{device:'cpu',cacheBudgetBytes:1073741824},status:{cacheBytes:0,freeDiskBytes:10737418240}}:{...structuredClone(f.state),gateOpen:true,maintenance:null}};
 }
 function cacheState(f){return JSON.stringify({resource:resourceState(f),state:f.evaluate('JSON.stringify(state)'),connection:f.get('connection').textContent,maintenance:f.get('cache-maintenance').className});}
+test('cache progress identifies prune release and receipt waits and restores buttons',async()=>{
+ for(const mode of ['separate','mixed'])for(const action of ['prune-cache','release-cache'])for(const stage of ['post','get'])for(const outcome of ['success','error']){
+  const h=await heldCache(mode,action,stage),f=h.f,release=action==='release-cache';
+  assert.equal(f.get(action).attrs['aria-busy'],'true');assert.equal(f.get(action).disabled,true);
+  assert.equal(f.get(action).textContent,stage==='get'?(release?'편집 상태 확인 중…':'정리 결과 확인 중…'):(release?'정리 종료 요청 중…':'분석 캐시 정리 중…'));
+  assert.match(f.get('status').textContent,stage==='get'?(release?/편집 상태를 확인/:/정리 결과와 캐시 상태를 확인/):(release?/캐시 정리 종료를 요청/:/완료된 분석 캐시를 정리/));
+  const calls=f.calls.length;await f.click(action);assert.equal(f.calls.length,calls);
+  if(outcome==='success')h.resume(h.value);else h.reject(new Error('Owned cache progress failure'));await h.run;
+  assert.equal(f.get(action).attrs['aria-busy'],'false');assert.equal(f.get(action).textContent,release?'정리 종료 후 편집 계속':'완료된 분석 캐시 정리');assert.equal(f.evaluate('cacheRequest'),null);
+  assert.match(f.get('status').textContent,outcome==='success'?(release?/편집.*계속/:/완료된 캐시 1/):(release&&stage==='get'?/편집 상태를 확인하지 못/:/Owned cache progress failure/));
+ }
+});
+test('cache progress preserves newer guidance and immediate update during each wait',async()=>{
+ for(const mode of ['separate','mixed'])for(const action of ['prune-cache','release-cache'])for(const stage of ['post','get'])for(const outcome of ['success','error']){
+  const h=await heldCache(mode,action,stage);h.f.evaluate('say("Owned newer cache guidance")');if(outcome==='success')h.resume(h.value);else h.reject(new Error('Owned old cache progress'));await h.run;assert.equal(h.f.get('status').textContent,'Owned newer cache guidance');assert.equal(h.f.get(action).attrs['aria-busy'],'false');
+ }
+ for(const action of ['prune-cache','release-cache'])for(const stage of ['post','get']){
+  const h=await heldCache('mixed',action,stage);assert.equal(h.f.get('update').disabled,false);await h.f.click('update');assert.equal(h.f.calls.filter(c=>c.path==='/updates/start').length,1);assert.equal(h.f.evaluate('stopped'),true);const guide=h.f.get('status').textContent;h.resume(h.value);await h.run;assert.equal(h.f.get('status').textContent,guide);assert.equal(h.f.get(action).attrs['aria-busy'],'false');assert.equal(h.f.get('analyze').disabled,true);
+ }
+});
+test('cache progress idle labels and busy state leave resource saving and budget feedback independent',async()=>{
+ const f=await updatePanel();assert.equal(f.get('prune-cache').attrs['aria-busy'],'false');assert.equal(f.get('release-cache').attrs['aria-busy'],'false');assert.equal(f.get('prune-cache').textContent,'완료된 분석 캐시 정리');assert.equal(f.get('release-cache').textContent,'정리 종료 후 편집 계속');
+ f.get('cache-budget').value='-1';f.get('cache-budget').oninput();assert.equal(f.get('prune-cache').disabled,false);assert.equal(f.get('save-resources').disabled,true);assert.equal(f.get('cache-budget').attrs['aria-invalid'],'true');
+ const h=await heldResourceSettings('separate');assert.equal(h.f.get('save-resources').attrs['aria-busy'],'true');for(const id of ['prune-cache','release-cache'])assert.equal(h.f.get(id).attrs['aria-busy'],'false');h.resume();await h.run;
+});
+test('cache release state query errors retain newer guidance received during the prior POST',async()=>{
+ for(const mode of ['separate','mixed']){
+  const h=await heldCache(mode,'release-cache','post','const baseCacheApi=api;api=async(...args)=>{if(args[0]==="/state"&&cacheRequest?.phase==="checking")throw new Error("Owned late release state failure");return baseCacheApi(...args)}');
+  h.f.evaluate('say("Owned new guide during release POST")');h.resume(h.value);await h.run;assert.equal(h.f.get('status').textContent,'Owned new guide during release POST');assert.equal(h.f.get('release-cache').attrs['aria-busy'],'false');assert.equal(h.f.evaluate('cacheRequest'),null);
+ }
+});
 test('cache prune and release discard late POST and follow-up GET after immediate update or cancel',async()=>{
  for(const mode of ['separate','mixed'])for(const action of ['prune-cache','release-cache'])for(const stage of ['post','get'])for(const stop of ['update','cancel'])for(const outcome of ['success','error']){
   const h=await heldCache(mode,action,stage);await h.f.click(stop);const before=cacheState(h.f),calls=h.f.calls.length;

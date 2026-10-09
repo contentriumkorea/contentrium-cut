@@ -264,6 +264,9 @@ function toggle(){
   for(const id of ['read-project','read-selection','install-model','save-resources','prune-cache'])$(id).disabled=locked;
   const budgetIssue=cacheBudgetFeedback();$('save-resources').disabled=locked||!!budgetIssue;
   const savingResources=!!resourceRequest?.save;$('save-resources').textContent=savingResources?(resourceRequest.phase==='checking'?'저장 결과 확인 중…':'자원 설정 저장 중…'):'자원 설정 저장';$('save-resources').setAttribute('aria-busy',savingResources?'true':'false');
+  for(const [id,release,idle] of [['prune-cache',false,'완료된 분석 캐시 정리'],['release-cache',true,'정리 종료 후 편집 계속']]){
+    const active=!!cacheRequest&&cacheRequest.release===release;$(id).textContent=active?(cacheRequest.phase==='checking'?(release?'편집 상태 확인 중…':'정리 결과 확인 중…'):(release?'정리 종료 요청 중…':'분석 캐시 정리 중…')):idle;$(id).setAttribute('aria-busy',active?'true':'false');
+  }
   for(const el of document.querySelectorAll('[data-work]'))el.disabled=locked;
   $('add-override').disabled=locked||!connected;for(const row of overrideRows)row.remove.disabled=locked||!connected;
   for(const row of overrideRows)for(const field of [row.first,row.last,row.camera])field.disabled=locked||!connected;
@@ -1492,22 +1495,25 @@ function cacheResponseGuard(token){
 }
 async function runCache(release=false){
   if(!cacheReady(release))return;
-  const token={release,epoch:state.epoch,id:release?state.maintenance.id:null,plan,planInputHash,validationRevision,guidanceRevision:statusRevision,validationActive:false,validationFinished:false,invalid:false};cacheRequest=token;let current=cacheResponseGuard(token);
+  const token={release,phase:'requesting',epoch:state.epoch,id:release?state.maintenance.id:null,plan,planInputHash,validationRevision,guidanceRevision:statusRevision,validationActive:false,validationFinished:false,invalid:false};cacheRequest=token;let current=cacheResponseGuard(token);
+  say(release?'캐시 정리 종료를 요청하고 있습니다.':'완료된 분석 캐시를 정리하고 있습니다.');token.guidanceRevision=statusRevision;toggle();
   try{
     const value=await api('/resources/prune',release?{epoch:token.epoch,action:'release'}:{epoch:token.epoch});if(!current())return;
     let message;
     if(release){
       if(value?.released!==true)throw new Error('캐시 정리 종료 응답을 확인하지 못했습니다.');
-      if(!await refresh(current,()=>{current=cacheResponseGuard(token);})||!current())return;
+      token.phase='checking';if(statusRevision===token.guidanceRevision){say('편집 상태를 확인하고 있습니다.');token.guidanceRevision=statusRevision;}toggle();
+      if(!await refresh(current,()=>{current=cacheResponseGuard(token);},()=>statusRevision===token.guidanceRevision)||!current())return;
       message='정리를 종료했습니다. 편집을 계속할 수 있습니다.';
     }else{
       if(!Array.isArray(value?.removed)||typeof value.budgetMet!=='boolean')throw new Error('캐시 정리 결과를 확인하지 못했습니다.');
+      token.phase='checking';if(statusRevision===token.guidanceRevision){say('정리 결과와 캐시 상태를 확인하고 있습니다.');token.guidanceRevision=statusRevision;}toggle();
       message='완료된 캐시 '+value.removed.length+'개 정리'+(value.budgetMet?'':' · 보존해야 하는 데이터가 있어 예산을 초과합니다.');
       if(!await loadResources(current,()=>{current=cacheResponseGuard(token);})||!current())return;
     }
     if(statusRevision===token.guidanceRevision)say(message);
   }catch(e){if(current()&&statusRevision===token.guidanceRevision)error(e);}
-  finally{if(cacheRequest===token)cacheRequest=null;}
+  finally{if(cacheRequest===token){cacheRequest=null;toggle();}}
 }
 handler('prune-cache',()=>runCache());
 handler('release-cache',()=>runCache(true));

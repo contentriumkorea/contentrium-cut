@@ -264,9 +264,10 @@ function toggle(){
   for(const id of ['read-project','read-selection','install-model','save-resources','prune-cache'])$(id).disabled=locked;
   const budgetIssue=cacheBudgetFeedback();$('save-resources').disabled=locked||!!budgetIssue;
   $('prune-cache').disabled=locked||resourceInputDirty;
-  const saveInfo=resourceInputDirty&&!resourceRequest?.save?'변경한 분석 자원 설정을 먼저 저장하세요. 캐시 정리는 저장된 예산을 사용합니다.':'';
+  const saveInfo=resourceInputDirty&&!resourceRequest?.save&&!resourceRequest?.discard?'변경한 분석 자원 설정을 먼저 저장하세요. 캐시 정리는 저장된 예산을 사용합니다.':'';
   if($('resource-save-info').textContent!==saveInfo)$('resource-save-info').textContent=saveInfo;$('resource-save-info').className='hint'+(saveInfo?'':' hidden');
   const savingResources=!!resourceRequest?.save;$('save-resources').textContent=savingResources?(resourceRequest.phase==='checking'?'저장 결과 확인 중…':'자원 설정 저장 중…'):'자원 설정 저장';$('save-resources').setAttribute('aria-busy',savingResources?'true':'false');
+  const discardingResources=!!resourceRequest?.discard;$('discard-resources').disabled=locked||!resourceSettingsReady(true)||!resourceInputDirty||!!resourceRequest;$('discard-resources').textContent=discardingResources?'저장된 설정 확인 중…':'저장된 설정으로 되돌리기';$('discard-resources').setAttribute('aria-busy',discardingResources?'true':'false');
   for(const [id,release,idle] of [['prune-cache',false,'완료된 분석 캐시 정리'],['release-cache',true,'정리 종료 후 편집 계속']]){
     const active=!!cacheRequest&&cacheRequest.release===release;$(id).textContent=active?(cacheRequest.phase==='checking'?(release?'편집 상태 확인 중…':'정리 결과 확인 중…'):(release?'정리 종료 요청 중…':'분석 캐시 정리 중…')):idle;$(id).setAttribute('aria-busy',active?'true':'false');
   }
@@ -1457,10 +1458,10 @@ async function loadResources(current=()=>true,accepted=()=>{}){
   const device=value.settings.device,budget=value.settings.cacheBudgetBytes,budgetText=Number.isSafeInteger(budget)&&budget>0?String(budget/1073741824):'',cacheInfo='캐시 '+(value.status.cacheBytes/1073741824).toFixed(2)+' GB · 사용 가능 디스크 '+(value.status.freeDiskBytes/1073741824).toFixed(1)+' GB';
   $('analysis-device').value=device;$('cache-budget').value=budgetText;$('cache-info').textContent=cacheInfo;resourceLoaded=true;resourceInputDirty=false;accepted();return true;
 }
-async function runResourceSettings(save=false){
-  if(!resourceSettingsReady(save))return;
-  const token={save,phase:'saving'};resourceRequest=token;let current=resourceResponseGuard(token,save);
-  if(save)say('분석 자원 설정을 저장하고 있습니다.');let guidanceRevision=statusRevision;toggle();
+async function runResourceSettings(save=false,discard=false){
+  const editing=save||discard;if(!resourceSettingsReady(editing)||discard&&(!resourceInputDirty||resourceRequest||previewBusy>0))return;
+  const token={save,discard,phase:discard?'checking':'saving'};resourceRequest=token;let current=resourceResponseGuard(token,editing);
+  if(save)say('분석 자원 설정을 저장하고 있습니다.');else if(discard)say('저장된 분석 자원 설정을 다시 확인하고 있습니다.');let guidanceRevision=statusRevision;toggle();
   try{
     if(save){
       const settings={device:$('analysis-device').value},budget=cacheBudgetInput();
@@ -1468,12 +1469,14 @@ async function runResourceSettings(save=false){
       await api('/resources',{settings,epoch:state.epoch});if(!current())return;
       token.phase='checking';if(statusRevision===guidanceRevision){say('저장된 분석 자원 설정과 캐시 상태를 확인하고 있습니다.');guidanceRevision=statusRevision;}toggle();
     }
-    if(!await loadResources(current,()=>{current=resourceResponseGuard(token,save);})||!current())return;
+    if(!await loadResources(current,()=>{current=resourceResponseGuard(token,editing);})||!current())return;
     if(save&&statusRevision===guidanceRevision)say('분석 자원 설정을 저장했습니다.');
+    else if(discard&&statusRevision===guidanceRevision)say('저장된 분석 자원 설정으로 되돌렸습니다.');
   }catch(e){if(current()&&statusRevision===guidanceRevision)error(e);}
   finally{if(resourceRequest===token){resourceRequest=null;toggle();}}
 }
 handler('save-resources',()=>runResourceSettings(true));
+handler('discard-resources',()=>runResourceSettings(false,true));
 function cacheReady(release=false){
   return !!credentials&&!!state&&!updateIntent&&!panelContextConflict&&state.compatible!==false&&state.stopEpoch==null&&!binding&&!projectRead&&!job&&!validationCount&&!applying&&!batchRunning&&!localEditPending&&!state.applyRecovery?.blocked&&(release?state.maintenance?.canRelease===true&&state.maintenance.drained===true&&!state.gateOpen:state.gateOpen&&!stopped&&!state.maintenance&&!resourceInputDirty);
 }

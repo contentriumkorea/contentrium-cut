@@ -388,12 +388,19 @@ function calibrationJumpTicks(row,edge){
   return String(edge==='start'?start:end-frame);
 }
 function calibrationJumpReady(row){return !workLocked()&&calibrationRows.includes(row)&&calibrationJumpTicks(row,'start')!==null;}
-function calibrationLengthText(row){
-  if(calibrationJumpTicks(row,'start')===null)return '';
+function calibrationDurationText(first,last){
   const fps=connected.snapshot.fps;
   if(!Number.isSafeInteger(fps?.num)||!Number.isSafeInteger(fps?.den)||fps.num<=0||fps.den<=0)return '';
-  const frames=BigInt(Number(row.last.value))-BigInt(Number(row.first.value)),num=BigInt(fps.num),milliseconds=(frames*BigInt(fps.den)*1000n+num/2n)/num;
-  return '단독 발화 길이: '+frames+'프레임 · 약 '+milliseconds/1000n+'.'+String(milliseconds%1000n).padStart(3,'0')+'초';
+  const frames=BigInt(Number(last))-BigInt(Number(first)),num=BigInt(fps.num),milliseconds=(frames*BigInt(fps.den)*1000n+num/2n)/num;
+  return frames+'프레임 · 약 '+milliseconds/1000n+'.'+String(milliseconds%1000n).padStart(3,'0')+'초';
+}
+function calibrationLengthText(row){
+  if(calibrationJumpTicks(row,'start')===null)return '';
+  const text=calibrationDurationText(row.first.value,row.last.value);return text?'단독 발화 길이: '+text:'';
+}
+function calibrationRestoreLengthText(row){
+  if(!calibrationRestoreReady(row)||calibrationRestoreIssue(row))return '';
+  const text=calibrationDurationText(row.resetBackup.first,row.resetBackup.last);return text?'복원할 구간 길이: '+text:'';
 }
 function calibrationFeedback(){
   let firstIssue='';
@@ -417,6 +424,7 @@ function calibrationFeedback(){
     if(row.lengthHint){const length=calibrationLengthText(row);if(row.lengthHint.textContent!==length)row.lengthHint.textContent=length;row.lengthHint.className='hint'+(length?'':' hidden');}
     if(row.restoreHint){const backup=row.resetBackup,text=calibrationRestoreReady(row)?'복원할 입력: 시작 '+(backup.first===''?'빈 입력':JSON.stringify(backup.first))+' / 종료 '+(backup.last===''?'빈 입력':JSON.stringify(backup.last))+' · 복원 후 구간을 확인하세요.':'';if(row.restoreHint.textContent!==text)row.restoreHint.textContent=text;row.restoreHint.className='hint'+(text?'':' hidden');}
     if(row.restoreIssue){const text=calibrationRestoreIssue(row);if(row.restoreIssue.textContent!==text)row.restoreIssue.textContent=text;row.restoreIssue.className='hint input-error'+(text?'':' hidden');}
+    if(row.restoreLengthHint){const text=calibrationRestoreLengthText(row);if(row.restoreLengthHint.textContent!==text)row.restoreLengthHint.textContent=text;row.restoreLengthHint.className='hint'+(text?'':' hidden');}
   }
   return firstIssue;
 }
@@ -491,6 +499,7 @@ function renderSources(){
     calibration.appendChild(jumps);
     const restoreHint=element('p','','hint hidden');restoreHint.id='calibration-restore-guide-'+(calibrationRows.length-1);restoreHint.setAttribute('role','status');restoreHint.setAttribute('aria-live','polite');calibration.appendChild(restoreHint);calibrationRow.restoreHint=restoreHint;restore.setAttribute('aria-describedby',restore.getAttribute('aria-describedby')+' '+restoreHint.id);
     const restoreIssue=element('p','','hint input-error hidden');restoreIssue.id='calibration-restore-error-'+(calibrationRows.length-1);restoreIssue.setAttribute('role','status');restoreIssue.setAttribute('aria-live','polite');calibration.appendChild(restoreIssue);calibrationRow.restoreIssue=restoreIssue;restore.setAttribute('aria-describedby',restore.getAttribute('aria-describedby')+' '+restoreIssue.id);
+    const restoreLengthHint=element('p','','hint hidden');restoreLengthHint.id='calibration-restore-length-'+(calibrationRows.length-1);restoreLengthHint.setAttribute('role','status');restoreLengthHint.setAttribute('aria-live','polite');calibration.appendChild(restoreLengthHint);calibrationRow.restoreLengthHint=restoreLengthHint;restore.setAttribute('aria-describedby',restore.getAttribute('aria-describedby')+' '+restoreLengthHint.id);
     for(const field of [first,last]){field.min='0';field.step='1';field.setAttribute('aria-describedby',calibrationIssue.id+' '+calibrationHint.id+(positionGuide?' '+positionGuide.id:''));field.disabled=workLocked()||!connected||!calibrationActive(calibrationRow);field.oninput=field.onchange=()=>calibrationChanged(calibrationRow);}
   }
   for(const track of s.tracks.filter(t=>t.mediaType==='video'&&s.clips.some(c=>c.trackRef===t.trackRef))){

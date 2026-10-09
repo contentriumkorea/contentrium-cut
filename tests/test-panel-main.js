@@ -61,7 +61,7 @@ async function panel(extra={}){
       require:name=>name==='uxp'?uxp:name==='./bundle.json'?bundle:name==='./connection.js'?{create:(_uxp,_bundle,options)=>{f.validation=options?.onValidation;return {connect:async()=>{f.connectCalls++;return extra.connect?extra.connect(f):{};},request,reset:()=>{f.resetCalls++;},cancelPending:async()=>{f.cancelValidationCalls++;}};}}:
       ['./sync.js','./selection.js'].includes(name)?{install:x=>x}:require('../plugin/'+name.replace('./',''))});
   vm.runInContext(fs.readFileSync('plugin/main.js','utf8'),context);
-  for(let i=0;i<40;i++)await Promise.resolve();
+  for(let i=0;i<100;i++)await Promise.resolve();
   f.click=async id=>{assert.ok(d.get(id),id);await d.get(id).onclick();};f.tick=()=>timers[0]();f.host=host;f.state=state;f.evaluate=source=>vm.runInContext(source,context);
   f.reviewPlan=async expression=>{f.planResult=f.evaluate('('+expression+')');await f.click('analyze');await f.tick();await f.click('plan');};
   return f;
@@ -2424,4 +2424,51 @@ test('selection late job cleanup cannot cancel an already current job with that 
 
 test('selection atomic commit preserves exact native project and item handles for input creation',async()=>{
   const h=await heldSelection('native'),project={ownedProject:true},item={ownedItem:true};h.native.project=project;h.native.items=[item];h.resolve(h.native);await h.run;assert.equal(h.f.evaluate('projectSelection.project'),project);assert.equal(h.f.evaluate('projectSelection.items[0]'),item);assert.equal(h.f.evaluate('projectSelection.items'),h.native.items);
+});
+
+async function heldInitialization(stage,mode='separate'){
+  let armed=false,resolve,reject;
+  const f=await updatePanel({connect:()=>armed&&stage==='connect'?new Promise((a,b)=>{resolve=a;reject=b;}):Promise.resolve({}),request:(path)=>armed&&!resolve&&path===stage?new Promise((a,b)=>{resolve=a;reject=b;}):undefined});
+  if(mode==='mixed')await f.click('mode-mixed');
+  const originalSnapshot=f.host.snapshot;f.host.snapshot=()=>armed&&stage==='native'?new Promise((a,b)=>{resolve=a;reject=b;}):originalSnapshot();
+  if(stage==='pending')f.evaluate('workflow.pending=()=>new Promise((a,b)=>{globalThis.resumeInitPending=a;globalThis.rejectInitPending=b;})');
+  armed=true;const run=f.evaluate('initialize({manual:true})');
+  for(let i=0;i<120;i++){await Promise.resolve();if(stage==='pending'){resolve=f.evaluate('globalThis.resumeInitPending');reject=f.evaluate('globalThis.rejectInitPending');}if(resolve)break;}
+  assert.equal(typeof resolve,'function','init stage reached '+stage);
+  const value=stage==='connect'?{}:stage==='pending'?null:stage==='/state'?structuredClone(f.state):stage==='/heartbeat'?{epoch:0,gateOpen:true,stopEpoch:null}:stage==='native'?{...f.native,snapshot:structuredClone(f.native.snapshot)}:{};
+  return {f,run,resolve,reject,value};
+}
+for(const mode of ['separate','mixed'])for(const stage of ['connect','pending','/state','/heartbeat','native','/updates/check'])test('initialize lifetime '+mode+' '+stage+' rejects stopped late followers',async()=>{
+  for(const action of ['cancel','update'])for(const failure of [false,true]){
+    const h=await heldInitialization(stage,mode);await h.f.click(action);const guide=h.f.get('status').textContent,credential=h.f.evaluate('credentials'),calls=h.f.calls.length;
+    if(failure)h.reject(Object.assign(new Error('Owned late init error'),{code:'AUTH_REQUIRED'}));else h.resolve(h.value);await h.run;
+    for(let i=0;i<15;i++)await Promise.resolve();
+    assert.equal(h.f.get('status').textContent,guide);assert.equal(h.f.evaluate('credentials'),credential);assert.equal(h.f.evaluate('stopped'),true);assert.equal(h.f.calls.length,calls,'no old followups');
+  }
+});
+test('initialize pending keeps work locked and cancel available until explicit verified retry',async()=>{
+  const h=await heldInitialization('pending');assert.equal(h.f.get('analyze').disabled,true);assert.equal(h.f.get('cancel').disabled,false);await h.f.click('cancel');h.resolve(null);await h.run;await h.f.tick();assert.equal(h.f.get('analyze').disabled,true);h.f.evaluate('workflow.pending=async()=>null');await h.f.click('refresh');assert.equal(h.f.get('analyze').disabled,false);assert.equal(h.f.evaluate('initializationIncomplete'),false);
+});
+
+test('initialize scoped late responses preserve newer credentials owner epoch and guidance',async()=>{
+  for(const stage of ['connect','pending','/state','/heartbeat','native','/updates/check'])for(const failure of [false,true])for(const change of ['credentials={newSession:true}','initializationRequest={newOwner:true}','stopRevision++','state.epoch++','mode=mode=== "mixed"?"separate":"mixed"','job={jobId:"new-job",kind:"analysis"}','localEditPending=true']){
+    const h=await heldInitialization(stage);h.f.evaluate(change+';say("Owned newer initialization state")');const credential=h.f.evaluate('credentials'),resets=h.f.resetCalls,calls=h.f.calls.length,owner=h.f.evaluate('initializationRequest'),before=h.f.evaluate('JSON.stringify({credentials,stopped,localEditPending,connected:connected?.snapshot.snapshotHash,job})');
+    if(failure)h.reject(Object.assign(new Error('Owned stale initializer error'),{code:'AUTH_REQUIRED'}));else h.resolve(h.value);await h.run;
+    assert.equal(h.f.get('status').textContent,'Owned newer initialization state',stage+change);assert.equal(h.f.evaluate('credentials'),credential);assert.equal(h.f.resetCalls,resets);assert.equal(h.f.calls.length,calls,stage+change);assert.equal(h.f.evaluate('JSON.stringify({credentials,stopped,localEditPending,connected:connected?.snapshot.snapshotHash,job})'),before,stage+change);
+    if(change.startsWith('initializationRequest')){assert.equal(h.f.evaluate('initializationRequest'),owner);assert.equal(h.f.evaluate('initializing'),stage!=='/updates/check');}
+  }
+});
+test('initialize validates persisted intent and preserves repair locks',async()=>{
+  for(const receipt of [false,[],{},'private text',0,{schemaVersion:1,requestId:'owned',kind:'unknown'}, {schemaVersion:1,requestId:'owned',kind:'edit'},null]){
+    const h=await heldInitialization('pending');h.resolve(receipt);await h.run;
+    if(receipt===null){assert.equal(h.f.evaluate('localEditPending'),false);assert.equal(h.f.get('analyze').disabled,false);}
+    else{assert.equal(h.f.evaluate('localEditPending'),true);assert.equal(h.f.get('analyze').disabled,true);assert.equal(h.f.get('recover-apply').disabled,false);assert.equal(h.f.evaluate('localIntentError'),receipt?.kind==='edit'?null:'EDIT_INTENT_CORRUPT');}
+  }
+});
+test('initialize update network wait leaves controls usable and cannot overwrite newer guide',async()=>{
+  const h=await heldInitialization('/updates/check');assert.equal(h.f.evaluate('initializing'),false);assert.equal(h.f.evaluate('initializationIncomplete'),false);assert.equal(h.f.get('analyze').disabled,false);h.f.evaluate('say("Owned newer guide")');h.resolve({});await h.run;assert.equal(h.f.get('status').textContent,'Owned newer guide');
+});
+
+test('initialize current invalid installation stays nonretryable despite newer guidance',async()=>{
+  for(const code of ['BOOTSTRAP_INVALID','INSTALLATION_ENROLLMENT_INVALID']){const h=await heldInitialization('connect');h.f.evaluate('say("Owned newer recovery guidance")');h.reject(Object.assign(new Error('Owned invalid installation'),{code}));await h.run;assert.equal(h.f.get('status').textContent,'Owned newer recovery guidance');assert.equal(h.f.evaluate('retryAt'),Infinity);assert.equal(h.f.get('analyze').disabled,true);}
 });

@@ -2055,6 +2055,24 @@ async function heldResourceSettings(mode,stage='post',kind='save'){
  assert.equal(f.get(kind==='save'?'save-resources':'open-settings').disabled,false,'resource button admitted');const run=f.click(kind==='save'?'save-resources':'open-settings');for(let i=0;i<100&&!entered;i++)await Promise.resolve();assert.equal(entered,true);return {f,run,resume,reject};
 }
 function resourceState(f){return JSON.stringify({result:JSON.parse(resultState(f)),device:f.get('analysis-device').value,budget:f.get('cache-budget').value,cache:f.get('cache-info').textContent,loaded:f.evaluate('resourceLoaded'),status:f.get('status').textContent,timer:f.evaluate('settingsTimer')});}
+test('resource preview stop owner refuses save and discard callbacks then admits exact save after drain',async()=>{
+ for(const mode of ['separate','mixed']){
+  const h=await heldExample(mode),f=h.f;h.resume(exampleReceipt(f));await h.run;assert.equal(f.evaluate('previewPlaying'),true);assert.equal(f.evaluate('job'),null);await f.click('open-settings');assert.equal(f.get('cache-budget').disabled,false);f.get('cache-budget').value='2.25';f.get('cache-budget').oninput();const result=resultState(f),cache=f.get('cache-info').textContent;let settle;f.host.ppro.SourceMonitor.play=()=>new Promise(a=>{settle=a;});f.timeouts.at(-1)();for(let i=0;i<100&&!settle;i++)await Promise.resolve();assert.equal(typeof settle,'function');assert.equal(f.evaluate('previewBusy'),1);
+  for(const id of ['save-resources','discard-resources']){assert.equal(f.get(id).disabled,true);const count=f.calls.length;await f.click(id);assert.equal(f.calls.length,count,id);assert.equal(f.get('cache-budget').value,'2.25');assert.equal(f.evaluate('resourceInputDirty'),true);assert.equal(f.get('cache-info').textContent,cache);assert.equal(resultState(f),result);}
+  settle(true);for(let i=0;i<100;i++)await Promise.resolve();assert.equal(f.evaluate('previewBusy'),0);assert.equal(f.evaluate('previewPlaying'),false);assert.equal(f.get('save-resources').disabled,false,'actual drained save admission');const count=f.calls.length;await f.click('save-resources');const sent=f.calls.slice(count);assert.equal(sent.length,2);assert.equal(sent[0].path,'/resources');assert.deepEqual(JSON.parse(JSON.stringify(sent[0].body)),{settings:{device:'cpu',cacheBudgetBytes:2415919104},epoch:0});assert.equal(sent[1].path,'/resources');assert.equal(sent[1].body,undefined);assert.equal(f.evaluate('resourceInputDirty'),false);assert.equal(resultState(f),result);
+ }
+});
+test('resource preview wait keeps earlier save receipts inert and immediate update available',async()=>{
+ for(const mode of ['separate','mixed'])for(const stage of ['post','get'])for(const outcome of ['success','error'])for(const action of ['none','guide','update']){
+  const h=await heldResourceSettings(mode,stage),f=h.f;f.evaluate('previewBusy=1;toggle()');if(action==='guide')f.evaluate('say("Owned resource preview guidance")');if(action==='update'){assert.equal(f.get('update').disabled,false);await f.click('update');assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.equal(f.evaluate('stopped'),true);}const before=resourceState(f),count=f.calls.length;
+  if(outcome==='success')h.resume();else h.reject(new Error('Owned resource preview error'));await h.run;assert.equal(resourceState(f),before,[mode,stage,outcome,action].join('/'));assert.equal(f.calls.length,count);assert.equal(f.evaluate('resourceRequest'),null);assert.equal(f.get('save-resources').attrs['aria-busy'],'false');
+ }
+});
+test('resource preview wait does not restrict current initial read or idle resource guards',async()=>{
+ for(const mode of ['separate','mixed']){
+  const h=await heldResourceSettings(mode,'get','open'),f=h.f;f.evaluate('previewBusy=1;toggle()');assert.equal(f.get('cache-budget').disabled,true);h.resume();await h.run;assert.equal(f.get('analysis-device').value,'cuda');assert.equal(f.get('cache-budget').value,'3');assert.equal(f.evaluate('resourceLoaded'),true);assert.equal(f.evaluate('resourceRequest'),null);assert.equal(f.evaluate('resourceSettingsReady(false)'),true);assert.equal(f.evaluate('resourceSettingsReady(true)'),false);f.evaluate('previewBusy=0;toggle()');assert.equal(f.get('save-resources').disabled,false);assert.equal(f.evaluate('resourceSettingsReady(true)'),true);
+ }
+});
 async function heldResourceDiscard(mode='separate',raw='2.25',device='cuda'){
  let hold=false,resume,reject;
  const f=await updatePanel({request:async(p,b)=>hold&&p==='/resources'&&!b?new Promise((a,z)=>{resume=a;reject=z;}):undefined});

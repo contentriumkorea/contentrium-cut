@@ -1446,7 +1446,7 @@ function cacheBudgetFeedback(){
   if(node.textContent!==issue)node.textContent=issue;node.className='hint input-error'+(issue?'':' hidden');return issue;
 }
 function resourceSettingsReady(save=false){
-  return !!credentials&&!!state&&!updateIntent&&!panelContextConflict&&state.compatible!==false&&state.stopEpoch==null&&(!save||state.gateOpen&&!stopped&&!binding&&!projectRead&&!job&&!validationCount&&!applying&&!batchRunning&&!localEditPending&&!state.applyRecovery?.blocked);
+  return !!credentials&&!!state&&!updateIntent&&!panelContextConflict&&state.compatible!==false&&state.stopEpoch==null&&(!save||state.gateOpen&&!stopped&&!binding&&!projectRead&&!job&&!validationCount&&!applying&&!batchRunning&&!previewBusy&&!localEditPending&&!state.applyRecovery?.blocked);
 }
 function resourceScope(){return [credentials,connected,connected?.snapshot.snapshotHash,connected?.snapshot.hostSnapshotHash,mode,analysisState,analysisState?.revision,state?.epoch,state?.gateOpen,stopped,state?.compatible,state?.appVersion,state?.bundleId,state?.protocolVersion,localEditPending,state?.applyRecovery?.blocked,binding,projectRead,job,validationCount,validationRevision,applying,batchRunning,projectSelection,inputCapability,plan,planInputHash,syncResult,syncJob,syncResultInputHash,resourceInputRevision,resourceViewRevision,resourceInputDirty,stopRevision];}
 function resourceResponseGuard(token,save=false){
@@ -1459,7 +1459,7 @@ async function loadResources(current=()=>true,accepted=()=>{}){
   $('analysis-device').value=device;$('cache-budget').value=budgetText;$('cache-info').textContent=cacheInfo;resourceLoaded=true;resourceInputDirty=false;accepted();return true;
 }
 async function runResourceSettings(save=false,discard=false){
-  const editing=save||discard;if(!resourceSettingsReady(editing)||discard&&(!resourceInputDirty||resourceRequest||previewBusy>0))return;
+  const editing=save||discard;if(!resourceSettingsReady(editing)||discard&&(!resourceInputDirty||resourceRequest))return;
   const token={save,discard,phase:discard?'checking':'saving'};resourceRequest=token;let current=resourceResponseGuard(token,editing);
   if(save)say('분석 자원 설정을 저장하고 있습니다.');else if(discard)say('저장된 분석 자원 설정을 다시 확인하고 있습니다.');let guidanceRevision=statusRevision;toggle();
   try{

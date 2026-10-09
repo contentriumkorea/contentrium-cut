@@ -44,7 +44,7 @@ async function panel(extra={}){
   const request=async(path,body)=>{
     calls.push({path,body});if(extra.request){const result=await extra.request(path,body,f);if(result!==undefined)return result;}
     if(path==='/state')return structuredClone(state);
-    if(path==='/heartbeat')return {gateOpen:true,stopEpoch:null};
+    if(path==='/heartbeat')return {epoch:state.epoch,gateOpen:true,stopEpoch:null};
     if(path==='/project'){f.bound=structuredClone(body.snapshot);return {snapshotHash:body.snapshot.snapshotHash};}
     if(path==='/jobs'){f.jobKind=body.kind;return {jobId:'job-1',kind:body.kind,status:'running'};}
     if(path==='/jobs/job-1')return {jobId:'job-1',kind:f.jobKind,status:f.jobStatus,...(f.jobKind==='sync'?{epoch:0,drained:!['running','canceling'].includes(f.jobStatus)}:{}),result:{}};
@@ -1205,7 +1205,7 @@ test('update starts while preview stop is held and stale refresh cannot reopen e
     await f.tick();assert.equal(f.calls.filter(c=>c.path==='/updates/ack').length,0);
     assert.equal(f.calls.filter(c=>c.path==='/heartbeat').at(-1).body.quiescent,false);
   }finally{release(true);await click;}
-  await f.tick();assert.ok(f.calls.some(c=>c.path==='/updates/ack'));
+  await f.tick();assert.equal(f.evaluate('previewBusy'),0);assert.equal(f.evaluate('previewPlaying'),false);await f.tick();assert.ok(f.calls.some(c=>c.path==='/updates/ack'));
 });
 
 test('preview stop failure cannot prevent update start or claim quiescence',async()=>{
@@ -1471,7 +1471,7 @@ async function heldProject(mode,stage,automatic=true,withPlan=false){
  const original=f.saved.getItem;f.saved.getItem=async key=>stage==='storage'&&hold?promise:original(key);
  const request=f.evaluate('connection.request');f.evaluate('connection').request=async(...args)=>{if(hold&&args[0]===(stage==='heartbeat'?'/heartbeat':'/project')&&['heartbeat','project'].includes(stage))return promise;return request(...args);};
  f.resolveHeld=resolve;const run=automatic?f.evaluate('followSequence()'):f.click('read-project');for(let i=0;i<50;i++)await Promise.resolve();
- return {f,run,resume:()=>{hold=false;resolve(stage==='host'?{snapshot:structuredClone(native.snapshot),perFrame:native.perFrame,sequence:native.sequence}:stage==='heartbeat'?{gateOpen:true,stopEpoch:null}:stage==='storage'?undefined:{snapshotHash:native.snapshot.snapshotHash});},reject:e=>{hold=false;reject(e);}};
+ return {f,run,resume:()=>{hold=false;resolve(stage==='host'?{snapshot:structuredClone(native.snapshot),perFrame:native.perFrame,sequence:native.sequence}:stage==='heartbeat'?{epoch:f.evaluate('state.epoch'),gateOpen:true,stopEpoch:null}:stage==='storage'?undefined:{snapshotHash:native.snapshot.snapshotHash});},reject:e=>{hold=false;reject(e);}};
 }
 test('late automatic project replies preserve update status connection settings and analysis',async()=>{
  for(const mode of ['separate','mixed'])for(const stage of ['host','heartbeat','project','storage'])for(const outcome of ['success','error']){
@@ -1507,7 +1507,7 @@ test('stale closed read heartbeat cannot stop or clear a newer plan',async()=>{
   const {f,run}=await heldProject(mode,'heartbeat',true,true);f.evaluate(change+';planInputHash=planInputsHash();say("Owned new plan")');const before=resultState(f),connection=f.evaluate('connected');
   // Resolve the actual held heartbeat directly with a closed receipt.
     // heldProject exposes its deferred receipt resolver below.
-  f.resolveHeld({gateOpen:false,stopEpoch:0});await run;assert.equal(resultState(f),before);assert.equal(f.evaluate('connected'),connection);assert.equal(f.evaluate('stopped'),false);assert.equal(f.get('status').textContent,'Owned new plan');
+  f.resolveHeld({epoch:0,gateOpen:false,stopEpoch:0});await run;assert.equal(resultState(f),before);assert.equal(f.evaluate('connected'),connection);assert.equal(f.evaluate('stopped'),false);assert.equal(f.get('status').textContent,'Owned new plan');
  }
 });
 test('current automatic registration errors propagate to connection recovery',async()=>{
@@ -1524,7 +1524,7 @@ async function heldCurrentCheck(mode,stage,action='plan'){
  const snapshot=f.host.snapshot;f.host.snapshot=()=>stage==='host'?promise:snapshot();const saved=f.saved.getItem;f.saved.getItem=key=>stage==='storage'?promise:saved(key);
  const request=f.evaluate('connection.request');f.evaluate('connection').request=(...args)=>args[0]===(stage==='heartbeat'?'/heartbeat':'/project')&&['heartbeat','project'].includes(stage)?promise:request(...args);
  const run=action==='correct'?f.evaluate('runAction(()=>correct({type:"name",speakerId:"A",name:"진행자"}))'):action==='sample'?f.evaluate('runAction(()=>listenExample({exampleId:"owned-example"}))'):action==='seek'?f.evaluate('runAction(()=>seekFrame(30))'):f.click(action);
- for(let i=0;i<60;i++)await Promise.resolve();return {f,run,resume:value=>resume(value===undefined?(stage==='host'?{snapshot:structuredClone(native.snapshot),perFrame:native.perFrame,sequence:native.sequence}:stage==='heartbeat'?{gateOpen:true,stopEpoch:null}:stage==='storage'?undefined:{}):value),reject};
+ for(let i=0;i<60;i++)await Promise.resolve();return {f,run,resume:value=>resume(value===undefined?(stage==='host'?{snapshot:structuredClone(native.snapshot),perFrame:native.perFrame,sequence:native.sequence}:stage==='heartbeat'?{epoch:f.evaluate('state.epoch'),gateOpen:true,stopEpoch:null}:stage==='storage'?undefined:{}):value),reject};
 }
 test('update during current timeline check preserves its status and never starts a followup operation',async()=>{
  for(const mode of ['separate','mixed'])for(const stage of ['host','project','heartbeat','storage'])for(const outcome of ['success','error']){
@@ -1761,15 +1761,15 @@ async function heldSavedRangeRebind(mode,stage){
  let resume,reject,entered=false,body;const conn=f.evaluate('connection'),request=conn.request;
  conn.request=(...args)=>{if(args[0]===stage){f.calls.push({path:args[0],body:args[1]});body=args[1];return new Promise((a,b)=>{entered=true;resume=a;reject=b;}).then(result=>{if(stage==='/project')f.bound=structuredClone(body.snapshot);return result;});}return request(...args);};
  const run=f.click('load-settings');for(let i=0;i<150&&!entered;i++)await Promise.resolve();assert.equal(entered,true,stage);
- return {f,run,resume,reject,result:()=>stage==='/heartbeat'?{gateOpen:true,stopEpoch:null}:{snapshotHash:body.snapshot.snapshotHash}};
+ return {f,run,resume,reject,result:()=>stage==='/heartbeat'?{epoch:f.evaluate('state.epoch'),gateOpen:true,stopEpoch:null}:{snapshotHash:body.snapshot.snapshotHash}};
 }
 test('saved range rebind checks inner heartbeat and project waits and preserves current failure guidance',async()=>{
  for(const mode of ['separate','mixed'])for(const stage of ['/heartbeat','/project'])for(const change of ['current','update','cancel','epoch','raw','owner','binding'])for(const outcome of ['success','error']){
   const {f,run,resume,reject,result}=await heldSavedRangeRebind(mode,stage);
   if(change==='update'||change==='cancel')await f.click(change);else if(change==='epoch')f.evaluate('state.epoch++;say("Owned newer rebind scope")');else if(change==='raw')f.evaluate('$("min-shot").value="9";say("Owned newer rebind scope")');else if(change==='owner')f.evaluate('settingsRestore={ownedNew:true};say("Owned newer rebind scope")');else if(change==='binding')f.evaluate('projectRead={ownedNew:true};binding=true;say("Owned newer rebind scope")');
-  const before=savedRestoreState(f),owner=f.evaluate('settingsRestore'),binding=f.evaluate('binding'),calls=f.calls.length;
+  const before=savedRestoreState(f),owner=f.evaluate('settingsRestore'),binding=f.evaluate('binding'),priorConnection=f.evaluate('connected'),calls=f.calls.length;
   if(outcome==='error')reject(Object.assign(new Error('Owned current rebind failure'),{code:'OWNED_CURRENT_REBIND'}));else resume(result());await run;
-  if(change==='current'){if(outcome==='error'){assert.match(f.get('status').textContent,/OWNED_CURRENT_REBIND/);assert.equal(f.evaluate('connected'),null);}else{assert.equal(f.evaluate('analysisState.analysisId'),f.analysisId);assert.match(f.get('status').textContent,/저장한 분석/);}}else{assert.equal(savedRestoreState(f),before,mode+stage+change+outcome);assert.equal(f.calls.length,calls);}
+  if(change==='current'){if(outcome==='error'){assert.match(f.get('status').textContent,stage==='/heartbeat'?/편집 연결 상태를 확인하지 못.*새로고침/:/OWNED_CURRENT_REBIND/);assert.equal(f.evaluate('connected'),stage==='/heartbeat'?priorConnection:null);if(stage==='/heartbeat')assert.equal(f.evaluate('stopped'),true);}else{assert.equal(f.evaluate('analysisState.analysisId'),f.analysisId);assert.match(f.get('status').textContent,/저장한 분석/);}}else{assert.equal(savedRestoreState(f),before,mode+stage+change+outcome);assert.equal(f.calls.length,calls);}
   if(change==='owner')assert.equal(f.evaluate('settingsRestore'),owner);else assert.equal(f.evaluate('settingsRestore'),null);if(change==='binding')assert.equal(f.evaluate('binding'),binding);else assert.equal(f.evaluate('binding'),false);
  }
 });
@@ -2317,4 +2317,48 @@ test('refresh old connection success and errors cannot cross an actual auth reco
   assert.equal(h.f.evaluate('credentials'),credential);assert.equal(h.f.resetCalls,resets);assert.equal(h.f.get('status').textContent,guide);assert.equal(refreshView(h.f),before);assert.notEqual(credential,oldCredential);
   h.f.evaluate('resumeRecoveryRead(false)');await fresh;assert.ok(h.f.evaluate('credentials'));assert.equal(h.f.evaluate('stopped'),false);
  }
+});
+
+
+async function heldHeartbeat(mode='separate',periodic=false,action=null){
+ let armed=false,resume,reject;const f=await updatePanel({request:p=>armed&&!resume&&p==='/heartbeat'?new Promise((a,b)=>{resume=a;reject=b;}):undefined});if(mode==='mixed')await f.click('mode-mixed');await f.reviewPlan('{planHash:"heartbeat-plan",snapshotHash:connected.snapshot.snapshotHash,segments:[{startFrame:0,endFrame:300,cameraId:"video:0",reason:"speech"}],reviews:[]}');armed=true;const run=action?f.click(action):periodic?f.tick():f.evaluate('heartbeat()');for(let i=0;i<80&&!resume;i++)await Promise.resolve();assert.equal(typeof resume,'function');return {f,run,resume,reject,value:{epoch:f.evaluate('state.epoch'),gateOpen:true,stopEpoch:null}};
+}
+test('heartbeat obsolete periodic auth and closed receipts preserve replacement connection plan and skip followers',async()=>{
+ for(const mode of ['separate','mixed'])for(const outcome of ['success','AUTH_REQUIRED','SESSION_EXPIRED','PANEL_CONTEXT_CONFLICT','TRANSPORT_FAILED']){const h=await heldHeartbeat(mode,true);h.f.evaluate('credentials={newConnection:true};say("New heartbeat connection")');const credential=h.f.evaluate('credentials'),before=refreshView(h.f),calls=h.f.calls.length,resets=h.f.resetCalls;if(outcome==='success')h.resume({...h.value,gateOpen:false,stopEpoch:0});else h.reject(Object.assign(new Error('private old heartbeat'),{code:outcome}));await h.run;assert.equal(refreshView(h.f),before);assert.equal(h.f.evaluate('credentials'),credential);assert.equal(h.f.resetCalls,resets);assert.equal(h.f.calls.length,calls);}
+});
+test('heartbeat newer exact owner and scopes discard late success error without releasing newer owner',async()=>{
+ for(const mode of ['separate','mixed'])for(const outcome of ['success','error'])for(const change of ['state={...state}','state.epoch++','state.gateOpen=false','state.stopEpoch=0','state.compatible=false','state.models.silero.status="error"','state.update.checkState="CHECKING"','stopRevision++','updateIntent={epoch:0}','mode=mode==="mixed"?"separate":"mixed"','connected={...connected}','analysisState={...analysisState,revision:1}','plan={...plan,planHash:"new"}','job={jobId:"new"}','validationRevision++','applying=true','batchRunning=true','previewPlaying=true','previewBusy=1','localEditPending=true','panelContextConflict=true']){const h=await heldHeartbeat(mode);h.f.evaluate(change+';say("New heartbeat scope");toggle()');const before=refreshView(h.f),calls=h.f.calls.length;if(outcome==='success')h.resume({...h.value,gateOpen:false,stopEpoch:0});else h.reject(Object.assign(new Error('private obsolete'),{code:'AUTH_REQUIRED'}));assert.equal(await h.run,false);assert.equal(refreshView(h.f),before,change);assert.equal(h.f.calls.length,calls,change);}
+ const h=await heldHeartbeat();const owner=h.f.evaluate('heartbeatOwner');assert.equal(await h.f.evaluate('heartbeat()'),true);h.f.evaluate('say("New exact heartbeat")');const before=refreshView(h.f);h.resume({...h.value,gateOpen:false,stopEpoch:0});assert.equal(await h.run,false);assert.equal(refreshView(h.f),before);assert.notEqual(h.f.evaluate('heartbeatOwner'),owner);
+});
+test('heartbeat malformed current receipts preserve last state plan and lock until refreshed',async()=>{
+ for(const value of [null,{},[],{epoch:-1,gateOpen:true,stopEpoch:null},{epoch:"0",gateOpen:true,stopEpoch:null},{epoch:0,gateOpen:"true",stopEpoch:null},{epoch:0,gateOpen:true,stopEpoch:-1},{epoch:0,gateOpen:true,stopEpoch:1}]){const h=await heldHeartbeat(),state=h.f.evaluate('state'),plan=h.f.evaluate('plan');h.resume(value);assert.equal(await h.run,false);assert.equal(h.f.evaluate('state'),state);assert.equal(h.f.evaluate('plan'),plan);assert.equal(h.f.evaluate('stopped'),true);assert.match(h.f.get('status').textContent,/새로고침/);assert.doesNotMatch(h.f.get('status').textContent,/TypeError|private/);await h.f.click('refresh');assert.equal(h.f.evaluate('stopped'),false);}
+});
+test('heartbeat current failures keep new guidance and reconnect only owned auth',async()=>{
+ for(const mode of ['separate','mixed'])for(const code of ['AUTH_REQUIRED','SESSION_EXPIRED','PANEL_CONTEXT_CONFLICT','TRANSPORT_FAILED'])for(const guide of [false,true]){const h=await heldHeartbeat(mode),state=h.f.evaluate('state'),plan=h.f.evaluate('plan'),credential=h.f.evaluate('credentials');if(guide)h.f.evaluate('say("New main guidance")');h.reject(Object.assign(new Error('private path/token'),{code}));assert.equal(await h.run,false);assert.equal(h.f.evaluate('state'),state);assert.equal(h.f.evaluate('stopped'),true);assert.equal(h.f.resetCalls,['AUTH_REQUIRED','SESSION_EXPIRED'].includes(code)?1:0);assert.equal(h.f.evaluate('credentials'),code==='TRANSPORT_FAILED'?credential:null);if(code!=='PANEL_CONTEXT_CONFLICT')assert.equal(h.f.evaluate('plan'),plan);if(guide)assert.equal(h.f.get('status').textContent,'New main guidance');assert.doesNotMatch(h.f.get('status').textContent,/private|path|token/);}
+});
+test('heartbeat custom guard rejects before request and after receipt and respects native quiescence',async()=>{
+ const f=await updatePanel(),calls=f.calls.length;assert.equal(await f.evaluate('heartbeat(()=>false)'),false);assert.equal(f.calls.length,calls);
+ const h=await heldHeartbeat();h.f.evaluate('credentials=null');h.resume(h.value);assert.equal(await h.run,false);
+ for(const change of ['applying=true','previewPlaying=true','previewBusy=1']){const g=await updatePanel();g.evaluate(change);assert.equal(await g.evaluate('heartbeat()'),true);assert.equal(g.calls.filter(c=>c.path==='/heartbeat').at(-1).body.quiescent,false);}
+});
+test('heartbeat discarded direct source selection does not clear prior rows or invoke native read',async()=>{
+ for(const mode of ['separate','mixed'])for(const outcome of ['success','error']){const h=await heldHeartbeat(mode,false,'read-selection');let reads=0;h.f.host.selectedSources=async()=>{reads++;throw new Error('must not read');};h.f.evaluate('credentials={newConnection:true};say("New source owner")');const before=refreshView(h.f),calls=h.f.calls.length;if(outcome==='success')h.resume(h.value);else h.reject(Object.assign(new Error('obsolete source'),{code:'AUTH_REQUIRED'}));await h.run;assert.equal(refreshView(h.f),before);assert.equal(reads,0);assert.equal(h.f.calls.length,calls);}
+});
+
+test('heartbeat actual reconnect before intent read preserves new connection on every old outcome',async()=>{
+ for(const mode of ['separate','mixed'])for(const outcome of ['success','AUTH_REQUIRED','SESSION_EXPIRED','PANEL_CONTEXT_CONFLICT','TRANSPORT_FAILED']){const h=await heldHeartbeat(mode,true);h.f.evaluate('pollError({code:"AUTH_REQUIRED"});workflow.pending=()=>new Promise(r=>globalThis.resumeHeartbeatRecovery=r)');const init=h.f.evaluate('initialize()');for(let i=0;i<80;i++)await Promise.resolve();const credential=h.f.evaluate('credentials'),resets=h.f.resetCalls;h.f.evaluate('say("Real new connection")');const before=refreshView(h.f),calls=h.f.calls.length;if(outcome==='success')h.resume({...h.value,gateOpen:false,stopEpoch:0});else h.reject(Object.assign(new Error('old connection private'),{code:outcome}));await h.run;assert.equal(refreshView(h.f),before);assert.equal(h.f.evaluate('credentials'),credential);assert.equal(h.f.resetCalls,resets);assert.equal(h.f.calls.length,calls);h.f.evaluate('resumeHeartbeatRecovery(false)');await init;assert.ok(h.f.evaluate('credentials'));assert.equal(h.f.evaluate('stopped'),false);}
+});
+test('heartbeat current closed gate and newer epoch invalidate plan but preserve state until explicit refresh',async()=>{
+ for(const receipt of [{epoch:0,gateOpen:false,stopEpoch:null},{epoch:0,gateOpen:true,stopEpoch:0},{epoch:1,gateOpen:true,stopEpoch:null}]){const h=await heldHeartbeat(),state=h.f.evaluate('state');h.resume(receipt);assert.equal(await h.run,true);assert.equal(h.f.evaluate('state'),state);assert.equal(h.f.evaluate('plan'),null);assert.equal(h.f.evaluate('stopped'),true);assert.equal(h.f.get('analyze').disabled,true);await h.f.click('refresh');assert.equal(h.f.evaluate('stopped'),false);}
+ const h=await heldHeartbeat();h.resume(h.value);assert.equal(await h.run,true);assert.ok(h.f.evaluate('plan'));assert.equal(h.f.evaluate('stopped'),false);
+});
+test('heartbeat current monotonic check and post-await custom guard reject without partial commit',async()=>{
+ const f=await updatePanel();f.state.epoch=2;await f.click('refresh');const request=f.evaluate('connection.request');f.evaluate('connection').request=(...a)=>a[0]==='/heartbeat'?Promise.resolve({epoch:1,gateOpen:true,stopEpoch:null}):request(...a);const state=f.evaluate('state');assert.equal(await f.evaluate('heartbeat()'),false);assert.equal(f.evaluate('state'),state);assert.equal(f.evaluate('stopped'),true);
+ let resume,armed=false;const g=await updatePanel({request:p=>armed&&p==='/heartbeat'?new Promise(a=>{resume=a;}):undefined});armed=true;g.evaluate('globalThis.heartbeatGuard=true');const run=g.evaluate('heartbeat(()=>heartbeatGuard)');for(let i=0;i<40;i++)await Promise.resolve();g.evaluate('heartbeatGuard=false;say("New guard guide")');const before=refreshView(g);resume({epoch:0,gateOpen:false,stopEpoch:0});assert.equal(await run,false);assert.equal(refreshView(g),before);
+});
+test('heartbeat discarded input creation cannot issue native authorization or clear selected sources',async()=>{
+ for(const action of ['update','cancel','credential','closed']){const f=await selectedPanel();f.state.update={updateState:'IDLE',updateEpoch:0,checkState:'AVAILABLE',candidate:{candidateId:'release:hash',manifestDigest:'a'.repeat(64),appVersion:'0.1.1'}};await f.evaluate('refresh()');const request=f.evaluate('connection.request');let resume;f.evaluate('connection').request=(...a)=>a[0]==='/heartbeat'?new Promise(r=>{resume=r;}):request(...a);const run=f.click('create-input');for(let i=0;i<80&&!resume;i++)await Promise.resolve();assert.equal(typeof resume,'function');if(action==='credential')f.evaluate('credentials={newConnection:true};say("New input owner")');else if(action!=='closed')await f.click(action);const selection=f.evaluate('projectSelection'),capability=f.evaluate('inputCapability'),calls=f.calls.length;resume({epoch:0,gateOpen:action!=='closed',stopEpoch:null});await run;assert.equal(f.evaluate('projectSelection'),selection);assert.equal(f.evaluate('inputCapability'),capability);assert.ok(f.calls.slice(calls).every(c=>['/state','/updates/ack'].includes(c.path)),action+JSON.stringify(f.calls.slice(calls).map(c=>c.path)));assert.equal(f.calls.some(c=>c.path==='/input/begin'),false);}
+});
+test('heartbeat discarded initialization follower does not read sequence or start update lookup',async()=>{
+ let armed=false,resume;const f=await updatePanel({request:p=>armed&&!resume&&p==='/heartbeat'?new Promise(r=>{resume=r;}):undefined});armed=true;const run=f.evaluate('initialize()');for(let i=0;i<80&&!resume;i++)await Promise.resolve();assert.equal(typeof resume,'function');await f.click('update');const before=refreshView(f),calls=f.calls.length;resume({epoch:0,gateOpen:true,stopEpoch:null});await run;assert.equal(refreshView(f),before);assert.equal(f.calls.length,calls);assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);
 });

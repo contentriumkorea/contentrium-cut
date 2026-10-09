@@ -1,0 +1,103 @@
+{
+  "version": "0.1.71",
+  "assets": [
+    {
+      "name": "Contentrium-CUT-Windows-x64.zip",
+      "size": 332265552,
+      "sha256": "2ffd4e23f969af2b52683a8a44c08dcff415793dbff4265ad2c62d66633f785d",
+      "members": 18119,
+      "expandedBytes": 893081284
+    },
+    {
+      "name": "Contentrium-CUT.ccx",
+      "size": 82142,
+      "sha256": "f9b889d77956752417563b35b6142b9a5e927fd76b845f51ba580d8f729066d2",
+      "members": 16,
+      "expandedBytes": 298625
+    },
+    {
+      "name": "Contentrium-CUT-Setup.exe",
+      "size": 93424229,
+      "sha256": "29b3baae9b2033a2362d1b61c6855fd6ee6dff02642c9b1289796a49a741bfab"
+    }
+  ],
+  "packagedModulesMatchSource": {
+    "runtime": [
+      "contentrium_cut.analysis_inputs",
+      "contentrium_cut.apply_journal",
+      "contentrium_cut.audio",
+      "contentrium_cut.audio_evidence",
+      "contentrium_cut.auth",
+      "contentrium_cut.bootstrap",
+      "contentrium_cut.cache",
+      "contentrium_cut.contract",
+      "contentrium_cut.coordinator",
+      "contentrium_cut.corrections",
+      "contentrium_cut.dependencies",
+      "contentrium_cut.input_capabilities",
+      "contentrium_cut.integration",
+      "contentrium_cut.jobs",
+      "contentrium_cut.launcher",
+      "contentrium_cut.launcher_transaction",
+      "contentrium_cut.lifecycle",
+      "contentrium_cut.migration_registration",
+      "contentrium_cut.mixed_chunks",
+      "contentrium_cut.model_setup",
+      "contentrium_cut.models",
+      "contentrium_cut.policy",
+      "contentrium_cut.process_scope",
+      "contentrium_cut.resource",
+      "contentrium_cut.service",
+      "contentrium_cut.source_validation",
+      "contentrium_cut.sync_methods",
+      "contentrium_cut.updater",
+      "contentrium_cut.windows_install"
+    ],
+    "setup": [
+      "contentrium_cut.analysis_inputs",
+      "contentrium_cut.apply_journal",
+      "contentrium_cut.audio",
+      "contentrium_cut.audio_evidence",
+      "contentrium_cut.auth",
+      "contentrium_cut.bootstrap",
+      "contentrium_cut.cache",
+      "contentrium_cut.contract",
+      "contentrium_cut.coordinator",
+      "contentrium_cut.corrections",
+      "contentrium_cut.dependencies",
+      "contentrium_cut.input_capabilities",
+      "contentrium_cut.installer_preparation",
+      "contentrium_cut.integration",
+      "contentrium_cut.jobs",
+      "contentrium_cut.launcher_transaction",
+      "contentrium_cut.lifecycle",
+      "contentrium_cut.migration_registration",
+      "contentrium_cut.mixed_chunks",
+      "contentrium_cut.models",
+      "contentrium_cut.policy",
+      "contentrium_cut.process_scope",
+      "contentrium_cut.resource",
+      "contentrium_cut.sync_methods",
+      "contentrium_cut.updater",
+      "contentrium_cut.windows_install"
+    ]
+  },
+  "packagedEntrypointsMatchSource": [
+    "companion/main.py",
+    "tools/install_entry.py"
+  ],
+  "runtimeProbe": {
+    "appVersion": "0.1.71",
+    "bundleId": "contentrium-cut-0.1.71",
+    "runtimeReady": true,
+    "torchVersion": "2.14.1+cpu",
+    "onnxVersion": "1.30.0"
+  },
+  "setupHelpExitCode": 0,
+  "bundledSileroHashesVerified": true,
+  "ccxMatchesSource": true,
+  "privateMaterialScanPassed": true,
+  "liveInstallationChanged": false,
+  "nativePremiereTested": false,
+  "elapsedSeconds": 66.63999999999942
+}

@@ -1025,11 +1025,37 @@ function syncValidation(count,descriptors){
 function syncPollScope(){
   return [credentials,connected,connected?.snapshot.snapshotHash,connected?.snapshot.hostSnapshotHash,mode,job,state?.epoch,state?.gateOpen,state?.stopEpoch,state?.compatible,state?.appVersion,state?.bundleId,state?.protocolVersion,state?.maintenance,stopped,updateIntent,stopRevision,panelContextConflict,localEditPending,state?.applyRecovery?.blocked,applying,batchRunning,binding,projectRead,projectSelection,inputCapability,analysisState,analysisState?.revision,plan,planInputHash,syncResult,syncJob,syncResultInputHash,syncInvalidated,settingsRestore,settingsSave,resourceRequest,cacheRequest,modelRequest,syncInputHash(),JSON.stringify([$('sync-method').value,$('sync-reference').value,syncRows.map(r=>[r.check.checked,r.stream.value,r.channel.value,r.offset.value,r.confirmed.checked,r.clockId.value,r.date.value,r.fps.value,r.drop.checked,r.clockConfirmed.checked])])];
 }
+const syncReviewReasons={
+ TIMECODE_FPS_MISMATCH:'타임코드 FPS를 확인하지 못했거나 소스·기준 소스와 다릅니다. FPS 설정을 확인하세요.',
+ TIMECODE_DROPFRAME_MISMATCH:'Drop-frame 설정이 타임코드 또는 기준 소스와 다릅니다. FPS와 Drop-frame 설정을 확인하세요.',
+ TIMECODE_DATE_REQUIRED:'촬영 날짜를 확인하지 못했습니다. 실제 촬영 날짜를 YYYY-MM-DD로 입력하세요.',
+ TIMECODE_CLOCK_REQUIRED:'공통 시계 이름이 없습니다. 같은 시계의 소스에 동일한 이름을 입력하세요.',
+ TIMECODE_CLOCK_MISMATCH:'기준 소스와 공통 시계가 다릅니다. 시계 설정을 확인하거나 수동 싱크로 보정하세요.',
+ TIMECODE_CONFIRMATION_REQUIRED:'타임코드 정보를 확인하지 않았습니다. 날짜와 공통 시계 정보를 확인하세요.',
+ TIMECODE_RESET:'타임코드가 리셋되었거나 리셋 여부를 확인하지 못했습니다. 정보를 확인하고 수동 싱크로 보정하세요.',
+ TIMECODE_INVALID:'타임코드 형식 또는 프레임 값이 올바르지 않습니다. 소스 타임코드와 FPS를 확인하세요.',
+ TIMECODE_METADATA_CONFLICT:'소스 타임코드 정보가 서로 맞지 않습니다. 소스를 확인하고 수동 싱크로 보정하세요.',
+ TIMECODE_MISSING:'소스에 타임코드 정보가 없습니다. 오디오 싱크 또는 수동 싱크를 사용하세요.',
+ TIMECODE_DATE_AMBIGUOUS:'촬영 날짜와 시간 차이를 확정하지 못했습니다. 날짜를 확인하거나 수동 싱크로 보정하세요.',
+ TIMECODE_AUDIO_CONFLICT:'타임코드와 오디오 싱크 결과가 다릅니다. 소스를 확인하고 수동 싱크로 보정하세요.',
+ MANUAL_SYNC_CONFIRMATION_REQUIRED:'수동 싱크 시간값을 확인하지 않았습니다. 보정값을 확인하세요.',
+ MANUAL_SYNC_INVALID:'수동 싱크 시간값 또는 대응 지점이 올바르지 않습니다. 입력값을 확인하세요.',
+ MANUAL_SYNC_DRIFT:'대응 지점의 시간 차이가 일정하지 않습니다. 앞뒤 지점을 확인하고 수동 싱크로 보정하세요.',
+ SYNC_DRIFT:'녹음 중 시간 차이가 변합니다. 앞뒤 싱크를 확인하고 수동 싱크로 보정하세요.',
+ SYNC_GRAPH_CONFLICT:'소스 간 싱크 결과가 서로 맞지 않습니다. 기준 소스를 확인하고 수동 싱크로 보정하세요.',
+ SYNC_ACCUMULATED_UNCERTAINTY:'여러 소스를 거친 시간 차이의 신뢰도가 낮습니다. 기준 소스와 직접 비교하거나 수동 싱크로 보정하세요.',
+ SYNC_PATH_UNCERTAIN:'기준 소스까지의 싱크 연결을 확정하지 못했습니다. 오디오 채널을 확인하거나 수동 싱크로 보정하세요.',
+ SYNC_UNRESOLVED:'기준 소스와 맞출 구간을 찾지 못했습니다. 오디오 채널을 확인하거나 수동 싱크로 보정하세요.'
+};
+function syncReviewReason(result,id,evidence){
+  const reviews=Array.isArray(result.reviews)?result.reviews:[],codes=[...new Set([evidence.reason||evidence.code,...reviews.filter(review=>review&&typeof review==='object'&&(review.assetId===id||Array.isArray(review.assetIds)&&review.assetIds.includes(id))).map(review=>review.code)].filter(code=>typeof code==='string'&&code.trim()))];
+  return codes.length?codes.map(code=>Object.prototype.hasOwnProperty.call(syncReviewReasons,code)?syncReviewReasons[code]:code).join(' · '):evidence.status==='review'?'싱크 연결을 확인하고 수동 싱크로 보정하세요.':evidence.status;
+}
 function stagedSyncDisplay(result,assets,connection){
   const record=value=>!!value&&typeof value==='object'&&!Array.isArray(value);
   if(!record(result)||!record(result.sources)||!record(result.offsets)||Object.keys(result.sources).length!==assets.length||assets.some(id=>!record(result.sources[id])||typeof result.sources[id].status!=='string'))throw Object.assign(new Error('싱크 결과를 확인하지 못했습니다. 싱크를 다시 분석하세요.'),{code:'SYNC_RESULT_INVALID'});
   const sources=new Map(connection.snapshot.sources.map(s=>[s.assetId,basename(s.canonicalPath)]));
-  return assets.map(id=>{const evidence=result.sources[id],offset=result.offsets[id];if(evidence.status==='accepted'&&(!['number','string'].includes(typeof offset)||typeof offset==='string'&&!offset.trim()||!Number.isFinite(Number(offset))))throw Object.assign(new Error('싱크 시간 정보를 확인하지 못했습니다. 싱크를 다시 분석하세요.'),{code:'SYNC_RESULT_INVALID'});return sources.get(id)+' · '+(evidence.status==='accepted'?Number(offset).toFixed(3)+'초':'확인 필요 · '+(evidence.reason||evidence.code||evidence.status));}).join('\n');
+  return assets.map(id=>{const evidence=result.sources[id],offset=result.offsets[id];if(evidence.status==='accepted'&&(!['number','string'].includes(typeof offset)||typeof offset==='string'&&!offset.trim()||!Number.isFinite(Number(offset))))throw Object.assign(new Error('싱크 시간 정보를 확인하지 못했습니다. 싱크를 다시 분석하세요.'),{code:'SYNC_RESULT_INVALID'});return sources.get(id)+' · '+(evidence.status==='accepted'?Number(offset).toFixed(3)+'초':'확인 필요 · '+syncReviewReason(result,id,evidence));}).join('\n');
 }
 async function pollSyncJob(active){
   if(syncPoll)return;
@@ -1177,7 +1203,7 @@ async function pollJob(){
       if(active.inputHash!==syncInputHash()){invalidateSyncResult();return;}
       syncJob=value.jobId;syncResult=value.result;syncResultInputHash=active.inputHash;
       const sources=new Map(connected.snapshot.sources.map(s=>[s.assetId,basename(s.canonicalPath)]));
-      $('sync-result').textContent=Object.entries(syncResult.sources).map(([id,evidence])=>sources.get(id)+' · '+(evidence.status==='accepted'?(Number(syncResult.offsets[id]).toFixed(3)+'초'):'확인 필요 · '+(evidence.reason||evidence.code||evidence.status))).join('\n');
+      $('sync-result').textContent=Object.entries(syncResult.sources).map(([id,evidence])=>sources.get(id)+' · '+(evidence.status==='accepted'?(Number(syncResult.offsets[id]).toFixed(3)+'초'):'확인 필요 · '+syncReviewReason(syncResult,id,evidence))).join('\n');
       say('싱크 분석 완료 · 확인이 필요한 소스를 검토하세요.');
     }else if(active.kind==='input-probe'){
       try{

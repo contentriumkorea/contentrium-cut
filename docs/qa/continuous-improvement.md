@@ -2506,3 +2506,30 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 종료근거: 업로드 native22079/exit0·실제3다운로드 native15279/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native12395/exit0·Setup native54855/exit0·추출패키지 native22441/exit0/51.000초. 공개883파일 비공개패턴검사·신뢰키불변·최종52raw일치·설치0.1.0 hash동일·서명키존재만확인·자동화ACTIVE15분·자체CLI0. Node727/native91072/exit0/79129.1205ms·Python496고유/native87696/exit0/99.219초. 독립추가58고유/59raw·미해결0·source52/peer10/seal 일치.
 - 실패원인: 신규4 RED/native1은클립범위입력버튼부재4fail/181.9418ms. GREEN4/4/native0/223.2000ms·시험helper교정/재실행0·기존시험본문기대변경0. 관련38/38/native0/2147.2195ms. apply_patch 초기hunk순서거부1(소스무변경)→순서교정후적용·원본tool증거보존. 독립/수집helper실패시원본증거/교정별도기록. optional/torchcodec/Silero-SAPI는Community품질근거아님.
 - 이어갈 단계: actual-main raw 07/1.9e1를클립범위0/300으로입력한뒤 이전원문구간을되돌리는명시적버튼없음·resetBackup null·probe native0. 다음회차클립범위입력되돌리기를기획→설계·원문정확복구/행별backup/같은범위맥락과작업잠금/새입력·설정적용·행교체폐기/update즉시차단·분석/plan자동부활금지 수용조건→실패재현부터진행. 이번동결뒤추가제품변경없음·probe/독립matrix는정식집계가산없음. 실제Premiere/UXP/스크린리더/기존0.1.0설치전환/Community품질미검증. CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/결제/token/media외부업로드없음.
+
+
+## 94회차: 클립 범위 입력 되돌리기 — 0.1.95
+
+- 시작 clean HEADb62dd0db38b41d3b3e0212d326d60122fe1dd689/latest v0.1.94/release408401292/제목 Contentrium CUT/target77ff76a5805932d257d1be6802e4ad5a6e35ef0c·자체 CLI0. 클립 범위 입력으로 덮인 사용자 원문 구간을 바로 되돌릴 수 없는 불편을 개선한다.
+- 설계: 행별 clipRangeBackup에 채우기 직전 first/last 원문, 채운 값과 기존 editingResponseGuard+speaker/stream/channel 맥락을 보관한다. 클립 범위 입력 아래 별도 한 버튼 행으로 폭을 확보하고 명시적 되돌리기 버튼을 연결한다. 현재 값이 채운 값이고 같은 맥락/활성 행/연결/작업 잠금 해제일 때만 복원 허용; 클릭 시 재검사. raw 공백/빈 입력/무효 입력도 정확하게 복원하며 기존 입력 오류 안내가 이어진다. 직접 input/change, 초기화, 설정 적용, 모드/선택/맥락 변경, 행 교체로 기록 폐기. 잠금 자체는 임시 차단하며 업데이트 클릭 즉시 차단한다. 기존 calibrationChanged로 분석·plan 무효화/설정 예약을 공유하며 이전 분석·plan은 자동 부활하지 않는다. 복원은 1회이며 다른 마이크·snapshot·원본·오디오·자막·개별 컷 보존, host/API 작업 없음.
+- 수용 조건: 원문 공백/scientific/빈/무효/미사용 정확 복원·반복 no-op·aria 이름/설명·별도 버튼 행, 반복 마이크별 독립과 분석/plan 무효화, 직접 입력/change/설정 적용/초기화/모드·선택·채널·화자/맥락·행수명 폐기, 모든 worklocks/연결 해제/업데이트 즉시 차단. 신규 실패 재현→구현→관련/전체 Node/Python→읽기 전용 독립 리뷰→추출 패키지 실행→GitHub 공개 발견/서명/3download size/hash/고정v0.1.1 검증. 자율 설계·배포 승인 범위에서 진행. CUA/browser/Premiere 조작/사용자 설치 활성화/terms/결제/token/media 외부 업로드 없음. 실제 Premiere/UXP/스크린리더/0.1.0 설치 전환/Community-1 품질 미검증.
+
+- 신규4 RED/native1: 명시적 되돌리기 버튼 부재로4fail. 구현 전 새 시험의 미도달 설정/맥락 helper 두 이름을 실제 restoreSettings/projectRead로 바로잡고 RED 원문을 scratch 보존했다. 기존 시험 기대/본문 변경 없음. 소스 raw bytes 교체로 기존 mixed newline 보존.
+
+- GREEN 첫회3pass/1helperfail(native1): 신규 stale-backup 표의 eval 문자열에서 mode 따옴표 escape가 한 단계 소실되어 SyntaxError. 해당 helper만 escape 교정·원본 시험/source/log 보존, 제품 변경/기존 시험 기대 변경 없음. 실패 시험만 재실행하며 통과3 재실행 없음.
+
+- 신규4 최종고유4pass/5raw·helper실패1/실패1만교정재실행·통과재실행0. RED4부재/native1→GREEN3pass1helperfail/native1→실패1pass/native0. 기존 시험본문/기대 불변 확인. metadata5 0.1.95/52raw 입력동결·최종main bytes newline 보존.
+
+- 최종 정식 Node731/731/native31325/exit0/67554.7356ms·fail/cancel/skip/todo0. Python496고유/native65950/exit0/88.453초·fail/error/skip/excluded0·import 중복41만제거. 관련42/42/2236.2331ms/native0. 신규4고유/5raw·helper1 보존·실패만재실행·통과재실행0. 독립 추가시험은 정식 집계 가산 없음.
+
+- 독립검수 Important1 재현: 일시 validationCount/applying/localEditPending/applyRecovery 잠금에서 editingResponseGuard의 admission 조건이 false가 되어 feedback이 rawbackup을영구폐기. 신규 정식1 RED/native1/158.3868ms로 validationCount 잠금 복구 실패 확인. 변경맥락 identity만 비교하는 clip전용 guard로분리하고 workLocked는 버튼/직접handler 즉시차단을계속담당. 기존 shared guard/초기화복원 동작변경0. 이전52/main/Node731/Python496 증거 보존·최종main만변경/51불변으로동결갱신. Node 전체는 최종raw 재검증하며 Python 소스와Setup/runtime Python은 불변이라 재실행/재빌드하지 않는다.
+
+- 잠금 GREEN 첫실행(native1/146.0303ms): identity분리 뒤 batchRunning 단독은 기존workLocked에포함되지않아 새undo가활성화됨. 신규8잠금 표 중 마지막batch에서재현·원본log/native/main보존. undo readiness에batch admission만추가(backup identity에는포함하지않음), 기존 전역workLocked/sharedguard 불변. 실패 정식1을교정제품으로재검증한다.
+
+- 좁힌 독립추가검수에서 Important1: admission과identity분리로 실제cancel/update 직전stopRevision 변경을빠뜨려 rawbackup이즉시폐기되지않음. 순수stopRevision++, actual cancel, actual update3경로 독립제품실패·별도도우미3 selectedRows shape 오류는실패만교정·원본보존. 신규정식1 RED/native1/147.3000ms로실패재현, clip전용guard에stopRevision identity추가하여 중단/업데이트 lifecycle는폐기하고일시잠금은보존. 이전main/52/Node732증거보존·최종main만변경/51불변.
+
+- 독립 최종 C/I/M/미해결0·소스범위 병합가능. 원본69+새41=110고유/121raw/현재110pass·과거제품실패7/helper4 원본보존·실패만11교정재검증·통과재실행0·정식콜백0. Important I1 일시잠금 폐기4실패와I2 stopRevision 누락3실패를각각회귀/좁힌검수로해결. 원본/추가/최종36파일 seal bytes/SHA + 최종rawlog/native0은root추가SHA봉인. 각before/after52·HEAD/index/status/doc 일치·단계간main만변경/51불변·현재52일치. 원본helper1은비반복3행ARIA position기대오류, 추가helper3은dummy selectedRows shape 오류·실패만교정. 원본report d859ddfb98e6ce48be310ca99b7570b825ebbf514caee9e86792bc395edc38a9·추가1adf30a4aabd06aaf48d9952074c7b17fbe835a41ec06bf1a07f7584dd604be0·최종ffcce7da7effbf7db5b51ca643631d521d4e963be7ee7781bfa92d435b9537b8. root 읽기helper 경로명 integrity-final 추정1건은 실제 final-integrity로 바로잡았고tool원본보존·제품/시험실패 아님. 실제UXP화면/스크린리더/설치/Community품질은판단제외, root패키지/공개별도검증.
+
+- 최종 정식 Node733/733/native84728/exit0/85415.6567ms·fail/cancel/skip/todo0. Python496고유/native65950/exit0/88.453초·fail/error/skip/excluded0·import 중복41만제거. 관련42/42/2236.2331ms/native0. 신규6고유/8GREEN raw·helper1/product1 보존·실패만재실행·통과재실행0. 독립 추가시험은 정식 집계 가산 없음.
+
+- [0.1.95 패키지 검증](package-0.1.95-proof.json): runtime/CCX native91154/exit0·Setup native37650/exit0·추출 proof native64456/exit0·59.500초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.95·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.

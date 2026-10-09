@@ -2347,3 +2347,19 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 종료근거: 업로드 native95746/exit0·실제3다운로드 native97652/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native46761/exit0·Setup native86213/exit0·추출패키지 native23820/exit0/54.234초. 공개859파일 비공개패턴검사·신뢰키불변·최종52raw일치·설치0.1.0 hash동일·서명키존재만확인·자동화ACTIVE15분·helper종료뒤자체CLI0. root Node703/native5371/exit0/99845.7636ms·Python496고유/native65500/exit0/94.765초. 독립 native580 정확히1회·추가67고유/67raw·미해결0·최종source52/peer10/hash seal확인.
 - 실패원인보존: 최초신규4 RED/native1/123.7148ms는길이표시부재. 첫GREEN2pass/2fail/native1/243.2288ms는연결해제fixture가captureSettings()를호출한오류. 새시험의raw행캡처만수정하여실패2만2/2/native0/282.7694ms. 관련22/22/native0/1345.8228ms, 정식Node703/Python496통과. record-native는성공했으나동일조회명령의존재하지않는旧next-inspect.js조회로tool종료1; 실제.cjs경로확인·로그와정식집계보존·시험재실행없음. optional/torchcodec/Silero-SAPI는Community품질근거아님. 독립helper실패는별도검수기록과raw seal에보존.
 - 이어갈 단계: actual-main 구간7–19프레임에시작/끝확인2개만있고미사용초기화action은없음·raw/hash불변·probe native0. 다음회차선택된단독발화구간을명시적인한번의동작으로0 / 0으로되돌리는기능을기획→설계·제외/mixed/작업잠금/행교체/설정복원/accepted결과무효화/즉시update보존수용조건→실패재현부터진행. 이번최종동결뒤제품추가변경없음·probe/독립matrix는정식집계에가산하지않음. 실제Premiere/UXP 화면·편집·스크린리더·기존0.1.0 업데이트설치전환·Community-1 실제품질미검증. 컴퓨터유즈/browser/Premiere실행조작종료/사용자재설치활성화/terms/결제/token/media외부업로드없음.
+
+
+## 88회차: 단독 발화 구간 미사용 초기화 — 0.1.89
+
+- 시작 cleanHEAD3597a26a6e31eb025992309fc12255b73047b466/latestv0.1.88/release408334682/제목Contentrium CUT/targetfaa946eb0303af2f15173d68677493e9b5e4e649·자체CLI0. 직전 actual-main 7–19 구간에미사용초기화action 없음확인.
+- 기획/설계: 기존mono단일패널의calibration이동버튼행에native button '미사용으로 초기화' 추가. 현재행소유권/connected/개별녹음/마이크선택/모든workLocked를확인하고, trim비어있지않은두값이numeric0이면disabled/no-op. 유효·무효·빈입력 모두선택한행만literal0 / 0으로수정. 기존calibrationChanged→invalidateAnalysis→설정저장/feedback/toggle 경로재사용. 재클릭/lateoldrow/excluded/mixed/disconnected/작업잠금은입력·accepted결과·저장·API 변경없음. 기존guide/error/aria/start/end/length 유지. 명시적인버튼이므로별도확인대기없음.
+- 수용: valid/invalid/blank/outsideclip/scientific/space 구간초기화·한행만변경·stream/channel/speaker/check/다른입력보존·accepted분석/plan무효화·설정저장복원·숫자0이미미사용은raw보존·12worklock/기타gate/oldrow 차단·update즉시작업차단·cancel/start 유지. 실패재현→관련회귀→정식Node/Python→독립read-only검수→추출패키지→공개AVAILABLE/CURRENT/서명/3실제download/고정v0.1.1 확인. 자율설계/배포승인범위; CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/결제/token/media외부업로드 금지. 실제UXP/host/screenreader/설치전환/Community-1품질미검증.
+
+- 신규4 RED/native1은reset버튼부재4fail. GREEN4/4/native0·239.9303ms·제품3행추가·기존시험기대변경없음. 관련회귀12/12/native0·884.4238ms는별도로그보존·정식집계에가산하지않음. metadata5를0.1.89로갱신하고최종52입력을동결함.
+
+- 최종정식 Node707/707/native49208/exit0·123953.7606ms·fail/cancel/skip/todo0. Python496고유/native78418/exit0·100.922초·fail/error/skip/excluded0·import중복41만제거. 신규4 RED/native1→GREEN4/native0/239.9303ms·관련12/native0/884.4238ms. 별도matrix는정식집계에가산하지않음·실제Community품질근거아님.
+
+- 독립C/I/M/미해결0. native584 정확히1회/session33716/PID77704/parent176536/exit0/72791.2067ms. 추가57고유/58raw·첫57중56pass/1fixture실패(연결해제후captureSettings조회)·실패사례만1pass로교정·통과56재실행없음. 원본/fixed helpers/logs 봉인44개 root전체hash확인. reportSHA7f97bbc43689a52bfaa56939cd2e2b467844010b56318941e0ab698fcc076d01/sealSHA5f1c262445c37ad13dd31395ad79a3f621a11b63881164e667617ddeb73082df. freeze목록10항목(중복static-before1 포함, 고유9개) HEAD/index/status/peer10/packaging52불변·현재52+10일치·제품추가수정없음. 정식집계에가산없음. package/public은root별도검증·실제UXP/Premiere/screenreader/설치/Community품질미검증.
+- 검수기록root helper 첫실행/native1은declined_to_judge가없는스키마조회오류; 실제declined_judgments목록으로reader만교정·fixed/native0·원본log/marker보존·제품/native/독립시험재실행없음. 독립static helper 첫실패는parameterized native584와직접선언수를혼동; 4신규선언비교로교정·원본봉인·소스시험재실행없음.
+
+- [0.1.89 패키지 검증](package-0.1.89-proof.json): runtime/CCX native93277/exit0·Setup native73941/exit0·추출 proof native35271/exit0·52.000초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.89·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.

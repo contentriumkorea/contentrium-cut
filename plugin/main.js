@@ -372,6 +372,13 @@ function analysisOptionChanged(id){
 function calibrationActive(row){return mode==='separate'&&row.check.checked;}
 function calibrationResetReady(row){return !workLocked()&&!!connected&&calibrationRows.includes(row)&&calibrationActive(row)&&!(row.first.value.trim()!==''&&row.last.value.trim()!==''&&Number(row.first.value)===0&&Number(row.last.value)===0);}
 function calibrationRestoreReady(row){return !workLocked()&&!!connected&&calibrationRows.includes(row)&&calibrationActive(row)&&row.first.value==='0'&&row.last.value==='0'&&!!row.resetBackup&&row.resetBackup.current();}
+function calibrationRestoreIssue(row){
+  if(!calibrationRestoreReady(row))return '';
+  const a=row.resetBackup.first.trim(),b=row.resetBackup.last.trim(),first=Number(a),last=Number(b);
+  if(!a||!b||!Number.isSafeInteger(first)||!Number.isSafeInteger(last)||first<0||last<=first)return '복원 대상: 시작·종료는 정수 프레임이며 종료가 시작보다 커야 합니다. 복원 후 입력을 고치세요.';
+  if(BigInt(first)*BigInt(connected.perFrame)<BigInt(row.clip.startTicks)||BigInt(last)*BigInt(connected.perFrame)>BigInt(row.clip.endTicks))return '복원 대상: 단독 발화 구간이 이 마이크 클립 범위를 벗어납니다. 복원 후 입력을 고치세요.';
+  return '';
+}
 function calibrationJumpTicks(row,edge){
   if(!connected||!calibrationActive(row))return null;
   const a=row.first.value.trim(),b=row.last.value.trim(),first=Number(a),last=Number(b);
@@ -409,6 +416,7 @@ function calibrationFeedback(){
     if(row.hint.textContent!==hint)row.hint.textContent=hint;if(message&&!firstIssue)firstIssue=message;
     if(row.lengthHint){const length=calibrationLengthText(row);if(row.lengthHint.textContent!==length)row.lengthHint.textContent=length;row.lengthHint.className='hint'+(length?'':' hidden');}
     if(row.restoreHint){const backup=row.resetBackup,text=calibrationRestoreReady(row)?'복원할 입력: 시작 '+(backup.first===''?'빈 입력':JSON.stringify(backup.first))+' / 종료 '+(backup.last===''?'빈 입력':JSON.stringify(backup.last))+' · 복원 후 구간을 확인하세요.':'';if(row.restoreHint.textContent!==text)row.restoreHint.textContent=text;row.restoreHint.className='hint'+(text?'':' hidden');}
+    if(row.restoreIssue){const text=calibrationRestoreIssue(row);if(row.restoreIssue.textContent!==text)row.restoreIssue.textContent=text;row.restoreIssue.className='hint input-error'+(text?'':' hidden');}
   }
   return firstIssue;
 }
@@ -482,6 +490,7 @@ function renderSources(){
     const restore=element('button','초기화 되돌리기');restore.setAttribute('type','button');restore.setAttribute('data-work','true');restore.setAttribute('data-calibration-restore','true');restore.setAttribute('aria-label','단독 발화 초기화 되돌리기 · '+calibrationRow.title);restore.setAttribute('aria-describedby',calibrationIssue.id+' '+calibrationHint.id+(positionGuide?' '+positionGuide.id:''));restore.disabled=!calibrationRestoreReady(calibrationRow);restore.onclick=()=>{if(!calibrationRestoreReady(calibrationRow))return;const backup=calibrationRow.resetBackup;first.value=backup.first;last.value=backup.last;calibrationChanged(calibrationRow);};jumps.appendChild(restore);calibrationRow.restoreButton=restore;
     calibration.appendChild(jumps);
     const restoreHint=element('p','','hint hidden');restoreHint.id='calibration-restore-guide-'+(calibrationRows.length-1);restoreHint.setAttribute('role','status');restoreHint.setAttribute('aria-live','polite');calibration.appendChild(restoreHint);calibrationRow.restoreHint=restoreHint;restore.setAttribute('aria-describedby',restore.getAttribute('aria-describedby')+' '+restoreHint.id);
+    const restoreIssue=element('p','','hint input-error hidden');restoreIssue.id='calibration-restore-error-'+(calibrationRows.length-1);restoreIssue.setAttribute('role','status');restoreIssue.setAttribute('aria-live','polite');calibration.appendChild(restoreIssue);calibrationRow.restoreIssue=restoreIssue;restore.setAttribute('aria-describedby',restore.getAttribute('aria-describedby')+' '+restoreIssue.id);
     for(const field of [first,last]){field.min='0';field.step='1';field.setAttribute('aria-describedby',calibrationIssue.id+' '+calibrationHint.id+(positionGuide?' '+positionGuide.id:''));field.disabled=workLocked()||!connected||!calibrationActive(calibrationRow);field.oninput=field.onchange=()=>calibrationChanged(calibrationRow);}
   }
   for(const track of s.tracks.filter(t=>t.mediaType==='video'&&s.clips.some(c=>c.trackRef===t.trackRef))){

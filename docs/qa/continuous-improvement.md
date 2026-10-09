@@ -1303,3 +1303,13 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 독립 최종208/208 explicit VM 시나리오·native exit0 및 전체 panel 정확히1회452/452·82,111.1372ms·session62772/actual exit0. 현재 C/I/M0/0/0·제품/fixture 실패 없음, main/tests 위 SHA 전후 동일. TEMP contentrium-cut-cycle50-independent-91751ab557a8416dbf09f340ea99edfa/review-report.md·원본 matrix/full/exit/hash 증거 보존. 단계별POST/GET·새 안내·owner/credential/raw/view/scope·exact payload/cache·초기 조회·추가toggle의 plan/sync 보존을 확인했다. cancel은 실제 VM handler 호출의 수명 동작이며 자원 저장 중 cancel 버튼 활성화나 물리 전송 취소로 확대하지 않는다. update는 실제 활성 admission과 즉시1회 제출을 확인했다. 빌드 중, 사용자 설치/활성화·Premiere 조작 없음.
 
 - 엔진/CCX native21616·Setup native28745·패키지 검사 native88800 모두 actual exit0. [0.1.51 패키지 증거](package-0.1.51-proof.json): ZIP/CCX CRC·경로·크기·비공개 자료 제외·raw 최종 CCX source/metadata·Silero 해시·runtime29/Setup26모듈·진입점2개 일치. 추출 engine runtimeReady=true/0.1.51·Setup help exit0·54.547초. 고정52입력·공개699개 비공개 패턴·신뢰 키 유지. 이번 준비는 기존 Windows CRLF metadata를 보존하여 빌드 전후 raw SHA 동일하다. optional/torchcodec 경고 보존. 현재 단계는 기획·설계·구현·회귀·독립 검수·패키지 실행 완료이며0.1.51 공개 및 익명 AVAILABLE/서명/실제3다운로드/CURRENT/고정v0.1.1 검증을 이어간다. 사용자 실제 설치/활성화·Premiere 조작 없음.
+
+### 공개 결과
+
+- [v0.1.51](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.51): release `407690131`, 제목 `Contentrium CUT`, draft/prerelease 아님. 공개 시각 2026-10-09 17:09:38 KST (`2026-10-09T08:09:38Z`), target/tag commit `77dba5272d0f7c09b98e70c0354c5907a2b0a474` 확인.
+- [공개 실제 재다운로드](release-0.1.51-proof.json): 익명 제품 경로0.1.50 →0.1.51 AVAILABLE·서명·실제 ZIP/CCX/Setup3개 크기/SHA-256 일치.
+- [현재 버전](release-0.1.51-current-proof.json): 빈 상태0.1.51 CURRENT/후보 없음. 공개 자산5개 ID·크기·digest 및 서명 문서 실제 바이트 일치.
+- [고정 복구 조회](migration-pinned-0.1.1-after-0.1.51-proof.json): latest0.1.51에서도 정확한 서명 v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+- 현재 단계: 기획 → 설계 → 구현 → 검증 →0.1.51 공개 및 공개 재검증 완료. 다음 회차는 캐시 예산 입력의 즉시 오류 피드백이다. actual 활성 입력/저장 버튼 두 모드×0/-1/1e20의6개에서 aria-invalid/인라인 오류가 없고 저장이 활성화되어 있음을 cycle50-next-inspect.js/.log(native exit0)에 기록했다. 기존 검증은 저장 클릭 뒤 모두 POST 전에 거절해 안전 경계를 유지한다. 빈 예산·양수의 정확한 bytes 반올림/안전정수 조건을 보존하며 입력 중 피드백·저장 admission·오류 수정 후 복원을 설계한다. 사용자 실제 시각/UI 시험이 아닌 VM evidence다.
+- root Node575/575·Python496/496·실제 native exit0, 독립208/208·패널 full 정확히1회452/452·각exit0·현재C/I/M0/0/0. 신규3valid RED(native1)→관련10GREEN(native0), 최종main/tests 검수 전후 SHA 동일. 이번 전체 회귀/검수/패키지 실행에 미해결 실패 없음. 기존 간헐 실패는 이번 최종 전체에서 재현되지 않았고 원인은 미확정이다. 원본 RED와 빌드 optional/torchcodec 경고·독립 report/log/hash/exit 증거를 보존한다.
+- 활성0.1.0 active/journal/first-install 해시 동일·서명 키 존재·ACTIVE15분·기존 공개 파일/사용자 자료/설정/실패 증거 보존. 컴퓨터유즈·브라우저·Premiere 조작·재설치·provider/미디어 업로드 없음. 실제 UXP/Premiere 편집·설치 전환·Community-1 품질·이미 발행한 API/저장소/재생/물리 전송 취소/rollback 미검증.

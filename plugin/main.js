@@ -5,7 +5,7 @@ require('./sync.js').install(ContentriumHost);
 require('./selection.js').install(ContentriumHost);
 const $=id=>document.getElementById(id);
 const view=require('./view.js').install(document);
-const connection=require('./connection.js').create(uxp,bundle,{onValidation:(count,descriptors)=>{validationRevision++;validationCount=count;const own=cacheValidation(count,descriptors),modelOwn=modelValidation(count,descriptors);if(count&&!stopped){if(modelOwn){if(modelRequest.guidanceRevision===statusRevision){say('화자 모델 리비전을 확인하고 있습니다.');modelRequest.guidanceRevision=statusRevision;}}else{say(own?'완료된 캐시를 확인하고 정리하고 있습니다.':'원본 파일의 내용이 분석 결과와 같은지 확인하고 있습니다.');if(own)cacheRequest.guidanceRevision=statusRevision;}}toggle();}});
+const connection=require('./connection.js').create(uxp,bundle,{onValidation:(count,descriptors)=>{validationRevision++;validationCount=count;const own=cacheValidation(count,descriptors),modelOwn=modelValidation(count,descriptors),syncOwn=syncValidation(count,descriptors);if(count&&!stopped){if(syncOwn){if(syncPoll.guidanceRevision===statusRevision){say('싱크 원본 파일을 확인하고 있습니다.');syncPoll.guidanceRevision=statusRevision;}}else if(modelOwn){if(modelRequest.guidanceRevision===statusRevision){say('화자 모델 리비전을 확인하고 있습니다.');modelRequest.guidanceRevision=statusRevision;}}else{say(own?'완료된 캐시를 확인하고 정리하고 있습니다.':'원본 파일의 내용이 분석 결과와 같은지 확인하고 있습니다.');if(own)cacheRequest.guidanceRevision=statusRevision;}}toggle();}});
 function requestId(){const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');}
 const workflow=require('./workflow.js').create({api:(...args)=>api(...args),storage:uxp.storage.secureStorage,randomId:requestId,
   stopped:()=>stopped,onBatch:value=>{batchRunning=value;},onResult:()=>say('결과 시퀀스에 편집을 적용하고 있습니다.')});
@@ -15,7 +15,7 @@ let microphoneSelectionCustomized=false;
 let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;let projectRead=null,nativePreparation=null,editingSubmission=null,correctionRequest=null,settingsRestore=null,settingsSave=null;
 let settingsWriteTail=Promise.resolve();
 let modelRequest=null,modelInputRevision=0,modelPoll=null;
-let cacheRequest=null;
+let cacheRequest=null,syncPoll=null;
 let resourceRequest=null,resourceInputRevision=0,resourceViewRevision=0,resourceInputDirty=false,stopRevision=0;
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
 let analysisState=null;
@@ -574,7 +574,7 @@ async function submitEditingJob(path,body,identity,message,inputsCurrent=()=>tru
     if(!current())throw currentCheckDiscarded;
     let next;try{next=await api(path,body);}catch(e){if(!current())throw currentCheckDiscarded;throw e;}
     if(!current())throw currentCheckDiscarded;
-    job={...next,...identity};say(message);toggle();
+    job={...next,...identity,...(next.kind==='sync'?{epoch:body.epoch}:{})};say(message);toggle();
   }finally{if(editingSubmission===token)editingSubmission=null;}
 }
 async function listenExample(example){
@@ -871,8 +871,67 @@ async function pollModelJob(active){
     finishPolledJob(active);
   }finally{if(modelPoll===token)modelPoll=null;}
 }
+function syncValidation(count,descriptors){
+  const token=syncPoll;if(!token)return false;
+  const own=!token.invalid&&token.phase==='query'&&!token.validationFinished&&count===1&&Array.isArray(descriptors)&&descriptors.length===1&&descriptors[0].path==='/jobs/'+token.active.jobId&&descriptors[0].epoch===token.epoch&&typeof descriptors[0].id==='string'&&/^[a-f0-9]{32}$/.test(descriptors[0].id)&&(!token.id||token.id===descriptors[0].id);
+  if(own){token.id=descriptors[0].id;token.validationActive=true;token.validationRevision=validationRevision;return true;}
+  if(!count&&token.validationActive&&!token.invalid){token.validationActive=false;token.validationFinished=true;token.validationRevision=validationRevision;return false;}
+  token.invalid=true;return false;
+}
+function syncPollScope(){
+  return [credentials,connected,connected?.snapshot.snapshotHash,connected?.snapshot.hostSnapshotHash,mode,job,state?.epoch,state?.gateOpen,state?.stopEpoch,state?.compatible,state?.appVersion,state?.bundleId,state?.protocolVersion,state?.maintenance,stopped,updateIntent,stopRevision,panelContextConflict,localEditPending,state?.applyRecovery?.blocked,applying,batchRunning,binding,projectRead,projectSelection,inputCapability,analysisState,analysisState?.revision,plan,planInputHash,syncResult,syncJob,syncResultInputHash,syncInvalidated,settingsRestore,settingsSave,resourceRequest,cacheRequest,modelRequest,syncInputHash(),JSON.stringify([$('sync-method').value,$('sync-reference').value,syncRows.map(r=>[r.check.checked,r.stream.value,r.channel.value,r.offset.value,r.confirmed.checked,r.clockId.value,r.date.value,r.fps.value,r.drop.checked,r.clockConfirmed.checked])])];
+}
+function stagedSyncDisplay(result,assets,connection){
+  const record=value=>!!value&&typeof value==='object'&&!Array.isArray(value);
+  if(!record(result)||!record(result.sources)||!record(result.offsets)||Object.keys(result.sources).length!==assets.length||assets.some(id=>!record(result.sources[id])||typeof result.sources[id].status!=='string'))throw Object.assign(new Error('싱크 결과를 확인하지 못했습니다. 싱크를 다시 분석하세요.'),{code:'SYNC_RESULT_INVALID'});
+  const sources=new Map(connection.snapshot.sources.map(s=>[s.assetId,basename(s.canonicalPath)]));
+  return assets.map(id=>{const evidence=result.sources[id],offset=result.offsets[id];if(evidence.status==='accepted'&&(!['number','string'].includes(typeof offset)||typeof offset==='string'&&!offset.trim()||!Number.isFinite(Number(offset))))throw Object.assign(new Error('싱크 시간 정보를 확인하지 못했습니다. 싱크를 다시 분석하세요.'),{code:'SYNC_RESULT_INVALID'});return sources.get(id)+' · '+(evidence.status==='accepted'?Number(offset).toFixed(3)+'초':'확인 필요 · '+(evidence.reason||evidence.code||evidence.status));}).join('\n');
+}
+async function pollSyncJob(active){
+  if(syncPoll)return;
+  const token={active,credential:credentials,epoch:state?.epoch,jobEpoch:active.epoch??state?.epoch,scope:syncPollScope(),rows:syncRows.slice(),phase:'query',validationRevision,validationActive:false,validationFinished:false,invalid:false,guidanceRevision:statusRevision};syncPoll=token;
+  const owned=()=>syncPoll===token&&job===active&&credentials===token.credential&&state?.epoch===token.epoch;
+  const current=()=>{if(!owned()||token.invalid||validationRevision!==token.validationRevision||validationCount!==(token.validationActive?1:0))return false;const scope=syncPollScope();return token.scope.every((value,index)=>value===scope[index])&&syncRows.length===token.rows.length&&token.rows.every((row,index)=>row===syncRows[index]);};
+  const canGuide=()=>current()&&!token.validationActive&&polledJobCurrent(active,token.epoch)&&!state.maintenance&&!batchRunning&&!binding&&!projectRead&&!!connected&&active.snapshotHash===connected.snapshot.snapshotHash&&active.inputHash===syncInputHash();
+  const queryFailure=()=>{if(canGuide()&&statusRevision===token.guidanceRevision)say('싱크 작업 상태를 확인하지 못했습니다. 실제 종료를 확인할 때까지 다시 조회합니다.');};
+  const showError=e=>{if(canGuide()&&statusRevision===token.guidanceRevision)error(e);};
+  try{
+    let value;
+    try{value=await api('/jobs/'+active.jobId);}catch(e){
+      const sourceChanged=['SOURCE_CHANGED','SOURCE_REANALYSIS_REQUIRED'].includes(e.code),stopping=canceledJobs.has(active.jobId);
+      if(current()&&!token.validationActive&&((sourceChanged&&canGuide())||stopping)&&!['AUTH_REQUIRED','SESSION_EXPIRED'].includes(e.code)){
+        // Completed GET source verification can fail or be gated after stop.
+        // A fresh authenticated state may prove drain, but never supplies a result.
+        token.phase='drain';let receipt;
+        try{receipt=await api('/state');}catch(_){if(canGuide())queryFailure();return;}
+        if(!current())return;
+        const terminal=Array.isArray(receipt?.jobs)?receipt.jobs.find(value=>value?.jobId===active.jobId):null;
+        if(receipt?.epoch===token.epoch&&receipt.appVersion===state.appVersion&&receipt.bundleId===state.bundleId&&receipt.protocolVersion===state.protocolVersion&&terminal?.kind==='sync'&&terminal.epoch===token.jobEpoch&&terminal.drained===true&&['completed','canceled','failed','interrupted'].includes(terminal.status)){
+          if(sourceChanged&&canGuide()&&statusRevision===token.guidanceRevision){syncInvalidated=true;say('싱크 원본이 변경됐습니다. 현재 시퀀스를 다시 읽고 싱크를 다시 분석하세요.');}
+          finishPolledJob(active);return;
+        }
+      }
+      if(canGuide()){queryFailure();if(['AUTH_REQUIRED','SESSION_EXPIRED'].includes(e.code)){setConnection(false,'편집 연결 복구 중');credentials=null;connection.reset();retryAt=Date.now()+1000;toggle();}}return;
+    }
+    if(!owned())return;
+    if(!value||value.jobId!==active.jobId||value.kind!=='sync'||value.epoch!==token.jobEpoch||typeof value.drained!=='boolean'||!['running','canceling','completed','canceled','failed','interrupted'].includes(value.status)){queryFailure();return;}
+    if(['running','canceling'].includes(value.status)||!value.drained){if(canGuide()&&statusRevision===token.guidanceRevision)say(value.status==='canceling'?'싱크 작업을 중단하고 있습니다.':'소스의 싱크를 분석하고 있습니다.');return;}
+    const canceled=()=>canceledJobs.has(active.jobId);
+    if(!current()&&!canceled())return;
+    if(!canGuide()){if(current()&&!stopped&&!updateIntent&&!canceled()&&connected&&active.inputHash!==syncInputHash()&&!syncResult&&!syncJob&&statusRevision===token.guidanceRevision)invalidateSyncResult();if(!token.validationActive)finishPolledJob(active);return;}
+    if(value.status!=='completed'){if(statusRevision===token.guidanceRevision)say(value.status==='interrupted'?'싱크 작업이 이전 연결에서 중단됐습니다. 싱크를 다시 분석하세요.':'싱크 작업을 중단했습니다. 설정을 확인하고 다시 분석하세요.');finishPolledJob(active);return;}
+    let display;try{display=stagedSyncDisplay(value.result,syncOptions().assetIds,connected);}catch(e){showError(e);finishPolledJob(active);return;}
+    token.phase='snapshot';let fresh;
+    try{fresh=await ContentriumHost.snapshot();}catch(e){if(canGuide()){showError(e);finishPolledJob(active);}else if(owned()&&canceled())finishPolledJob(active);return;}
+    if(!canGuide()){if(owned()&&canceled())finishPolledJob(active);return;}
+    if(fresh?.snapshot?.snapshotHash!==connected.snapshot.hostSnapshotHash){const guide=statusRevision===token.guidanceRevision;resetSequence();if(guide)error(new Error('싱크 중 타임라인이 변경됐습니다. 현재 시퀀스를 다시 읽어 주세요.'));if(owned())finishPolledJob(active);return;}
+    syncJob=value.jobId;syncResult=value.result;syncResultInputHash=active.inputHash;$('sync-result').textContent=display;
+    if(statusRevision===token.guidanceRevision)say('싱크 분석 완료 · 확인이 필요한 소스를 검토하세요.');finishPolledJob(active);
+  }finally{if(syncPoll===token)syncPoll=null;}
+}
 async function pollJob(){
   if(!job)return;
+  if(job.kind==='sync'){await pollSyncJob(job);return;}
   if(job.kind==='model-setup'){await pollModelJob(job);return;}
   const active=job,inputScope=active.kind==='input-probe'?{selection:projectSelection,rows:selectedRows.slice(),epoch:state?.epoch}:null,analysisScope=active.kind==='analysis'?{connection:connected,snapshotHash:connected?.snapshot.snapshotHash,hostSnapshotHash:connected?.snapshot.hostSnapshotHash,epoch:state?.epoch,mode,analysisState,revision:analysisState?.revision}:null;let value;
   try{value=await api('/jobs/'+active.jobId);}catch(e){

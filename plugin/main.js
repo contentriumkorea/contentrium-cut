@@ -5,19 +5,20 @@ require('./sync.js').install(ContentriumHost);
 require('./selection.js').install(ContentriumHost);
 const $=id=>document.getElementById(id);
 const view=require('./view.js').install(document);
-const connection=require('./connection.js').create(uxp,bundle,{onValidation:count=>{validationCount=count;if(count&&!stopped)say('원본 파일의 내용이 분석 결과와 같은지 확인하고 있습니다.');toggle();}});
+const connection=require('./connection.js').create(uxp,bundle,{onValidation:count=>{validationRevision++;validationCount=count;if(count&&!stopped)say('원본 파일의 내용이 분석 결과와 같은지 확인하고 있습니다.');toggle();}});
 function requestId(){const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');}
 const workflow=require('./workflow.js').create({api:(...args)=>api(...args),storage:uxp.storage.secureStorage,randomId:requestId,
   stopped:()=>stopped,onBatch:value=>{batchRunning=value;},onResult:()=>say('결과 시퀀스에 편집을 적용하고 있습니다.')});
 let credentials=null,state=null,connected=null,mode='separate',job=null,analysisJob=null,analysis=null,plan=null,syncResult=null,syncJob=null,planCameraRefs=[],applying=false,batchRunning=false,stopped=false,applyId=null,polling=false,pending=false;
 const microphoneRows=[],cameraRows=[],speakerRows=[],calibrationRows=[],overrideRows=[],syncRows=[];
 let microphoneSelectionCustomized=false;
-let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;let projectRead=null,nativePreparation=null,editingSubmission=null,correctionRequest=null,settingsRestore=null;
+let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;let projectRead=null,nativePreparation=null,editingSubmission=null,correctionRequest=null,settingsRestore=null,settingsSave=null;
+let settingsWriteTail=Promise.resolve();
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
 let analysisState=null;
 let planInputHash=null,planInvalidated=false;
 let overrideSerial=0,overrideErrorsOnly=false,overrideVisibleRows=new Set();
-let validationCount=0,heartbeatRequest=null,updateIntent=null;
+let validationCount=0,validationRevision=0,statusRevision=0,heartbeatRequest=null,updateIntent=null;
 let reviewPage=0,reviewWindow=null;
 let microphoneIssue='',rangeIssue='',syncIssue='',policyIssue='',syncResultInputHash=null,syncInvalidated=false;
 const selectedRows=[];
@@ -30,7 +31,7 @@ function selectedSourceFeedback(row,locked=workLocked()){
   if(row.selectionHint.textContent!==text)row.selectionHint.textContent=text;row.selectionHint.className='hint'+(text?'':' hidden');
 }
 function inputSourceChoices(){return selectedRows.map(row=>({assetId:row.source.assetId,role:row.role.value,outputAudio:row.role.value!=='exclude'&&selectedSourceMedia(row)?.hasAudio===true&&row.audio.checked}));}
-function say(value){$('status').textContent=value;}
+function say(value){statusRevision++;$('status').textContent=value;}
 function setConnection(ready,text){$('connection').textContent=text;$('connection-dot').className=ready?'connected':'disconnected';$('host-status').textContent=ready?'PREMIERE 로컬 연결됨':'PREMIERE 연결 대기';}
 function invalidateAnalysis(){clearAnalysis();renderSpeakers(mode==='mixed'?[]:[...new Set(microphoneRows.filter(r=>r.check.checked).map(r=>r.speaker.value.trim()))]);scheduleSettings();say('음성 입력이 바뀌었습니다. 화자 분석을 다시 실행하세요.');toggle();}
 function invalidatePlan(){clearPolicyPlan();scheduleSettings();toggle();}
@@ -67,11 +68,25 @@ function options(select,values,empty){select.innerHTML='';if(empty){const e=elem
 function label(text,input){const e=element('label',text);e.appendChild(input);return e;}
 function basename(path){return path.split(/[\\/]/).pop();}
 function settingsKey(){return 'cut-settings-'+ContentriumHost.hash({projectRef:connected.snapshot.projectRef,sequenceRef:connected.snapshot.sequenceRef});}
+function settingsWriteReady(){return !!connected&&!!credentials&&!!state?.gateOpen&&!stopped&&!updateIntent&&state?.compatible!==false&&!panelContextConflict&&!localEditPending&&!state?.applyRecovery?.blocked&&!binding&&!projectRead&&!applying&&!batchRunning&&(state?.stopEpoch===null||state?.stopEpoch===undefined);}
 function scheduleSettings(){
-  if(settingsTimer)clearTimeout(settingsTimer);
-  if(!connected||binding)return;
-  const key=settingsKey();
-  settingsTimer=setTimeout(async()=>{settingsTimer=null;if(!connected||settingsKey()!==key||applying)return;try{await uxp.storage.secureStorage.setItem(key,JSON.stringify(captureSettings()));}catch(_){say('설정을 자동 저장하지 못했습니다. 설정에서 다시 저장해 주세요.');}},400);
+  if(settingsTimer){clearTimeout(settingsTimer);settingsTimer=null;}
+  if(!settingsWriteReady())return;
+  const key=settingsKey(),timer=setTimeout(async()=>{if(settingsTimer!==timer)return;settingsTimer=null;if(!settingsWriteReady()||settingsKey()!==key)return;await saveSettings(true);},400);
+  settingsTimer=timer;
+}
+async function saveSettings(automatic=false){
+  if(!settingsWriteReady())return;
+  if(!automatic&&settingsTimer){clearTimeout(settingsTimer);settingsTimer=null;}
+  const token={},guidanceRevision=statusRevision,key=settingsKey(),payload=JSON.stringify(captureSettings()),scope=[credentials,connected,mode,analysisState,analysisState?.revision,state.epoch,connected.snapshot.snapshotHash,connected.snapshot.hostSnapshotHash,projectSelection,inputCapability,plan,planInputHash,syncResult,syncJob,syncResultInputHash,job,validationCount,validationRevision,settingsRestore,correctionRequest,editingSubmission,nativePreparation],rows=selectedRows.slice();
+  const current=()=>settingsSave===token&&settingsWriteReady()&&scope.every((value,index)=>value===[credentials,connected,mode,analysisState,analysisState?.revision,state.epoch,connected.snapshot.snapshotHash,connected.snapshot.hostSnapshotHash,projectSelection,inputCapability,plan,planInputHash,syncResult,syncJob,syncResultInputHash,job,validationCount,validationRevision,settingsRestore,correctionRequest,editingSubmission,nativePreparation][index])&&selectedRows.length===rows.length&&rows.every((row,index)=>selectedRows[index]===row)&&settingsKey()===key&&JSON.stringify(captureSettings())===payload;
+  const prior=settingsWriteTail;let release;settingsWriteTail=new Promise(resolve=>{release=resolve;});settingsSave=token;
+  try{
+    await prior;if(!current())return;
+    await uxp.storage.secureStorage.setItem(key,payload);if(!current())return;
+    if(!automatic&&statusRevision===guidanceRevision)say('현재 시퀀스의 설정을 저장했습니다.');
+  }catch(e){if(current()&&statusRevision===guidanceRevision){if(automatic)say('설정을 자동 저장하지 못했습니다. 설정에서 다시 저장해 주세요.');else error(e);}}
+  finally{release();if(settingsSave===token)settingsSave=null;}
 }
 function captureSettings(){
   return {schemaVersion:2,projectRef:connected.snapshot.projectRef,sequenceRef:connected.snapshot.sequenceRef,mode,policy:policy(),policyInput:{minShot:$('min-shot').value,shortTurn:$('short-turn').value,overlap:$('overlap').value},
@@ -952,7 +967,7 @@ handler('create-input',async()=>{
   await performNative('input',{capabilityId:capability.capabilityId,choices,epoch:state.epoch},(approved,control)=>ContentriumHost.createSelectedInput(selection,choices,control),(approved,result)=>({...result.inputReceipt,planHash:approved.planHash}),'/input/begin');
   projectSelection=inputCapability=null;selectedRows.length=0;$('selected-sources').innerHTML='';connected=null;await readProject();say('입력 시퀀스를 만들었습니다. 트랙 설정에서 싱크와 화자 분석을 시작하세요.');
 });
-handler('save-settings',async()=>{admitted();await uxp.storage.secureStorage.setItem(settingsKey(),JSON.stringify(captureSettings()));say('현재 시퀀스의 설정을 저장했습니다.');});
+handler('save-settings',()=>{admitted();return saveSettings();});
 handler('load-settings',async()=>{admitted();return afterEditingPreview(loadSavedSettings);});
 $('add-override').onclick=()=>editOverrides(()=>addOverride());
 $('override-filter').onclick=()=>{if($('override-filter').disabled||!overrideRows.some(r=>r.error.textContent))return;overrideErrorsOnly=!overrideErrorsOnly;overrideVisibleRows.clear();view.show('cut');view.openDisclosure('disclosure-6');overrideFeedback();};

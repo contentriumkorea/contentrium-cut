@@ -2,7 +2,7 @@
 
 Premiere Pro 패널에서 트랙을 설정하고, 오디오를 로컬로 분석해 말하는 화자에 맞춰 카메라를 전환하는 플러그인입니다. 자동 싱크와 컷 편집 결과는 Premiere에서 계속 수정할 수 있는 새 시퀀스로 만듭니다.
 
-**[0.1.68을 공개했습니다](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.68).** 타임코드 싱크의 날짜 표기·실제 달력·윤년 오류를 안내합니다. 잘못된 날짜의 접근성 상태와 정정·제외·방식전환을 반영하고 raw 입력·부분 싱크의 개별 검토 동작을 유지합니다. 업데이트 클릭 즉시 절차 시작·원본·오디오·별도 자막·최상단 개별 컷을 유지합니다. Node635/Python496·독립 검수·패키지 실행·공개 서명과 실제3다운로드 해시를 확인했습니다. [반복 개선 기록](docs/qa/continuous-improvement.md)에 시험 한계와 다음 단계를 기록했습니다. 실제 Premiere/UXP 편집·기존0.1.0 설치 전환·Community-1 품질은 미검증입니다.
+**[0.1.69을 공개했습니다](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.69).** 타임코드 FPS와 Drop-frame 설정이 맞지 않으면 이유를 바로 안내합니다. FPS/Drop-frame 접근성 상태와 정정·제외·방식전환을 반영하고 raw 설정·부분 싱크 검토를 유지합니다. 업데이트 클릭 즉시 절차 시작·원본·오디오·별도 자막·최상단 개별 컷을 유지합니다. Node638/Python496·독립 검수·패키지 실행·공개 서명과 실제3다운로드 해시를 확인했습니다. [반복 개선 기록](docs/qa/continuous-improvement.md)에 시험 한계와 다음 단계를 기록했습니다. 실제 Premiere/UXP 편집·기존0.1.0 설치 전환·Community-1 품질은 미검증입니다.
 
 ## 단일 패널 사용 흐름
 

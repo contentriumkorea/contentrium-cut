@@ -808,3 +808,13 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 독립 최종 report에서 저장 검수 총 512/512(498 matrix + update 8 + ABA/progress 6)을 확인했다. panel 소스 SHA `cb57b84b8e1f0d8c05c68a164f7c0b568da59ef67875fadac6cc61b9e3bd5005`, 승인 main 해시와 일치하며 제품 소스를 더 변경하지 않는다.
 
 - [0.1.33 패키지 증거](package-0.1.33-proof.json): 엔진/CCX/Setup 빌드 exit 0, 입력 52개 해시 보존. ZIP/CCX CRC·경로·비공개 자료 제외·최종 CCX 소스·Silero 해시와 frozen 엔진 29개/Setup 26개 제품 모듈·진입점 2개 일치. 추출 엔진 runtimeReady=true/0.1.33 및 Setup help exit 0, 57.813초. 기존 선택적 모듈/torchcodec 등 빌드 경고를 보존하며 Community-1 품질 통과로 확대하지 않는다. 현재 단계: 구현·전체 회귀·독립 검수·패키지 실행 완료, 0.1.33 공개 → 익명 발견/서명·실제 다운로드 해시·고정 v0.1.1 확인으로 진행한다. 활성 사용자 설치·원본·서명 키는 그대로 유지한다.
+
+
+### 공개 결과
+
+- [v0.1.33](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.33): release `407390181`, 제목 `Contentrium CUT`, draft/prerelease 아님. 공개 시각 2026-10-09 10:00:51 KST (`2026-10-09T01:00:51Z`), target/tag commit `c88536716a3ea00eb2b75815482395cf8fe0e183`를 확인했다.
+- [공개 실제 재다운로드](release-0.1.33-proof.json): 익명 제품 경로에서 0.1.32 → 0.1.33 AVAILABLE. 서명과 실제 ZIP/CCX/Setup 3개의 크기·SHA-256 일치.
+- [현재 버전](release-0.1.33-current-proof.json): 빈 상태에서 0.1.33 CURRENT / 후보 없음. 공개 자산 5개 ID·크기·digest와 서명 문서 실제 바이트가 로컬과 일치.
+- [고정 복구 조회](migration-pinned-0.1.1-after-0.1.33-proof.json): latest 0.1.33에서도 정확한 서명 v0.1.1 / release `404226839` / commit `268d27e6665c8b1f0753a634f8021dfa86935b37` AVAILABLE. 설치 전환은 하지 않았다.
+- 현재 단계: 기획 → 설계 → 구현 → 검증 → 0.1.33 공개 및 공개 재검증 완료. 다음 회차는 분석 자원 설정 저장 및 캐시 작업/설정 창 조회의 중단·응답 소유권을 설계한다. actual-main 두 모드 × save-resources 대기 success/error 4/4에서 update 즉시 시작 후 안내 덮기를 재현했고 성공에서는 /resources 추가 조회와 budget 덮기도 확인했다(cycle32-next-inspect.js/.log). 현재 설정 저장 수정은 이 자원/캐시/모델 등 다른 action lifetime 전체를 보호하지 않는다. 재현·설계·독립 검수·회귀·패키지/공개 검증 없이 버전만 올리지 않는다.
+- 활성 설치 0.1.0의 active/journal/first-install 해시는 배포 전후 동일함을 읽기 전용 확인하고, 서명 키 존재·기존 ACTIVE/15분 자동화와 기존 공개 파일·설정·실패 증거를 보존했다. 컴퓨터유즈·브라우저·Premiere 조작·재설치·제공자 접근 없음. 실제 UXP/Premiere 편집·설치 전환·Community-1 품질 미검증. 이번 초기 자체/독립 fixture 실패·manual locks 미재현 원인은 위 기록대로 보존하며 원인 미확정 건의 해결을 주장하지 않는다. 현재 코드 검수 남은 C/I/M 0/0/0은 검수한 설정 저장 범위에 한정한다.

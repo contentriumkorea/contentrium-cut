@@ -967,7 +967,7 @@ test('sync input autosave preserves invalid values after automatic same-sequence
 });
 
 test('direct sync analysis rejects bad indices without events and input typing updates row accessibility',async()=>{
-  const f=await panel(),row=syncRow(f);row.stream.value='1.5';await f.click('sync');assert.equal(f.calls.some(c=>c.path==='/jobs'),false);assert.equal(row.stream.getAttribute('aria-invalid'),'true');assert.equal(row.stream.getAttribute('aria-describedby'),row.issue.id+' '+row.selectionHint.id);
+  const f=await panel(),row=syncRow(f);row.stream.value='1.5';await f.click('sync');assert.equal(f.calls.some(c=>c.path==='/jobs'),false);assert.equal(row.stream.getAttribute('aria-invalid'),'true');assert.deepEqual(row.stream.getAttribute('aria-describedby').split(' ').slice(0,2),[row.issue.id,row.selectionHint.id]);
   row.stream.value='2';row.stream.oninput();assert.equal(row.stream.getAttribute('aria-invalid'),'false');assert.equal(row.issue.textContent,'');assert.equal(f.get('sync').disabled,false);
 });
 
@@ -3610,5 +3610,30 @@ test('sync method guide preserves restoration results locks stale ownership and 
   for(const lock of trackLocks){const locked=await excludedReferencePanel(mode),node=locked.get('sync-method-hint'),before=locked.evaluate('JSON.stringify(syncOptions())'),message=node.textContent;locked.evaluate(lock+';toggle()');const calls=locked.calls.length;for(const control of syncControls(locked)){control.oninput?.();control.onchange?.();}assert.equal(locked.evaluate('JSON.stringify(syncOptions())'),before);assert.equal(locked.calls.length,calls);assert.equal(node.textContent,lock==='connected=null'?'':message);}
   const done=await completedSync({mode}),result=syncState(done),accepted=done.evaluate('syncInputHash()');done.evaluate('syncFeedback();toggle()');assert.equal(syncState(done),result);assert.equal(done.evaluate('syncInputHash()'),accepted);assert.ok(done.get('sync-method-hint').textContent);
   f.native=nativeSnapshot('method-guide-next');await f.click('read-project');const current=f.evaluate('JSON.stringify(captureSettings().sync)');old.check.onchange();assert.equal(f.evaluate('JSON.stringify(captureSettings().sync)'),current);assert.ok(guide.textContent);f.state.update={updateState:'IDLE',checkState:'AVAILABLE',candidate:{candidateId:'release:hash',manifestDigest:'a'.repeat(64),appVersion:'0.1.79'}};await f.tick();await f.click('update');assert.ok(f.calls.some(v=>v.path==='/updates/start'));assert.equal(f.get('sync').disabled,true);assert.ok(guide.textContent);
+ }
+});
+
+
+test('sync audio selection guide explains file relative one based numbers next to both actual fields',async()=>{
+ const text='번호는 파일 내부 기준입니다. 오디오 스트림은 파일의 오디오 스트림 순서, 채널은 선택한 스트림의 채널 순서로 1부터 입력하세요. Premiere 트랙 번호와 다릅니다.';
+ for(const mode of ['separate','mixed'])for(const method of ['audio','manual','timecode']){
+  const f=await excludedReferencePanel(mode);f.get('sync-method').value=method;f.get('sync-method').onchange();const rows=f.evaluate('syncRows');assert.ok(rows[0].audioGuide,'Actual source row needs file number guidance');const ids=new Set();
+  for(const r of rows){const g=r.audioGuide,parent=r.stream.parent.parent.parent;assert.equal(g.tag,'p');assert.equal(g.textContent,text);assert.equal(g.className,'hint');assert.equal(g.getAttribute('aria-live'),undefined);assert.equal(g.getAttribute('role'),undefined);assert.equal(parent.children.indexOf(g),parent.children.indexOf(r.stream.parent.parent)+1);assert.equal(parent.children.indexOf(r.issue),parent.children.indexOf(g)+1);assert.ok(!ids.has(g.id));ids.add(g.id);for(const field of [r.stream,r.channel])assert.equal(field.getAttribute('aria-describedby'),r.issue.id+' '+r.selectionHint.id+' '+g.id);}
+  const raw=f.evaluate('JSON.stringify(captureSettings().sync)'),input=f.evaluate('syncInputHash()'),calls=f.calls.length;f.evaluate('toggle();syncFeedback()');assert.equal(f.evaluate('JSON.stringify(captureSettings().sync)'),raw);assert.equal(f.evaluate('syncInputHash()'),input);assert.equal(f.calls.length,calls);
+ }
+});
+
+test('sync audio selection guide coexists with invalid excluded and reference feedback and clears when disconnected',async()=>{
+ for(const mode of ['separate','mixed']){
+  const f=await excludedReferencePanel(mode),r=syncRow(f),other=syncRow(f,1);assert.ok(r.audioGuide);const text=r.audioGuide.textContent;r.stream.value='bad';r.channel.value='';r.stream.oninput();assert.match(r.issue.textContent,/오디오 스트림.*채널/);assert.equal(r.audioGuide.textContent,text);assert.equal(r.stream.getAttribute('aria-invalid'),'true');r.check.checked=false;r.check.onchange();assert.equal(r.issue.textContent,'');assert.ok(r.selectionHint.textContent);assert.equal(r.audioGuide.textContent,text);assert.equal(f.get('sync-reference').getAttribute('aria-invalid'),'true');assert.match(f.get('sync-error').textContent,/기준 소스/);other.check.checked=false;other.check.onchange();assert.equal(f.get('sync-error').textContent,'싱크할 소스를 2개 이상 선택하세요.');assert.equal(r.audioGuide.textContent,text);f.evaluate('connected=null;toggle()');for(const row of f.evaluate('syncRows')){assert.equal(row.audioGuide.textContent,'');assert.equal(row.audioGuide.className,'hint hidden');}f.native=nativeSnapshot('audio-guide-reconnected');await f.click('read-project');assert.equal(syncRow(f).audioGuide.textContent,text);
+ }
+});
+
+test('sync audio selection guide preserves raw restore results locks stale owners and immediate update with idempotent writes',async()=>{
+ for(const mode of ['separate','mixed']){
+  const f=await excludedReferencePanel(mode),r=syncRow(f);assert.ok(r.audioGuide);r.stream.value=' 2 ';r.channel.value='3';r.stream.onchange();const raw=f.evaluate('JSON.stringify(captureSettings().sync)'),input=f.evaluate('syncInputHash()');await f.click('save-settings');r.stream.value='1';r.channel.value='1';r.stream.onchange();await f.click('load-settings');assert.equal(f.evaluate('JSON.stringify(captureSettings().sync)'),raw);assert.equal(f.evaluate('syncInputHash()'),input);const g=r.audioGuide;let text=g.textContent,writes=0;Object.defineProperty(g,'textContent',{get:()=>text,set:v=>{text=v;writes++;}});f.evaluate('toggle();toggle();syncFeedback()');assert.equal(writes,0);
+  for(const lock of trackLocks){const locked=await excludedReferencePanel(mode),node=syncRow(locked).audioGuide,before=locked.evaluate('JSON.stringify(syncOptions())'),message=node.textContent;locked.evaluate(lock+';toggle()');const calls=locked.calls.length;for(const control of syncControls(locked)){control.oninput?.();control.onchange?.();}assert.equal(locked.evaluate('JSON.stringify(syncOptions())'),before);assert.equal(locked.calls.length,calls);assert.equal(node.textContent,lock==='connected=null'?'':message);}
+  for(const method of ['audio','manual','timecode']){const done=await completedSync({mode,method}),result=syncState(done),accepted=done.evaluate('syncInputHash()');done.evaluate('syncFeedback();toggle()');assert.equal(syncState(done),result);assert.equal(done.evaluate('syncInputHash()'),accepted);assert.ok(syncRow(done).audioGuide.textContent);}
+  f.native=nativeSnapshot('audio-guide-next');await f.click('read-project');const current=f.evaluate('JSON.stringify(captureSettings().sync)'),currentGuide=syncRow(f).audioGuide;r.check.onchange();assert.equal(f.evaluate('JSON.stringify(captureSettings().sync)'),current);assert.ok(currentGuide.textContent);f.state.update={updateState:'IDLE',checkState:'AVAILABLE',candidate:{candidateId:'release:hash',manifestDigest:'a'.repeat(64),appVersion:'0.1.80'}};await f.tick();await f.click('update');assert.ok(f.calls.some(v=>v.path==='/updates/start'));assert.equal(f.get('sync').disabled,true);assert.ok(currentGuide.textContent);
  }
 });

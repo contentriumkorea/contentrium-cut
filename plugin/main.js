@@ -459,9 +459,10 @@ function renderSyncSources(){
     const row=element('div',undefined,'source-row'),check=checkbox(true),title=element('label',names.get(source.assetId));title.insertBefore(check,title.firstChild);row.appendChild(title);
     const referenceHint=element('p','','hint sync-reference-hint hidden');referenceHint.id='sync-reference-hint-'+syncRows.length;row.appendChild(referenceHint);
     const fields=element('div',undefined,'row'),stream=number(1),channel=number(1);stream.min=channel.min='1';stream.step=channel.step='1';fields.appendChild(label('오디오 스트림',stream));fields.appendChild(label('채널',channel));row.appendChild(fields);
+    const audioGuide=element('p','','hint hidden');audioGuide.id='sync-audio-guide-'+syncRows.length;row.appendChild(audioGuide);
     const issue=element('p','', 'hint input-error hidden');issue.id='sync-source-error-'+syncRows.length;issue.setAttribute('role','status');issue.setAttribute('aria-live','polite');
     const selectionHint=element('p','','hint hidden');selectionHint.id='sync-selection-hint-'+syncRows.length;selectionHint.setAttribute('aria-live','polite');check.setAttribute('aria-describedby',selectionHint.id+' '+referenceHint.id);
-    for(const field of [stream,channel])field.setAttribute('aria-describedby',issue.id+' '+selectionHint.id);row.appendChild(issue);row.appendChild(selectionHint);
+    for(const field of [stream,channel])field.setAttribute('aria-describedby',issue.id+' '+selectionHint.id+' '+audioGuide.id);row.appendChild(issue);row.appendChild(selectionHint);
     const manual=element('div'),offset=number(0),confirmed=checkbox();offset.step='0.001';manual.appendChild(label('기준 대비 오프셋 · 초',offset));manual.appendChild(label('이 오프셋을 확인했습니다',confirmed));row.appendChild(manual);
     const manualHint=element('p','','hint hidden');manualHint.id='sync-manual-hint-'+syncRows.length;manualHint.setAttribute('aria-live','polite');manual.appendChild(manualHint);
     const manualGuide=element('p','같은 소리가 기준 소스 10초·현재 소스 12초에 있으면 -2초, 기준 소스 12초·현재 소스 10초에 있으면 +2초를 입력하세요.','hint hidden');manualGuide.id='sync-manual-guide-'+syncRows.length;manual.appendChild(manualGuide);
@@ -469,7 +470,7 @@ function renderSyncSources(){
     options(fps,[['24000/1001','23.976'],['24/1','24'],['25/1','25'],['30000/1001','29.97'],['30/1','30'],['50/1','50'],['60000/1001','59.94'],['60/1','60']]);fps.value=connected.snapshot.fps.num+'/'+connected.snapshot.fps.den;
     clock.appendChild(label('공통 시계',clockId));clock.appendChild(label('촬영 날짜',date));clock.appendChild(label('타임코드 FPS',fps));clock.appendChild(label('Drop-frame',drop));clock.appendChild(label('날짜와 시계가 같고 촬영 중 리셋하지 않았습니다',clockConfirmed));row.appendChild(clock);
     const clockHint=element('p','','hint hidden');clockHint.id='sync-clock-hint-'+syncRows.length;clockHint.setAttribute('aria-live','polite');clock.appendChild(clockHint);
-    $('sync-sources').appendChild(row);const syncRow={check,source,displayName:names.get(source.assetId),referenceHint,stream,channel,issue,selectionHint,manual,manualHint,manualGuide,offset,confirmed,clock,clockHint,clockId,date,fps,drop,clockConfirmed};syncRows.push(syncRow);
+    $('sync-sources').appendChild(row);const syncRow={check,source,displayName:names.get(source.assetId),referenceHint,stream,channel,audioGuide,issue,selectionHint,manual,manualHint,manualGuide,offset,confirmed,clock,clockHint,clockId,date,fps,drop,clockConfirmed};syncRows.push(syncRow);
     for(const field of [offset,confirmed,clockId,date,fps,drop,clockConfirmed])field.setAttribute('aria-describedby',selectionHint.id);
     for(const field of [offset,confirmed])field.setAttribute('aria-describedby',selectionHint.id+' '+manualHint.id+' '+manualGuide.id);
     for(const field of [clockId,date,fps,drop,clockConfirmed])field.setAttribute('aria-describedby',selectionHint.id+' '+clockHint.id);
@@ -513,6 +514,8 @@ function syncFeedback(){
   const count=$('sync-selection-count'),countText=connected&&syncRows.length?'싱크 소스 '+selected.length+'/'+syncRows.length+'개 선택 · 최소 2개':'';
   if(count.textContent!==countText)count.textContent=countText;count.className=countText?'hint':'hint hidden';
   for(const row of syncRows){
+    const audioText=connected?'번호는 파일 내부 기준입니다. 오디오 스트림은 파일의 오디오 스트림 순서, 채널은 선택한 스트림의 채널 순서로 1부터 입력하세요. Premiere 트랙 번호와 다릅니다.':'';
+    if(row.audioGuide.textContent!==audioText)row.audioGuide.textContent=audioText;row.audioGuide.className=audioText?'hint':'hint hidden';
     const referenceText=connected&&row.check.checked&&row.source.assetId===referenceField.value?'싱크 기준 소스 · 이 소스의 시간을 기준으로 다른 소스를 맞춥니다.':'';
     if(row.referenceHint.textContent!==referenceText)row.referenceHint.textContent=referenceText;row.referenceHint.className='hint sync-reference-hint'+(referenceText?'':' hidden');
     row.selectionHint.textContent=row.check.checked?'':'이 소스는 싱크에서 제외되어 있습니다. 다시 선택하면 입력한 설정을 사용합니다.';

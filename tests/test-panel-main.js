@@ -2024,3 +2024,70 @@ test('release cache preserves newer update candidate and model metadata at stage
   const h=await heldCache('separate','release-cache','get');h.f.evaluate(change+';say("New server metadata")');const before=cacheState(h.f);h.resume(h.value);await h.run;assert.equal(cacheState(h.f),before,change);
  }
 });
+
+
+async function heldModel(mode,stage='revision',setup=null){
+ let resume,reject,hold=false;
+ const f=await updatePanel({request:async p=>{if(hold&&!resume&&p==='/models/community-1/'+stage)return new Promise((a,z)=>{resume=a;reject=z;});if(p==='/models/community-1/revision')return {revision:'b'.repeat(40)};if(p==='/models/community-1/install')return {jobId:'owned-model-fixture',kind:'model-setup',status:'running'};}});
+ if(mode==='mixed')await f.click('mode-mixed');f.get('model-token').value='owned-model-access';f.get('model-terms').checked=true;if(setup)f.evaluate(setup);
+ hold=true;const run=f.click('install-model');for(let i=0;i<40&&!resume;i++)await Promise.resolve();assert.equal(typeof resume,'function');
+ return {f,run,resume,reject,value:stage==='revision'?{revision:'b'.repeat(40)}:{jobId:'owned-model-fixture',kind:'model-setup',status:'running'}};
+}
+function modelRequestState(f){return JSON.stringify({result:resultState(f),status:f.get('status').textContent,modelStatus:f.get('model-install-status').textContent,job:f.evaluate('job'),token:f.get('model-token').value,terms:f.get('model-terms').checked,timer:f.evaluate('settingsTimer')});}
+test('model revision and install discard late responses after immediate update and cancel in both modes',async()=>{
+ for(const mode of ['separate','mixed'])for(const stage of ['revision','install'])for(const stop of ['update','cancel'])for(const outcome of ['success','error']){
+  const h=await heldModel(mode,stage);await h.f.click(stop);const before=modelRequestState(h.f),calls=h.f.calls.length;
+  if(outcome==='success')h.resume(h.value);else h.reject(Object.assign(new Error('private old provider URL'),{code:'MODEL_NOT_READY'}));await h.run;
+  assert.equal(modelRequestState(h.f),before,[mode,stage,stop,outcome].join('/'));assert.equal(h.f.calls.length,calls);if(stop==='update')assert.equal(h.f.calls.filter(c=>c.path==='/updates/start').length,1);
+ }
+});
+
+
+test('model replies reject scoped replacements raw inputs and foreign validation without publishing effects',async()=>{
+ const changes=['state.epoch++','credentials=null','credentials={...credentials}','connected=null','connected={...connected}','connected.snapshot.snapshotHash="new"','connected.snapshot.hostSnapshotHash="new"','mode=mode==="mixed"?"separate":"mixed"','analysisState={analysisId:"new",revision:2}','localEditPending=true','state.applyRecovery.blocked=true','binding=true','projectRead={}','job={jobId:"new"}','applying=true','batchRunning=true','projectSelection={}','inputCapability={}','syncResult={}','syncJob="new"','planInvalidated=!planInvalidated','planInputHash="new"','resourceInputRevision++','resourceViewRevision++','resourceRequest={}','cacheRequest={}','modelRequest={}','modelInputRevision+=2','validationCount=1','validationRevision+=2','state.compatible=false','state.stopEpoch=0','state.gateOpen=false','stopped=true','stopRevision++','$("model-token").value="new-access"','$("model-terms").checked=false','$("model-install-status").textContent="New model guidance"','state.models.silero.status="error"','state.update.candidate={candidateId:"new"}'];
+ for(const mode of ['separate','mixed'])for(const stage of ['revision','install'])for(const outcome of ['success','error'])for(const change of changes){
+  const h=await heldModel(mode,stage);h.f.evaluate(change+';say("New model request scope");toggle()');const before=modelRequestState(h.f),calls=h.f.calls.length;
+  if(outcome==='success')h.resume(h.value);else h.reject(Object.assign(new Error('private previous provider URL'),{code:'MODEL_NOT_READY'}));await h.run;assert.equal(modelRequestState(h.f),before,change);assert.equal(h.f.calls.length,calls,change);
+ }
+});
+test('model own revision continuation survives registration and completion but foreign lifecycle is discarded',async()=>{
+ for(const mode of ['separate','mixed'])for(const outcome of ['success','error']){
+  const h=await heldModel(mode),id='c'.repeat(32);h.f.validation(1,[{id,path:'/models/community-1/revision',epoch:0}]);assert.match(h.f.get('status').textContent,/모델 리비전/);h.f.validation(0,[]);
+  if(outcome==='success')h.resume(h.value);else h.reject(Object.assign(new Error('private current provider URL'),{code:'MODEL_NOT_READY'}));await h.run;
+  if(outcome==='success'){assert.equal(h.f.evaluate('job.kind'),'model-setup');assert.match(h.f.get('model-install-status').textContent,/설치 중/);}else{assert.equal(h.f.evaluate('job'),null);assert.match(h.f.get('model-install-status').textContent,/실패/);assert.doesNotMatch(h.f.get('status').textContent,/private/);}assert.equal(h.f.evaluate('modelRequest'),null);
+ }
+ for(const stage of ['revision','install'])for(const descriptors of [undefined,[{id:'c'.repeat(32),path:'/plan',epoch:0}],[{id:'c'.repeat(32),path:'/models/community-1/revision',epoch:1}]]){const h=await heldModel('separate',stage);h.f.validation(1,descriptors);h.f.validation(0,[]);const before=modelRequestState(h.f),calls=h.f.calls.length;h.resume(h.value);await h.run;assert.equal(modelRequestState(h.f),before);assert.equal(h.f.calls.length,calls);}
+ const h=await heldModel('mixed');h.f.validation(1,[{id:'c'.repeat(32),path:'/models/community-1/revision',epoch:0}]);h.f.validation(0,[]);h.f.validation(1,[{id:'d'.repeat(32),path:'/models/community-1/revision',epoch:0}]);h.f.validation(0,[]);const before=modelRequestState(h.f);h.resume(h.value);await h.run;assert.equal(modelRequestState(h.f),before);
+});
+test('model installation accepts no-timeline requests and captures access only for its own POST payload',async()=>{
+ const h=await heldModel('mixed','revision','connected=null;toggle()');assert.equal(h.f.get('model-token').value,'');assert.doesNotMatch(h.f.evaluate('JSON.stringify(modelRequest)'),/owned-model-access/);const revision=h.f.calls.find(c=>c.path==='/models/community-1/revision');assert.equal(revision.body.token,'owned-model-access');h.resume(h.value);await h.run;assert.equal(h.f.evaluate('job.kind'),'model-setup');const install=h.f.calls.find(c=>c.path==='/models/community-1/install');assert.equal(install.body.token,'owned-model-access');assert.equal(install.body.revision,'b'.repeat(40));assert.equal(install.body.termsAccepted,true);assert.doesNotMatch(h.f.get('model-install-status').textContent+h.f.get('status').textContent,/owned-model-access/);assert.equal(h.f.evaluate('modelRequest'),null);
+});
+test('model current errors preserve newer global guidance and malformed receipts never publish jobs',async()=>{
+ for(const stage of ['revision','install']){const h=await heldModel('separate',stage);h.f.evaluate('say("New global guidance")');h.reject(Object.assign(new Error('private authenticated URL'),{code:'MODEL_NOT_READY'}));await h.run;assert.equal(h.f.get('status').textContent,'New global guidance');assert.match(h.f.get('model-install-status').textContent,/실패/);assert.doesNotMatch(h.f.get('model-install-status').textContent,/private/);}
+ for(const bad of [null,{}, {revision:'invalid'},{revision:4}]){const h=await heldModel('mixed');h.resume(bad);await h.run;assert.equal(h.f.calls.filter(c=>c.path==='/models/community-1/install').length,0);assert.equal(h.f.evaluate('job'),null);assert.match(h.f.get('model-install-status').textContent,/실패/);}
+ for(const bad of [null,{}, {jobId:'bad/path',kind:'model-setup',status:'running'},{jobId:'owned-job',kind:'analysis',status:'running'},{jobId:'owned-job',kind:'model-setup',status:'unknown'},{jobId:'owned-job',kind:'model-setup',status:'running',epoch:1}]){const h=await heldModel('mixed','install');h.resume(bad);await h.run;assert.equal(h.f.evaluate('job'),null);assert.match(h.f.get('model-install-status').textContent,/실패/);}
+});
+test('model admission and input callbacks honor worklocks and duplicate clicks preserve request owner',async()=>{
+ for(const change of ['state.gateOpen=false','state.compatible=false','state.stopEpoch=0','stopped=true','job={jobId:"new"}','validationCount=1','binding=true','projectRead={}','localEditPending=true','state.applyRecovery.blocked=true','applying=true','batchRunning=true','updateIntent={epoch:0}','state.appVersion="different"']){const f=await modelPanel();f.get('model-token').value='owned-fixture-access';f.get('model-terms').checked=true;f.evaluate(change+';toggle()');const calls=f.calls.length;await f.click('install-model');assert.equal(f.calls.length,calls,change);assert.equal(f.get('model-token').value,'owned-fixture-access',change);const revision=f.evaluate('modelInputRevision');f.get('model-token').oninput();f.get('model-terms').onchange();assert.equal(f.evaluate('modelInputRevision'),revision,change);}
+ const h=await heldModel('mixed'),owner=h.f.evaluate('modelRequest'),calls=h.f.calls.length;assert.equal(h.f.get('model-token').disabled,true);assert.equal(h.f.get('model-terms').disabled,true);await h.f.click('install-model');assert.equal(h.f.evaluate('modelRequest'),owner);assert.equal(h.f.calls.length,calls);h.resume(h.value);await h.run;assert.equal(h.f.calls.filter(c=>c.path==='/models/community-1/install').length,1);
+});
+test('model stop ABA and newer owner cleanup cannot resurrect late installation',async()=>{
+ for(const stage of ['revision','install']){const h=await heldModel('separate',stage);await h.f.click('cancel');h.f.evaluate('stopped=false;state.gateOpen=true;toggle();say("New resumed guidance")');const before=modelRequestState(h.f);h.resume(h.value);await h.run;assert.equal(modelRequestState(h.f),before);const n=await heldModel('mixed',stage),owner=n.f.evaluate('modelRequest={newOwner:true};say("New owner stays");modelRequest');n.resume(n.value);await n.run;assert.equal(n.f.evaluate('modelRequest'),owner);assert.equal(n.f.get('status').textContent,'New owner stays');}
+});
+
+
+test('model preparation exposes real cancel control before validation and job receipts',async()=>{
+ for(const mode of ['separate','mixed'])for(const stage of ['revision','install']){const h=await heldModel(mode,stage);assert.equal(h.f.get('cancel').disabled,false,[mode,stage].join('/'));await h.f.click('cancel');assert.match(h.f.get('model-install-status').textContent,/중단.*요청/);const before=modelRequestState(h.f);h.resume(h.value);await h.run;assert.equal(modelRequestState(h.f),before);assert.equal(h.f.evaluate('job'),null);}
+});
+
+
+test('model validation progress and failures preserve newer global guidance and unlocked input ABA discards old response',async()=>{
+ const h=await heldModel('mixed');h.f.evaluate('say("New global guidance")');h.f.validation(1,[{id:'c'.repeat(32),path:'/models/community-1/revision',epoch:0}]);assert.equal(h.f.get('status').textContent,'New global guidance');h.f.validation(0,[]);h.reject(Object.assign(new Error('private provider URL'),{code:'MODEL_NOT_READY'}));await h.run;assert.equal(h.f.get('status').textContent,'New global guidance');assert.match(h.f.get('model-install-status').textContent,/실패/);
+ for(const stage of ['revision','install']){const n=await heldModel('separate',stage);n.f.evaluate('pending=false');n.f.get('model-token').value='new-access';n.f.get('model-token').oninput();n.f.get('model-token').value='';n.f.get('model-token').onchange();n.f.evaluate('pending=true;say("Input ABA stays");toggle()');const before=modelRequestState(n.f);n.resume(n.value);await n.run;assert.equal(modelRequestState(n.f),before);}
+});
+test('model direct await boundary honors stop before success and before sanitized error publication',async()=>{
+ for(const stage of ['revision','install'])for(const outcome of ['success','error']){
+  const setup='const ownedModelApi=api;api=async(...args)=>{try{const value=await ownedModelApi(...args);if(args[0]==="/models/community-1/'+stage+'"){stopRevision++;stopped=true;say("New boundary stop");}return value;}catch(e){if(args[0]==="/models/community-1/'+stage+'"){stopRevision++;stopped=true;say("New boundary stop");}throw e;}}';
+  const h=await heldModel('mixed',stage,setup);if(outcome==='success')h.resume(h.value);else h.reject(Object.assign(new Error('private provider URL'),{code:'MODEL_NOT_READY'}));await h.run;assert.equal(h.f.get('status').textContent,'New boundary stop');assert.equal(h.f.evaluate('job'),null);assert.doesNotMatch(h.f.get('status').textContent,/private/);
+ }
+});

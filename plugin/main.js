@@ -5,7 +5,7 @@ require('./sync.js').install(ContentriumHost);
 require('./selection.js').install(ContentriumHost);
 const $=id=>document.getElementById(id);
 const view=require('./view.js').install(document);
-const connection=require('./connection.js').create(uxp,bundle,{onValidation:(count,descriptors)=>{validationRevision++;validationCount=count;const own=cacheValidation(count,descriptors);if(count&&!stopped){say(own?'완료된 캐시를 확인하고 정리하고 있습니다.':'원본 파일의 내용이 분석 결과와 같은지 확인하고 있습니다.');if(own)cacheRequest.guidanceRevision=statusRevision;}toggle();}});
+const connection=require('./connection.js').create(uxp,bundle,{onValidation:(count,descriptors)=>{validationRevision++;validationCount=count;const own=cacheValidation(count,descriptors),modelOwn=modelValidation(count,descriptors);if(count&&!stopped){if(modelOwn){if(modelRequest.guidanceRevision===statusRevision){say('화자 모델 리비전을 확인하고 있습니다.');modelRequest.guidanceRevision=statusRevision;}}else{say(own?'완료된 캐시를 확인하고 정리하고 있습니다.':'원본 파일의 내용이 분석 결과와 같은지 확인하고 있습니다.');if(own)cacheRequest.guidanceRevision=statusRevision;}}toggle();}});
 function requestId(){const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');}
 const workflow=require('./workflow.js').create({api:(...args)=>api(...args),storage:uxp.storage.secureStorage,randomId:requestId,
   stopped:()=>stopped,onBatch:value=>{batchRunning=value;},onResult:()=>say('결과 시퀀스에 편집을 적용하고 있습니다.')});
@@ -14,6 +14,7 @@ const microphoneRows=[],cameraRows=[],speakerRows=[],calibrationRows=[],override
 let microphoneSelectionCustomized=false;
 let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;let projectRead=null,nativePreparation=null,editingSubmission=null,correctionRequest=null,settingsRestore=null,settingsSave=null;
 let settingsWriteTail=Promise.resolve();
+let modelRequest=null,modelInputRevision=0;
 let cacheRequest=null;
 let resourceRequest=null,resourceInputRevision=0,resourceViewRevision=0,resourceInputDirty=false,stopRevision=0;
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
@@ -241,6 +242,7 @@ function toggle(){
   for(const id of ['start-camera','reserve-camera'])$(id).disabled=locked||!connected;
   for(const id of ['range-start','range-end','min-shot','short-turn','overlap'])$(id).disabled=locked||!connected;
   for(const id of ['analysis-device','cache-budget'])$(id).disabled=locked;
+  for(const id of ['model-token','model-terms'])$(id).disabled=locked||!modelReady();
   for(const id of ['sync-method','sync-reference'])$(id).disabled=locked||!connected;
   for(const row of syncRows)for(const field of [row.check,row.stream,row.channel,row.offset,row.confirmed,row.clockId,row.date,row.fps,row.drop,row.clockConfirmed])field.disabled=locked||!connected;
   for(const row of selectedRows)selectedSourceFeedback(row,locked);
@@ -252,7 +254,7 @@ function toggle(){
   $('add-override').disabled=locked||!connected;for(const row of overrideRows)row.remove.disabled=locked||!connected;
   for(const row of overrideRows)for(const field of [row.first,row.last,row.camera])field.disabled=locked||!connected;
   $('override-filter').disabled=locked||!overrideRows.some(r=>r.error.textContent);
-  $('create-input').disabled=locked||!projectSelection||!inputCapability;$('cancel').disabled=!job&&!applying&&!previewPlaying&&!validationCount;
+  $('create-input').disabled=locked||!projectSelection||!inputCapability;$('cancel').disabled=!job&&!applying&&!previewPlaying&&!validationCount&&(!modelRequest||stopped||!!updateIntent);
   $('undo-correction').disabled=locked||!analysisState||activeCorrections().length===0;
   $('recover-apply').disabled=busy||!credentials||!(localEditPending||state?.applyRecovery?.blocked);
   $('release-cache').disabled=busy||!cacheReady(true);
@@ -978,7 +980,7 @@ $('override-filter').onclick=()=>{if($('override-filter').disabled||!overrideRow
 handler('undo-correction',()=>correct({type:'undo'}));
 handler('cancel',async()=>{
   stopRevision++;
-  if(job?.kind==='model-setup')modelInstallResult('canceling');
+  if(job?.kind==='model-setup'||modelRequest)modelInstallResult('canceling');
   stopped=true;plan=null;await stopPreview();
   const cancellations=[connection.cancelPending()];
   if(job){canceledJobs.add(job.jobId);cancellations.push(api('/jobs/'+job.jobId+'/cancel',{}));}
@@ -995,7 +997,7 @@ handler('update',async()=>{
   if(!updateIntent)updateIntent={candidateId:candidate.candidateId,manifestDigest:candidate.manifestDigest,requestId:requestId(),epoch:state.epoch};
   updateIntent.inFlight=true;stopRevision++;
   stopped=true;plan=null;if(job)canceledJobs.add(job.jobId);toggle();
-  if(job?.kind==='model-setup')modelInstallResult('canceling');
+  if(job?.kind==='model-setup'||modelRequest)modelInstallResult('canceling');
   say('Contentrium CUT 작업을 중단하고 업데이트를 시작합니다.');
   // Start the global stop independently of an unresponsive Adobe playback API.
   const intent=updateIntent;
@@ -1007,16 +1009,38 @@ handler('update',async()=>{
 });
 handler('recover-update',async()=>{await api('/updates/recover',{});await refresh();});
 handler('open-model-provider',()=>uxp.shell.openExternal('https://huggingface.co/pyannote/speaker-diarization-community-1','화자 모델 제공자의 이용 조건과 접근 권한을 확인합니다.'));
-handler('install-model',async()=>{
-  if(!credentials||!state?.gateOpen)throw new Error('편집 연결을 확인하세요.');
-  const token=$('model-token').value.trim(),termsAccepted=$('model-terms').checked;$('model-token').value='';
-  if(!token||!termsAccepted){$('model-install-status').textContent='접근 토큰을 입력하고 제공자 이용 조건 동의를 확인한 뒤 다시 설치하세요.';throw new Error($('model-install-status').textContent);}
+function modelValidation(count,descriptors){
+  const token=modelRequest;if(!token)return false;
+  const own=!token.invalid&&token.phase==='revision'&&!token.validationFinished&&count===1&&Array.isArray(descriptors)&&descriptors.length===1&&descriptors[0].path==='/models/community-1/revision'&&descriptors[0].epoch===token.epoch&&typeof descriptors[0].id==='string'&&/^[a-f0-9]{32}$/.test(descriptors[0].id)&&(!token.id||token.id===descriptors[0].id);
+  if(own){token.id=descriptors[0].id;token.validationActive=true;token.validationRevision=validationRevision;return true;}
+  if(!count&&token.validationActive&&!token.invalid){token.validationActive=false;token.validationFinished=true;token.validationRevision=validationRevision;return false;}
+  token.invalid=true;return false;
+}
+function modelReady(){return resourceSettingsReady(true)&&!state.maintenance&&state.appVersion===bundle.appVersion&&state.bundleId===bundle.bundleId&&state.protocolVersion===bundle.protocolVersion;}
+function modelResponseGuard(token){
+  const scope=[...cacheScope(),state.gateOpen,stopped,plan,planInputHash,modelInputRevision,cacheRequest],rows=selectedRows.slice(),raw=JSON.stringify([$('model-token').value,$('model-terms').checked,$('analysis-device').value,$('cache-budget').value]);
+  return ()=>{
+    if(modelRequest!==token||token.invalid||!credentials||!state?.gateOpen||stopped||updateIntent||panelContextConflict||state.stopEpoch!=null||state.compatible===false||state.maintenance||validationRevision!==token.validationRevision||validationCount!==(token.validationActive?1:0)||$('model-install-status').textContent!==token.modelStatus)return false;
+    const live=[...cacheScope(),state.gateOpen,stopped,plan,planInputHash,modelInputRevision,cacheRequest];return scope.every((value,index)=>value===live[index])&&rows.length===selectedRows.length&&rows.every((row,index)=>row===selectedRows[index])&&raw===JSON.stringify([$('model-token').value,$('model-terms').checked,$('analysis-device').value,$('cache-budget').value]);
+  };
+}
+async function runModelInstall(){
+  if(!modelReady())return;
+  const access=$('model-token').value.trim(),termsAccepted=$('model-terms').checked;$('model-token').value='';
+  if(!access||!termsAccepted){const text='접근 토큰을 입력하고 제공자 이용 조건 동의를 확인한 뒤 다시 설치하세요.';$('model-install-status').textContent=text;say(text);return;}
+  const token={epoch:state.epoch,phase:'revision',id:null,validationActive:false,validationFinished:false,validationRevision,guidanceRevision:statusRevision,modelStatus:'모델 리비전을 확인하고 있습니다.',invalid:false};modelRequest=token;$('model-install-status').textContent=token.modelStatus;toggle();const current=modelResponseGuard(token);
   try{
-    $('model-install-status').textContent='모델 리비전을 확인하고 있습니다.';
-    const epoch=state.epoch,revision=await api('/models/community-1/revision',{token,termsAccepted,epoch});
-    job=await api('/models/community-1/install',{token,termsAccepted,revision:revision.revision,epoch});$('model-install-status').textContent='로컬 모델 설치 중';
-  }catch(e){const canceled=['CANCELED','UPDATE_IN_PROGRESS'].includes(e.code);say(modelInstallResult(canceled?'canceled':'failed',e.code));}
-});
+    const revision=await api('/models/community-1/revision',{token:access,termsAccepted,epoch:token.epoch});if(!current()||token.validationActive)return;
+    if(typeof revision?.revision!=='string'||!/^[a-fA-F0-9]{40}$/.test(revision.revision))throw Object.assign(new Error('MODEL_NOT_READY'),{code:'MODEL_NOT_READY'});
+    token.phase='install';const next=await api('/models/community-1/install',{token:access,termsAccepted,revision:revision.revision,epoch:token.epoch});if(!current())return;
+    if(typeof next?.jobId!=='string'||!/^[a-zA-Z0-9_-]{1,128}$/.test(next.jobId)||next.kind!=='model-setup'||next.status!=='running'||Object.prototype.hasOwnProperty.call(next,'epoch')&&next.epoch!==token.epoch)throw Object.assign(new Error('MODEL_NOT_READY'),{code:'MODEL_NOT_READY'});
+    job=next;$('model-install-status').textContent='로컬 모델 설치 중';
+  }catch(e){if(current()){const canceled=['CANCELED','UPDATE_IN_PROGRESS'].includes(e.code),text=modelInstallResult(canceled?'canceled':'failed',e.code);if(statusRevision===token.guidanceRevision)say(text);}}
+  finally{if(modelRequest===token)modelRequest=null;}
+}
+handler('install-model',()=>runModelInstall());
+for(const id of ['model-token','model-terms'])$(id).oninput=$(id).onchange=()=>{if(workLocked()||!modelReady())return;modelInputRevision++;};
+
 function resourceSettingsReady(save=false){
   return !!credentials&&!!state&&!updateIntent&&!panelContextConflict&&state.compatible!==false&&state.stopEpoch==null&&(!save||state.gateOpen&&!stopped&&!binding&&!projectRead&&!job&&!validationCount&&!applying&&!batchRunning&&!localEditPending&&!state.applyRecovery?.blocked);
 }

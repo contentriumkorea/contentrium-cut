@@ -2029,3 +2029,13 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 독립10raw/HEAD/indexdigest/scopedstatus 동일·52/52·metadata5parsed version-only. 완료fixture timer/timeout0·auth peer timers정리·모든자체시도process종료/nativechild reaped·product edits0. 실제Premiere/스크린리더/사용자설치/Community/package/public은독립범위밖.
 
 - [0.1.78 패키지 검증](package-0.1.78-proof.json): runtime/CCX native2698/exit0·Setup native66188/exit0·추출 proof native54063/exit0·52.453초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.78·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.
+
+
+### 공개 결과
+
+- [v0.1.78](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.78): release408177099·제목 Contentrium CUT·공개2026-10-09T17:40:59Z·target/tag 14719d9459c0388dcd928bba592e08e5fd4ba40b·draft/prerelease 아님. [실제 재다운로드](release-0.1.78-proof.json): 익명0.1.77→0.1.78 AVAILABLE·서명·ZIP/CCX/Setup3개 실제 size/SHA 일치. [현재 조회](release-0.1.78-current-proof.json): CURRENT/후보 없음·5자산 ID/size/digest/서명 바이트 일치. [고정 복구](migration-pinned-0.1.1-after-0.1.78-proof.json): latest0.1.78에도 서명v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+- 기획→설계→구현→검증→0.1.78 공개/재검증 완료. 정식 Node666/Python496·독립 검수는 별도 evidence와 집계를 따른다. RED3/native1·관련15/15 native0 및 신규3 RED 보존 및 optional/torchcodec 경고 보존. 실제 Premiere/UXP 화면·편집·기존0.1.0 설치 업데이트 전환·Community-1 품질 미검증. 사용자 설치/활성화·컴퓨터유즈/브라우저/Premiere 조작·provider 동의/토큰/미디어 업로드 없음.
+
+- 종료근거: 업로드 native76958/exit0·실제3다운로드 native40942/exit0·CURRENT/5자산/고정v0.1.1 closeout 즉시exit0/session없음. package native54063/exit0·52.453초·runtime2698/Setup66188 모두0. 공개819파일/비공개패턴·신뢰키불변·52raw 일치·설치0.1.0 hash동일·서명키존재만확인·자동화ACTIVE15분·helper종료후순차자체CLI0. 정식Node666/Python496·독립543+190고유(actual-main188/static2/raw440) 별도집계·C/I/M/미해결0·통과fixture/native 재실행0.
+- 실패근거보존: 신규3 RED/native1·160.1909ms은row기준hint 부재·구현후관련15/15 native0·985.8161ms. root최초edit selector단일성assertion1은mic/sync동일문장때문·파일write전중단제품0사례·동일문장을sync행문맥으로범위명시해정정·원본tool/edit 보존. 독립4run의outerTextDecoder/기존clock-date정규화/raw기대/cancel readiness toggle/queued cancel receipt 및 timer종료순서 fixture오류는위raw근거로보존·중간exit0미완료를통과로간주하지않음·failed/미완료만재검증·최종190allpass. optional/torchcodec경고보존·Community-1품질근거아님.
+- 이어갈 단계: actual-main3source 양모드×3method6행에서기준marker는정상이나방식dropdown 전용설명ID/aria-describedby와 method-hint 안내가없는후보를바탕으로 audio/manual/timecode필요조건을짧게안내하는기획→설계. 현재method/ref/제외/교체/연결준비/작업잠금동작과rowhint/errorpriority/raw/hash/result/즉시update/late응답보존조건부터검증. 이번동결뒤제품추가변경없음·정식집계가산없음. 실제Premiere/UXP 시각/편집·screenreader·사용자설치전환·Community-1품질미검증. 컴퓨터유즈/브라우저/Premiere조작·사용자재설치/활성화·terms/결제/token/media외부업로드없음.

@@ -2110,7 +2110,7 @@ test('cache budget immediately marks invalid input and blocks save without chang
   f.get('cache-budget').value=raw;f.get('cache-budget').oninput();
   assert.equal(f.get('cache-budget').attrs['aria-invalid'],'true');assert.equal(f.get('cache-budget').attrs['aria-describedby'],'cache-budget-error');
   assert.match(f.get('cache-budget-error').textContent,/양수/);assert.equal(/\bhidden\b/.test(f.get('cache-budget-error').className),false);assert.equal(f.get('save-resources').disabled,true);
-  assert.equal(f.get('status').textContent,guide);assert.equal(f.calls.length,calls);assert.equal(f.get('prune-cache').disabled,false);
+  assert.equal(f.get('status').textContent,guide);assert.equal(f.calls.length,calls);assert.equal(f.get('prune-cache').disabled,true);
  }
 });
 test('cache budget corrections restore save and preserve exact rounded bytes and blank omission',async()=>{
@@ -2189,6 +2189,34 @@ async function heldCache(mode,action,stage='post',setup=null){
  return {f,run,resume,reject,value:stage==='post'?(action==='release-cache'?{released:true}:{removed:['owned-fixture'],budgetMet:true}):action==='prune-cache'?{settings:{device:'cpu',cacheBudgetBytes:1073741824},status:{cacheBytes:0,freeDiskBytes:10737418240}}:{...structuredClone(f.state),gateOpen:true,maintenance:null}};
 }
 function cacheState(f){return JSON.stringify({resource:resourceState(f),state:f.evaluate('JSON.stringify(state)'),connection:f.get('connection').textContent,maintenance:f.get('cache-maintenance').className});}
+test('unsaved resource edits block cache prune and preserve inputs without requests',async()=>{
+ for(const mode of ['separate','mixed'])for(const [id,value] of [['cache-budget','2.25'],['cache-budget',''],['cache-budget','-1'],['analysis-device','cuda']]){
+  const f=await updatePanel();if(mode==='mixed')await f.click('mode-mixed');await f.click('open-settings');assert.equal(f.get(id).disabled,false);f.get(id).value=value;f.get(id).oninput();
+  assert.equal(f.evaluate('resourceInputDirty'),true);assert.equal(f.get('prune-cache').disabled,true);assert.match(f.get('resource-save-info').textContent,/먼저 저장/);assert.equal(/\bhidden\b/.test(f.get('resource-save-info').className),false);
+  const calls=f.calls.length,guide=f.get('status').textContent;await f.click('prune-cache');assert.equal(f.calls.length,calls);assert.equal(f.get(id).value,value);assert.equal(f.evaluate('resourceInputDirty'),true);assert.equal(f.get('status').textContent,guide);
+ }
+});
+test('unsaved resource save restores prune only after confirmed GET and keeps failed edits',async()=>{
+ for(const mode of ['separate','mixed'])for(const failure of [null,'post','get']){
+  let saved=false,resumePost,resumeGet;const f=await updatePanel({request:async(p,b)=>{
+   if(p==='/resources'&&b?.settings)return new Promise((resolve,reject)=>{resumePost=()=>{if(failure==='post')reject(new Error('Owned unsaved POST error'));else{saved=true;resolve({});}};});
+   if(p==='/resources'&&!b&&saved)return new Promise((resolve,reject)=>{resumeGet=()=>failure==='get'?reject(new Error('Owned unsaved GET error')):resolve({settings:{device:'cpu',cacheBudgetBytes:2.25*1073741824},status:{cacheBytes:0,freeDiskBytes:10*1073741824}});});
+   if(p==='/resources/prune')return {removed:[],budgetMet:true};
+  }});if(mode==='mixed')await f.click('mode-mixed');await f.click('open-settings');assert.ok(f.get('resource-save-info'),'resource save notice exists');f.get('cache-budget').value='2.25';f.get('cache-budget').onchange();assert.equal(f.get('save-resources').disabled,false);const run=f.click('save-resources');for(let i=0;i<40&&!resumePost;i++)await Promise.resolve();assert.equal(typeof resumePost,'function');assert.equal(f.get('prune-cache').disabled,true);assert.equal(/\bhidden\b/.test(f.get('resource-save-info').className),true);resumePost();
+  if(failure!=='post'){for(let i=0;i<40&&!resumeGet;i++)await Promise.resolve();assert.equal(typeof resumeGet,'function');assert.equal(f.evaluate('resourceInputDirty'),true);assert.equal(f.get('prune-cache').disabled,true);resumeGet();}await run;
+  const post=f.calls.find(c=>c.path==='/resources'&&c.body?.settings);assert.deepEqual(JSON.parse(JSON.stringify(post.body)),{settings:{device:'cpu',cacheBudgetBytes:2.25*1073741824},epoch:0});assert.equal(f.get('cache-budget').value,'2.25');
+  assert.equal(f.evaluate('resourceInputDirty'),!!failure);assert.equal(f.get('prune-cache').disabled,!!failure);assert.equal(/\bhidden\b/.test(f.get('resource-save-info').className),!failure);
+  if(failure)assert.match(f.get('status').textContent,/Owned unsaved/);else{const calls=f.calls.length;const prune=f.click('prune-cache');for(let i=0;i<40;i++)await Promise.resolve();resumeGet();await prune;const request=f.calls.slice(calls).find(c=>c.path==='/resources/prune');assert.deepEqual(JSON.parse(JSON.stringify(request.body)),{epoch:0});assert.equal(f.get('cache-budget').value,'2.25');}
+ }
+});
+test('unsaved resource changes leave drained release and immediate update available',async()=>{
+ for(const mode of ['separate','mixed'])for(const action of ['release-cache','update']){
+  const f=await updatePanel({request:async(p,b,f)=>{if(p==='/resources/prune'&&b?.action==='release'){f.state.gateOpen=true;f.state.maintenance=null;return {released:true};}}});if(mode==='mixed')await f.click('mode-mixed');await f.click('open-settings');f.get('cache-budget').value='2.25';f.get('cache-budget').oninput();
+  if(action==='release-cache'){f.state.gateOpen=false;f.state.maintenance={id:'c'.repeat(32),status:'canceled',canRelease:true,drained:true};await f.evaluate('refresh()');}
+  assert.equal(f.get(action).disabled,false);await f.click(action);assert.equal(f.get('cache-budget').value,'2.25');assert.equal(f.evaluate('resourceInputDirty'),true);assert.equal(f.get('prune-cache').disabled,true);
+  assert.equal(f.calls.filter(c=>c.path===(action==='update'?'/updates/start':'/resources/prune')).length,1);if(action==='update')assert.equal(f.evaluate('stopped'),true);
+ }
+});
 test('cache progress identifies prune release and receipt waits and restores buttons',async()=>{
  for(const mode of ['separate','mixed'])for(const action of ['prune-cache','release-cache'])for(const stage of ['post','get'])for(const outcome of ['success','error']){
   const h=await heldCache(mode,action,stage),f=h.f,release=action==='release-cache';
@@ -2211,7 +2239,7 @@ test('cache progress preserves newer guidance and immediate update during each w
 });
 test('cache progress idle labels and busy state leave resource saving and budget feedback independent',async()=>{
  const f=await updatePanel();assert.equal(f.get('prune-cache').attrs['aria-busy'],'false');assert.equal(f.get('release-cache').attrs['aria-busy'],'false');assert.equal(f.get('prune-cache').textContent,'완료된 분석 캐시 정리');assert.equal(f.get('release-cache').textContent,'정리 종료 후 편집 계속');
- f.get('cache-budget').value='-1';f.get('cache-budget').oninput();assert.equal(f.get('prune-cache').disabled,false);assert.equal(f.get('save-resources').disabled,true);assert.equal(f.get('cache-budget').attrs['aria-invalid'],'true');
+ f.get('cache-budget').value='-1';f.get('cache-budget').oninput();assert.equal(f.get('prune-cache').disabled,true);assert.equal(f.get('save-resources').disabled,true);assert.equal(f.get('cache-budget').attrs['aria-invalid'],'true');
  const h=await heldResourceSettings('separate');assert.equal(h.f.get('save-resources').attrs['aria-busy'],'true');for(const id of ['prune-cache','release-cache'])assert.equal(h.f.get(id).attrs['aria-busy'],'false');h.resume();await h.run;
 });
 test('cache release state query errors retain newer guidance received during the prior POST',async()=>{

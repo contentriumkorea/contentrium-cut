@@ -435,14 +435,14 @@ function renderSources(){
     const issue=element('p','','hint input-error hidden');issue.id='microphone-error-'+microphoneRows.length;issue.setAttribute('role','status');issue.setAttribute('aria-live','polite');row.appendChild(issue);
     const selectionHint=element('p','','hint hidden');selectionHint.id='microphone-selection-'+microphoneRows.length;selectionHint.setAttribute('role','status');selectionHint.setAttribute('aria-live','polite');row.appendChild(selectionHint);
     for(const field of [speaker,channel,stream])field.setAttribute('aria-describedby',issue.id+' '+selectionHint.id+(field===speaker?'':' '+audioGuide.id));check.setAttribute('aria-describedby',selectionHint.id);
-    $('microphones').appendChild(row);microphoneRows.push({clip,check,speaker,channel,stream,issue,selectionHint,audioGuide,defaultChecked:{separate:order<2,mixed:order<1},title:'A'+(track.index+1)+' · '+track.name});
+    $('microphones').appendChild(row);microphoneRows.push({clip,check,speaker,channel,stream,issue,selectionHint,audioGuide,defaultChecked:{separate:order<2,mixed:order<1},title:'A'+(track.index+1)+' · '+track.name+' · '+microphoneNames.get(clip.assetId)});
     for(const field of [check,speaker,channel,stream]){field.disabled=workLocked()||!connected;field.onchange=()=>{if(workLocked()||!connected)return;if(field!==check&&!check.checked){scheduleSettings();toggle();return;}if(field===check)microphoneSelectionCustomized=true;invalidateAnalysis();renderSpeakers(mode==='mixed'?[]:[...new Set(microphoneRows.filter(r=>r.check.checked).map(r=>r.speaker.value.trim()))]);};}
     for(const field of [speaker,channel,stream])field.oninput=field.onchange;
     const calibration=element('div',undefined,'source-row'),bounds=element('div',undefined,'row'),first=number(0),last=number(0);
     calibration.appendChild(element('div','A'+(track.index+1)+' · '+microphoneNames.get(clip.assetId),'source-title'));
     bounds.appendChild(label('단독 발화 시작 · 프레임',first));bounds.appendChild(label('종료 · 프레임',last));calibration.appendChild(bounds);
     const calibrationHint=element('p','','hint'),calibrationIssue=element('p','','hint input-error hidden');calibrationHint.id='calibration-guide-'+calibrationRows.length;calibrationIssue.id='calibration-error-'+calibrationRows.length;calibrationIssue.setAttribute('aria-live','polite');calibration.appendChild(calibrationHint);calibration.appendChild(calibrationIssue);$('calibration').appendChild(calibration);
-    const calibrationRow={instanceKey:clip.instanceKey,clip,check,speaker,first,last,stream,channel,hint:calibrationHint,issue:calibrationIssue,title:'A'+(track.index+1)+' · '+track.name};calibrationRows.push(calibrationRow);
+    const calibrationRow={instanceKey:clip.instanceKey,clip,check,speaker,first,last,stream,channel,hint:calibrationHint,issue:calibrationIssue,title:'A'+(track.index+1)+' · '+track.name+' · '+microphoneNames.get(clip.assetId)};calibrationRows.push(calibrationRow);
     for(const field of [first,last]){field.min='0';field.step='1';field.setAttribute('aria-describedby',calibrationIssue.id+' '+calibrationHint.id);field.disabled=workLocked()||!connected||!calibrationActive(calibrationRow);field.oninput=field.onchange=()=>calibrationChanged(calibrationRow);}
   }
   for(const track of s.tracks.filter(t=>t.mediaType==='video'&&s.clips.some(c=>c.trackRef===t.trackRef))){

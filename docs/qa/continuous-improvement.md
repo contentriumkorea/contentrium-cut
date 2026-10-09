@@ -955,3 +955,13 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 다음 후보 actual-main 두 모드×update/cancel×example running/error8/8에서 늦은 단독 발화 샘플 안내/오류가 새 중단/업데이트 안내를 덮는 문제를 재현했다(cycle37-next-inspect.js/.log). 실제 listenExample 등록 handler를 사용했고 update start각1회(총4), 실제 provider/host/install0. 다음 회차는 example poll 및 SourceMonitor snapshot/open/play await·미리보기 종료 scope를 설계한다. 이번 sync poll 승인으로 example/전체 refresh lifetime 보호를 주장하지 않는다.
 
 - 엔진/CCX·Setup 빌드 exit0. 빌드 후 고정 입력52개 해시 동일·공개 파일634개 패턴 검사·신뢰 키 보존 통과. [0.1.38 패키지 증거](package-0.1.38-proof.json): ZIP/CCX CRC·경로·크기·비공개 자료 제외·CCX 최종 소스·Silero 해시·frozen engine29개/Setup26개 모듈·진입점2개 소스 일치, 추출 engine runtimeReady=true/0.1.38,Setup help exit0,55.141초. 선택적 모듈/torchcodec 경고를 보존하며 실제 Community-1 품질 통과로 확대하지 않는다. 현재 단계: 기획·설계·구현·독립 검수·전체 회귀·패키지 실행 완료.0.1.38 공개와 익명 발견/서명/실제 다운로드 해시·고정v0.1.1 확인으로 진행한다.
+
+
+### 공개 결과
+
+- [v0.1.38](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.38): release `407455751`, 제목 `Contentrium CUT`, draft/prerelease 아님. 공개 시각 2026-10-09 12:07:28 KST (`2026-10-09T03:07:28Z`), target/tag commit `68211ed6613f03d77b58061e8dabd572d8adc93d`를 확인했다.
+- [공개 실제 재다운로드](release-0.1.38-proof.json): 익명 제품 경로에서0.1.37 →0.1.38 AVAILABLE. 서명과 실제 ZIP/CCX/Setup3개의 크기·SHA-256 일치.
+- [현재 버전](release-0.1.38-current-proof.json): 빈 상태에서0.1.38 CURRENT/후보 없음. 공개 자산5개 ID·크기·digest와 서명 문서 실제 바이트가 로컬과 일치.
+- [고정 복구 조회](migration-pinned-0.1.1-after-0.1.38-proof.json): latest0.1.38에서도 정확한 서명 v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 설치 전환은 하지 않았다.
+- 현재 단계: 기획 → 설계 → 구현 → 검증 →0.1.38 공개 및 공개 재검증 완료. 다음 회차는 단독 발화 샘플 example poll의 current ownership/progress/error/terminal 및 SourceMonitor snapshot/open/play 경계·미리보기 종료 scope를 설계한다. 두 모드×update/cancel×example running/error8/8에서 이전 응답이 새 안내를 덮는 문제를 재현했다(cycle37-next-inspect.js/.log). update start각1회, 실제 provider/host/install0. 의미 있는 수정·설계·독립 검수·회귀·패키지/공개 검증을 이어가며 버전만 올리지 않는다. 이번 sync poll 승인으로 example/전체 refresh lifetime 보호를 주장하지 않는다.
+- 활성 설치0.1.0의 active/journal/first-install 해시는 배포 전후 동일함을 읽기 전용 확인했다. 서명 키 존재·기존 ACTIVE/15분 자동화·이전 공개 파일·설정·실패 증거를 보존했다. 컴퓨터유즈·브라우저·Premiere 조작·재설치·제공자 접근 없음. 실제 UXP/Premiere 편집·설치 전환·Community-1 품질 미검증. 늦은 안내·transport/malformed/drain·중복 query RED와 기존 pre-query 입력 변경 안내 회귀1건·독립 Important1 복구 잠금·null 상태 proof 문제를 해결하고 실패 증거를 보존했다. 최종 Node447/Python495 통과. Scoped 잔여 C/I/M0/0/0. 독립 wrapper/result assert18건은 시험 구성 오류로 구별해 수정했고 초기 증거를 보존했다. 기존 간헐 실패는 이번 회귀에서 재현되지 않았고 원인은 미확정이다. 이미 서버에서 시작한 작업을 취소/rollback했다고 주장하지 않는다.

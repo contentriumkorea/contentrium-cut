@@ -2543,3 +2543,19 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 종료 근거: 0.1.95 공개 업로드 native60986/exit0·실제3다운로드 native86368/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native91154/exit0·Setup native37650/exit0·추출 패키지 native64456/exit0/59.500초. 공개887파일 비공개패턴검사·신뢰키불변·52raw 동결 일치·설치0.1.0 hash동일·서명키 존재만확인·자동화ACTIVE15분·자체CLI0. Node733/Python496 정식 통과와 독립 검수는 별도 집계.
 - 실패 원인/보존: 신규4 RED 버튼부재 native1·첫GREEN3pass/1helperfail native1(새 표의 eval mode 따옴표 escape 소실)·실패1만교정pass native0. 추가잠금1 RED/native1→첫GREEN batchRunning admission실패/native1→최종pass/native0, 추가stopRevision1 RED/native1→GREEN/native0. 신규정식6고유/8GREEN raw·helper1/product1 보존·통과재실행0·기존시험본문/기대변경0. 독립 최종110고유/121raw/현재110pass·과거제품실패7/helper4와모든실패교정 원본보존·미해결0. 구현 전 미도달helper 이름2건은 실제 restoreSettings/projectRead로교정·원본REDsource 보존. 관련42/42는잠금교정전, 최종정식733에서전체재검증. optional/torchcodec 경고 원본 보존·Community품질근거 아님. root 읽기helper 경로추정1건도제품시험실패와구분하여보존.
 - 이어갈 단계: actual-main raw 07/1.9e1를0/300으로채운뒤 undo사용가능하지만 복원대상 원문을 클릭 전에 보여주는 별도 안내 없음·nextprobe native0. 다음회차 클립 범위 되돌리기 대상 원문 사전안내를 기획→설계·빈값/공백 명확표시·동일맥락/행수명/잠금/입력폐기·반복live쓰기0·설정/분석/plan불변·update즉시차단 수용조건→실패재현부터진행. 제품동결 뒤 추가제품변경 없음·probe/독립시험 정식집계가산 없음. 실제Premiere/UXP/스크린리더/기존0.1.0설치전환/Community품질미검증. CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/결제/token/media외부업로드없음.
+
+
+## 95회차: 클립 범위 되돌리기 대상 원문 안내 — 0.1.96
+
+- 시작 clean HEAD310cc8d5269efa813871828635ad93d4eccaea22/latest v0.1.95/release408409979/제목 Contentrium CUT/targetc7416e12944d20dd86105fe5c4efc5e35915efc5·자체 CLI0. 덮어쓴 구간을 되돌리기 전에 복원될 원문을 알 수 없는 불편을 개선한다.
+- 설계/수용 조건: undo 아래 행별 읽기 전용 status/polite 안내와 aria-describedby를 연결한다. 기존 calibrationClipUndoReady와 identity guard를 사용하여 복원 가능한 동안에만 정확한 first/last 원문 JSON 문자열(공백/scientific/무효 문자열 포함)과 빈 입력 표기/복원 후 구간 확인 안내를 보여준다. 일시 잠금은 안내만 숨기며 해제 시 다시 보인다. 실제 중단/update·입력·설정 적용·초기화·맥락·모드·행수명 변경/undo 뒤 폐기된다. 반복 toggle/feedback 동일 textContent 재쓰기0. 다른 마이크/설정/분석/plan/원본snapshot/API 불변, 입력은 편집 가능. 신규 실패 재현→구현→관련/전체 Node/Python→읽기 전용 독립 리뷰→추출 패키지 실행→공개 발견/서명/3download size/hash/고정v0.1.1 검증. 자율 진행 승인 범위이며 컴퓨터유즈/브라우저/Premiere 실행조작종료/사용자 설치활성화/terms/결제/token/media 외부 업로드 없음. 실제 Premiere/UXP/스크린리더/0.1.0 설치 전환/Community-1 품질 미검증.
+
+- 신규4 RED/native1: 안내 요소 부재로4fail, 원본 시험/로그/exit 보존. 기존 시험본문 불변. raw bytes로 main 두 지점에 안내 렌더/feedback만 추가하여 기존 undo readiness/identity/원문 복원 동작을 공유한다.
+
+- GREEN 첫3pass/1helper SyntaxError(native1): 새 표의 중첩 eval mode 문자열 따옴표 소실. 원본 시험/로그 보존·해당 helper만 char-code 문자열로 교정하여 실패1만 native0 재검증·통과3 중복 재실행0. 신규4고유/5GREEN raw, 기존 시험본문/기대 불변. metadata5 0.1.96·52raw 동결.
+
+- 최종 정식 Node737/737/native57716/exit0/121263.1394ms·fail/cancel/skip/todo0. Python496고유/native50615/exit0/96.125초·fail/error/skip/excluded0·import중복41만제거. 관련48/48/native0/2680.3709ms. 신규4고유/5GREEN raw·helper1 보존·실패만교정·통과재실행0·기존시험본문불변. 독립 추가시험은 정식 집계 가산 없음.
+
+- 독립 최종 C/I/M/미해결0·소스 범위 병합가능. 76고유/78raw/현재76pass·첫74pass/2fixturefail(초기backup undefined 기대와 빈 selectedRows.reverse 무변경) 원본보존·실패2만교정pass·통과재실행0·정식콜백0. 268파일 seal bytes/SHA + 4단계52raw/HEAD/index/status/current 동일·QA root373byte 추가만prefix 보존. 최초PID168272/PPID183520/exit1 live CIM 미수집을 그대로 기록하고 재검수PID170508/PPID185180/session1/exit0 live metadata 확인. 수집helper 첫 QA 동시 append assertion실패는수집만교정·원본보존·시험재실행없음. report 5e8d963b14567659a6fce75106b85159b55a83494b1f3ef079c2dae441d65f3f·seal 926a01d989c72590636834058f0513421eef52bf0075fc5f25f1e85000e7cd5b. 실제 UXP/스크린리더/설치/Community품질 미검증·패키지/공개는root 별도.
+
+- [0.1.96 패키지 검증](package-0.1.96-proof.json): runtime/CCX native18457/exit0·Setup native8361/exit0·추출 proof native71468/exit0·53.562초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.96·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.

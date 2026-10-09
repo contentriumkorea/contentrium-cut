@@ -16,7 +16,7 @@ let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEdit
 let settingsWriteTail=Promise.resolve();
 let modelRequest=null,modelInputRevision=0,modelPoll=null;
 let cacheRequest=null,syncPoll=null,examplePoll=null,refreshRequest=null,updateCheckRequest=null,updateRecoveryRequest=null,applyRecoveryRequest=null,cancelRequest=null,updateStartRequest=null;
-let previewBusy=0,previewGeneration=0;
+let previewBusy=0,previewGeneration=0,previewStopBusy=0;
 let resourceRequest=null,resourceInputRevision=0,resourceViewRevision=0,resourceInputDirty=false,resourceBudgetMissing=false,resourceSuggestedBudget=null,stopRevision=0;
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
 let analysisState=null;
@@ -283,7 +283,10 @@ function toggle(){
   $('recover-apply').disabled=!applyRecoveryReady();$('recover-apply').textContent=applyRecoveryRequest?'기록 확인 중…':'중단 작업 확인';$('recover-apply').setAttribute('aria-busy',applyRecoveryRequest?'true':'false');
   $('release-cache').disabled=busy||!cacheReady(true);
   const updateBusy=renderUpdateUI();
-  $('progress').className=cancelRequest||applyRecoveryRequest||updateRecoveryRequest||initializing||job||applying||pending||validationCount||updateBusy?'running':'';
+  const previewStopMessage=previewStopBusy>0?'미리보기 종료 요청을 기다리고 있습니다. 완료될 때까지 편집·캐시 작업이 잠깁니다.':'';
+  if($('preview-stop-info').textContent!==previewStopMessage)$('preview-stop-info').textContent=previewStopMessage;$('preview-stop-info').className='hint'+(previewStopMessage?'':' hidden');
+  const progressBusy=!!(cancelRequest||applyRecoveryRequest||updateRecoveryRequest||initializing||job||applying||pending||validationCount||previewBusy||updateBusy);
+  $('progress').className=progressBusy?'running':'';$('progress').setAttribute('aria-busy',progressBusy?'true':'false');
   const update=state?.update,available=update?.candidate&&['AVAILABLE','CHECKING'].includes(update.checkState);
   $('update').disabled=!credentials||!!updateIntent?.inFlight||!!updateIntent?.accepted||(!updateIntent&&!available)||!!update&& !['IDLE','COMPLETE','CANCELED','FAILED_BEFORE_REPLACE','ROLLED_BACK'].includes(update.updateState);
   $('update-banner-button').disabled=$('update').disabled;
@@ -573,13 +576,13 @@ async function correct(operation){
 async function stopPreview(current=()=>true){
   if(!current())throw currentCheckDiscarded;
   if(previewPlaying){
-    const generation=previewGeneration;previewBusy++;toggle();
+    const generation=previewGeneration;previewBusy++;previewStopBusy++;toggle();
     try{
       let result;try{result=await ContentriumHost.ppro.SourceMonitor.play(0);}catch(e){if(!current()||generation!==previewGeneration)throw currentCheckDiscarded;throw e;}
       if(!current()||generation!==previewGeneration)throw currentCheckDiscarded;
       if(!result)throw new Error('음성 미리보기를 멈추지 못했습니다.');
       previewPlaying=false;previewGeneration++;toggle();
-    }finally{previewBusy--;toggle();}
+    }finally{previewBusy--;previewStopBusy--;toggle();}
   }
 }
 

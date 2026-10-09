@@ -1,0 +1,27 @@
+{
+  "releaseTitle": "Contentrium CUT",
+  "tag": "v0.1.68",
+  "url": "https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.68",
+  "anonymousCheckState": "AVAILABLE",
+  "currentVersion": "0.1.67",
+  "remoteVersion": "0.1.68",
+  "signatureVerified": true,
+  "downloadedAssets": [
+    {
+      "role": "companion",
+      "size": 332266879,
+      "sha256": "c172ee582a9c86aa0faec58510bb151bb71278498b9b58fc516836b623eb5c78"
+    },
+    {
+      "role": "panel",
+      "size": 81047,
+      "sha256": "37d342c21870e60120dee92c801f979be6b4c05b7cd7ff70a8ac69e87b9ec8b5"
+    },
+    {
+      "role": "installer",
+      "size": 93421909,
+      "sha256": "38a2629affed27413e3900b57de3dd439c23a25084d4d0bc2c8d5ebaa7f2077e"
+    }
+  ],
+  "liveInstallationChanged": false
+}

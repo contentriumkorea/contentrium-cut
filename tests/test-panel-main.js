@@ -1204,7 +1204,7 @@ test('update starts while preview stop is held and stale refresh cannot reopen e
     f.state.gateOpen=false;f.state.epoch=1;f.state.stopEpoch=1;f.state.update.updateState='QUIESCING';f.state.update.updateEpoch=1;
     await f.tick();assert.equal(f.calls.filter(c=>c.path==='/updates/ack').length,0);
     assert.equal(f.calls.filter(c=>c.path==='/heartbeat').at(-1).body.quiescent,false);
-  }finally{release();await click;}
+  }finally{release(true);await click;}
   await f.tick();assert.ok(f.calls.some(c=>c.path==='/updates/ack'));
 });
 
@@ -2188,4 +2188,77 @@ test('sync state recovery requires exact component epoch terminal job and true d
 
 test('sync null and malformed state drain receipts remain untrusted without global poll errors',async()=>{
  for(const receipt of [null,undefined,{}, {jobs:[null]}, {epoch:0,jobs:[null,{}]}]){const h=await heldSyncDrainProof();h.resumeState(receipt);await h.run;assert.equal(h.f.evaluate('job'),h.active);assert.equal(h.f.evaluate('syncResult'),null);assert.doesNotMatch(h.f.get('status').textContent,/private|TypeError/);}
+});
+
+
+function exampleReceipt(f,status='completed',drained=true){return {jobId:'owned-example-job',kind:'example',epoch:0,status,drained,result:{analysisId:f.analysisId,revision:f.analysisRevision,path:'D:/owned/sample.wav',durationSeconds:2}};}
+async function heldExample(mode='separate',stage='query'){
+ let armed=false,resume,reject,queries=0;const f=await updatePanel({request:(path,body,fixture)=>{
+  if(path.endsWith('/example'))return {jobId:'owned-example-job',kind:'example',status:'running',epoch:0};
+  if(path==='/jobs/owned-example-job'){queries++;if(armed&&stage==='query')return new Promise((a,b)=>{resume=a;reject=b;});return exampleReceipt(fixture);}
+ }});if(mode==='mixed')await f.click('mode-mixed');await f.click('analyze');await f.tick();await f.evaluate('listenExample({exampleId:"owned-example"})');
+ let opens=0,plays=0,stops=0;const snapshot=f.host.snapshot;
+ f.host.snapshot=()=>armed&&stage==='snapshot'?new Promise((a,b)=>{resume=a;reject=b;}):snapshot();
+ f.host.ppro.SourceMonitor.openFilePath=async()=>{opens++;return armed&&stage==='open'?new Promise((a,b)=>{resume=a;reject=b;}):true;};
+ f.host.ppro.SourceMonitor.play=async value=>{if(!value){stops++;return true;}plays++;return armed&&stage==='play'?new Promise((a,b)=>{resume=a;reject=b;}):true;};
+ armed=true;const run=f.evaluate('pollJob()');for(let i=0;i<100;i++)await Promise.resolve();assert.equal(typeof resume,'function',stage);return {f,run,resume,reject,queries:()=>queries,opens:()=>opens,plays:()=>plays,stops:()=>stops};
+}
+test('example polling preserves update cancel and newer guidance after late progress or failure',async()=>{
+ for(const mode of ['separate','mixed'])for(const action of ['update','cancel','new-guide'])for(const outcome of ['running','error','completed']){
+  const {f,run,resume,reject,opens,plays}=await heldExample(mode);if(action==='new-guide')f.evaluate('say("Owned newer guide")');else await f.click(action);const guide=f.get('status').textContent;
+  if(outcome==='error')reject(Object.assign(new Error('private late sample'),{code:'WORKER_FAILED'}));else resume(exampleReceipt(f,outcome,outcome==='completed'));await run;
+  assert.equal(f.get('status').textContent,guide,mode+action+outcome);if(action!=='new-guide'){assert.equal(opens(),0);assert.equal(plays(),0);}if(action==='update')assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);
+ }
+});
+test('example native waits discard stale completions and stop already issued playback without claiming idle early',async()=>{
+ for(const mode of ['separate','mixed'])for(const stage of ['snapshot','open','play'])for(const action of ['cancel','update'])for(const outcome of ['success','error']){
+  const {f,run,resume,reject,plays,stops}=await heldExample(mode,stage);await f.click(action);const guide=f.get('status').textContent;
+  if(stage!=='snapshot'){await f.evaluate('heartbeat()');assert.equal(f.calls.filter(c=>c.path==='/heartbeat').at(-1).body.quiescent,false);assert.equal(f.get('analyze').disabled,true);}
+  if(outcome==='error')reject(new Error('private native failure'));else resume(stage==='snapshot'?await f.evaluate('({snapshot:{snapshotHash:connected.snapshot.hostSnapshotHash}})'):true);await run;
+  assert.equal(f.get('status').textContent,guide,mode+stage+action+outcome);assert.equal(plays(),stage==='play'?1:0);assert.equal(stops(),stage==='play'?1:0);assert.equal(f.evaluate('previewPlaying'),false);assert.equal(f.evaluate('job'),null);
+ }
+});
+test('example query malformed and undrained receipts keep job until exact terminal drain',async()=>{
+ for(const receipt of [null,{}, {status:'unsupported'}, ...['jobId','kind','epoch','drained'].map(key=>({[key]:key==='drained'?false:key==='epoch'?9:'other'}))]){
+  const {f,run,resume,plays}=await heldExample();const active=f.evaluate('job');resume(receipt&&Object.keys(receipt).length?{...exampleReceipt(f),...receipt}:receipt);await run;assert.equal(f.evaluate('job'),active);assert.equal(plays(),0);assert.match(f.get('status').textContent,/다시 조회|실제 종료/);
+ }
+});
+test('example transport errors preserve job retry and sanitize current error',async()=>{
+ const {f,run,reject}=await heldExample(),active=f.evaluate('job');reject(new Error('private sample path/token'));await run;assert.equal(f.evaluate('job'),active);assert.match(f.get('status').textContent,/다시 조회/);assert.doesNotMatch(f.get('status').textContent,/private/);
+});
+test('example query scope changes prevent playback status and replacement job cleanup',async()=>{
+ for(const change of ['state.epoch++','credentials={new:true}','connected={...connected}','mode="mixed"','analysisState={...analysisState}','analysisState.revision++','state.gateOpen=false','state.compatible=false','state.stopEpoch=0','state.maintenance={pending:true}','localEditPending=true','state.applyRecovery.blocked=true','validationRevision++','binding=true','projectRead={}','job={...job}','job={...job,jobId:"replacement"}'])for(const outcome of ['success','error']){
+  const {f,run,resume,reject,opens,plays}=await heldExample();f.evaluate(change+';say("Owned new scope");toggle()');const active=f.evaluate('job');if(outcome==='error')reject(new Error('old failure'));else resume(exampleReceipt(f));await run;assert.equal(f.get('status').textContent,'Owned new scope',change);assert.equal(f.evaluate('job'),active,change);assert.equal(opens(),0);assert.equal(plays(),0);
+ }
+});
+test('example duplicate poll and stale owner finally do not disturb new polling owner',async()=>{
+ const {f,run,resume,queries}=await heldExample();const duplicate=f.evaluate('pollJob()');for(let i=0;i<40;i++)await Promise.resolve();assert.equal(queries(),1);f.evaluate('examplePoll={owner:"new"}');const owner=f.evaluate('examplePoll');resume(exampleReceipt(f,'running',false));await run;assert.equal(f.evaluate('examplePoll'),owner);
+});
+test('example malformed completed sample never starts native work and trusted terminal releases job',async()=>{
+ for(const sample of [null,{}, {analysisId:'other'}, {revision:9},{path:''},{path:42},{durationSeconds:0},{durationSeconds:'NaN'},{durationSeconds:-1},{durationSeconds:true}]){
+  const {f,run,resume,opens,plays}=await heldExample();const value=exampleReceipt(f);value.result=sample&&Object.keys(sample).length?{...value.result,...sample}:sample;resume(value);await run;assert.equal(opens(),0);assert.equal(plays(),0);assert.equal(f.evaluate('job'),null);assert.match(f.get('status').textContent,/샘플/);
+ }
+});
+test('example current completed playback remains usable and old timer cannot clear replacement preview',async()=>{
+ const {f,run,resume,opens,plays}=await heldExample();resume(exampleReceipt(f));await run;assert.equal(opens(),1);assert.equal(plays(),1);assert.equal(f.evaluate('previewPlaying'),true);assert.equal(f.evaluate('job'),null);assert.match(f.get('status').textContent,/재생합니다/);const timer=f.timeouts.at(-1);await f.click('cancel');f.evaluate('stopped=false;previewPlaying=true;previewGeneration++;say("New preview")');timer();assert.equal(f.evaluate('previewPlaying'),true);assert.equal(f.get('status').textContent,'New preview');
+});
+
+test('example fresh authenticated state proves drain after changed analysis while malformed proof remains locked',async()=>{
+ for(const bad of [null,'valid','epoch','version','kind','jobepoch','id','drained','status','nulljob']){
+  const {f,run,reject,plays}=await heldExample(),active=f.evaluate('job');const value=exampleReceipt(f);f.state.jobs=[value];if(bad===null)f.state.jobs=[];if(bad==='epoch')f.state.epoch=9;if(bad==='version')f.state.appVersion='other';if(bad==='kind')value.kind='sync';if(bad==='jobepoch')value.epoch=9;if(bad==='id')value.jobId='other';if(bad==='drained')value.drained=false;if(bad==='status')value.status='running';if(bad==='nulljob')f.state.jobs=[null];reject(Object.assign(new Error('changed'),{code:'EXAMPLE_SCOPE'}));await run;assert.equal(f.evaluate('job'),bad==='valid'?null:active,String(bad));assert.equal(plays(),0);
+ }
+});
+test('example stopped fresh query can recover exact terminal state without new host work or guidance',async()=>{
+ for(const action of ['cancel','update']){const {f,run,reject,opens,plays}=await heldExample();await f.click(action);const guide=f.get('status').textContent;reject(Object.assign(new Error('old gated'),{code:'UPDATE_IN_PROGRESS'}));await run;assert.ok(f.evaluate('job'));f.state.jobs=[exampleReceipt(f)];f.evaluate('connection.request=((previous)=>(path,body)=>path==="/jobs/owned-example-job"?Promise.reject(Object.assign(new Error("gated"),{code:"UPDATE_IN_PROGRESS"})):previous(path,body))(connection.request)');await f.evaluate('pollJob()');assert.equal(f.evaluate('job'),null);assert.equal(f.get('status').textContent,guide);assert.equal(opens(),0);assert.equal(plays(),0);}
+});
+test('example pending native call prevents update ack until stop settles and failed stop remains nonidle',async()=>{
+ const {f,run,resume}=await heldExample('mixed','play');let settle;f.host.ppro.SourceMonitor.play=value=>value?Promise.resolve(true):new Promise(a=>{settle=a;});await f.click('update');f.state.gateOpen=false;f.state.update.updateState='QUIESCING';const requests=f.calls.length;await f.evaluate('refresh()');assert.equal(f.calls.slice(requests).some(c=>c.path==='/updates/ack'),false);resume(true);for(let i=0;i<50;i++)await Promise.resolve();assert.equal(typeof settle,'function');await f.evaluate('heartbeat()');assert.equal(f.calls.filter(c=>c.path==='/heartbeat').at(-1).body.quiescent,false);settle(true);await run;await f.evaluate('refresh()');assert.ok(f.calls.some(c=>c.path==='/updates/ack'));assert.equal(f.evaluate('previewBusy'),0);
+ const held=await heldExample('separate','play');held.f.host.ppro.SourceMonitor.play=async()=>false;await held.f.click('cancel');held.resume(true);await held.run;assert.equal(held.f.evaluate('previewPlaying'),true);await held.f.evaluate('heartbeat()');assert.equal(held.f.calls.filter(c=>c.path==='/heartbeat').at(-1).body.quiescent,false);assert.equal(held.f.get('cancel').disabled,false);
+});
+test('example natural end timer stops its owned playback and older stop completion preserves new generation',async()=>{
+ const {f,run,resume}=await heldExample();resume(exampleReceipt(f));await run;let settle;f.host.ppro.SourceMonitor.play=()=>new Promise(a=>{settle=a;});f.timeouts.at(-1)();for(let i=0;i<20;i++)await Promise.resolve();assert.equal(typeof settle,'function');assert.equal(f.evaluate('previewBusy'),1);f.evaluate('previewGeneration++;previewPlaying=true;say("New owned playback")');settle(true);for(let i=0;i<30;i++)await Promise.resolve();assert.equal(f.evaluate('previewPlaying'),true);assert.equal(f.evaluate('previewBusy'),0);assert.equal(f.get('status').textContent,'New owned playback');
+});
+
+test('example older update stop rejection cannot overwrite newer guidance or preview ownership',async()=>{
+ for(const change of ['say("New guide")','previewGeneration++;say("New preview")']){const {f,run,resume}=await heldExample();resume(exampleReceipt(f));await run;let reject;f.host.ppro.SourceMonitor.play=()=>new Promise((a,b)=>{reject=b;});await f.click('update');assert.equal(typeof reject,'function');f.evaluate(change);const guide=f.get('status').textContent;reject(new Error('old stop'));for(let i=0;i<50;i++)await Promise.resolve();assert.equal(f.get('status').textContent,guide);assert.equal(f.evaluate('previewPlaying'),true);assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);}
 });

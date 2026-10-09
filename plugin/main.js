@@ -15,7 +15,8 @@ let microphoneSelectionCustomized=false;
 let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;let projectRead=null,nativePreparation=null,editingSubmission=null,correctionRequest=null,settingsRestore=null,settingsSave=null;
 let settingsWriteTail=Promise.resolve();
 let modelRequest=null,modelInputRevision=0,modelPoll=null;
-let cacheRequest=null,syncPoll=null;
+let cacheRequest=null,syncPoll=null,examplePoll=null;
+let previewBusy=0,previewGeneration=0;
 let resourceRequest=null,resourceInputRevision=0,resourceViewRevision=0,resourceInputDirty=false,stopRevision=0;
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
 let analysisState=null;
@@ -227,7 +228,7 @@ function actionGuidance(){
   if(step==='review')return plan?'전체 편집안을 검토한 뒤 Premiere에 적용하세요.':'컷 편집 단계에서 편집안을 먼저 만드세요.';
   return step==='settings'?'모델·분석 자원·업데이트 설정을 확인하세요.':'카메라와 마이크를 지정한 뒤 화자 단계로 이동하세요.';
 }
-function inputLocked(){return binding||pending||applying||!!job||validationCount>0||stopped||!credentials||!state?.gateOpen;}
+function inputLocked(){return binding||pending||applying||!!job||previewBusy>0||validationCount>0||stopped||!credentials||!state?.gateOpen;}
 function workLocked(){return inputLocked()||state?.compatible===false||!!updateIntent||localEditPending||!!state?.applyRecovery?.blocked;}
 function toggle(){
   if(syncJob&&syncResult&&!syncResultMatches())invalidateSyncResult();
@@ -257,7 +258,7 @@ function toggle(){
   $('add-override').disabled=locked||!connected;for(const row of overrideRows)row.remove.disabled=locked||!connected;
   for(const row of overrideRows)for(const field of [row.first,row.last,row.camera])field.disabled=locked||!connected;
   $('override-filter').disabled=locked||!overrideRows.some(r=>r.error.textContent);
-  $('create-input').disabled=locked||!projectSelection||!inputCapability;$('cancel').disabled=!job&&!applying&&!previewPlaying&&!validationCount&&(!modelRequest||stopped||!!updateIntent);
+  $('create-input').disabled=locked||!projectSelection||!inputCapability;$('cancel').disabled=!job&&!applying&&!previewPlaying&&!previewBusy&&!validationCount&&(!modelRequest||stopped||!!updateIntent);
   $('undo-correction').disabled=locked||!analysisState||activeCorrections().length===0;
   $('recover-apply').disabled=busy||!credentials||!(localEditPending||state?.applyRecovery?.blocked);
   $('release-cache').disabled=busy||!cacheReady(true);
@@ -550,11 +551,16 @@ async function correct(operation){
 async function stopPreview(current=()=>true){
   if(!current())throw currentCheckDiscarded;
   if(previewPlaying){
-    try{await ContentriumHost.ppro.SourceMonitor.play(0);}catch(e){if(!current())throw currentCheckDiscarded;throw e;}
-    if(!current())throw currentCheckDiscarded;
-    previewPlaying=false;toggle();
+    const generation=previewGeneration;previewBusy++;toggle();
+    try{
+      let result;try{result=await ContentriumHost.ppro.SourceMonitor.play(0);}catch(e){if(!current()||generation!==previewGeneration)throw currentCheckDiscarded;throw e;}
+      if(!current()||generation!==previewGeneration)throw currentCheckDiscarded;
+      if(!result)throw new Error('음성 미리보기를 멈추지 못했습니다.');
+      previewPlaying=false;previewGeneration++;toggle();
+    }finally{previewBusy--;toggle();}
   }
 }
+
 async function afterEditingPreview(next,nativeToken=null){
   const scope=projectScope(),read=projectRead,selection=projectSelection,capability=inputCapability,rows=selectedRows.slice(),reviewed=plan,reviewedHash=planInputHash,sync=syncResult,syncId=syncJob,syncHash=syncResultInputHash;
   const current=()=>!binding&&!batchRunning&&projectRead===read&&projectScopeCurrent(scope,!!nativeToken)&&(!nativeToken||applying&&nativePreparation===nativeToken)&&projectSelection===selection&&inputCapability===capability&&selectedRows.length===rows.length&&rows.every((row,index)=>selectedRows[index]===row)&&plan===reviewed&&planInputHash===reviewedHash&&syncResult===sync&&syncJob===syncId&&syncResultInputHash===syncHash;
@@ -574,7 +580,7 @@ async function submitEditingJob(path,body,identity,message,inputsCurrent=()=>tru
     if(!current())throw currentCheckDiscarded;
     let next;try{next=await api(path,body);}catch(e){if(!current())throw currentCheckDiscarded;throw e;}
     if(!current())throw currentCheckDiscarded;
-    job={...next,...identity,...(next.kind==='sync'?{epoch:body.epoch}:{})};say(message);toggle();
+    job={...next,...identity,...(['sync','example'].includes(next.kind)?{epoch:body.epoch}:{})};say(message);toggle();
   }finally{if(editingSubmission===token)editingSubmission=null;}
 }
 async function listenExample(example){
@@ -756,7 +762,7 @@ function updateGuidance(update){
   const retry=remaining?'최소 '+remaining+'초 후 업데이트 확인을 다시 누르세요.':'업데이트 확인을 다시 누르세요.';
   if(updateIntent&&['IDLE','COMPLETE','CANCELED','FAILED_BEFORE_REPLACE','ROLLED_BACK','UNAVAILABLE'].includes(phase))return '업데이트 시작 요청을 확인하고 있습니다.';
   const phases={STOP_REQUESTED:'작업 중단을 요청했습니다.',
-    QUIESCING:previewPlaying?'미리보기 종료를 기다리고 있습니다. 지연되면 프로젝트를 저장하고 Premiere를 정상 종료하세요.':'진행 중인 작업을 안전하게 종료하고 있습니다.',
+    QUIESCING:previewPlaying||previewBusy?'미리보기 종료를 기다리고 있습니다. 지연되면 프로젝트를 저장하고 Premiere를 정상 종료하세요.':'진행 중인 작업을 안전하게 종료하고 있습니다.',
     DOWNLOADING:'업데이트 파일을 다운로드하고 있습니다.',VERIFYING_PACKAGE:'다운로드한 파일을 검증하고 있습니다.',
     WAITING_HOST_EXIT:code==='UPDATE_RATE_LIMIT'?'서버 요청 제한으로 설치를 기다리고 있습니다. '+(remaining?'최소 '+remaining+'초 후 자동으로 다시 시도합니다. ':'')+'프로젝트를 저장하고 Premiere를 정상 종료하세요.':'프로젝트를 저장하고 Premiere를 정상 종료하면 설치를 계속합니다.',
     INSTALLING:'업데이트 파일을 교체하고 있습니다.',PENDING_ACTIVATION:'새 플러그인의 실행을 확인하고 있습니다.',
@@ -799,10 +805,10 @@ async function refresh(current=()=>true,accepted=()=>{}){
   $('apply-recovery-text').textContent=localIntentError?messages[localIntentError]:localEditPending||recovery?.blocked?'이전 편집이 중단되었습니다. 기록을 확인한 뒤 새 작업을 시작할 수 있습니다.':'';
   $('cache-maintenance').className=state.maintenance?'':'hidden';
   $('cache-maintenance-text').textContent=state.maintenance?.canRelease?'정리 작업이 종료됐습니다. 편집을 계속할 수 있습니다.':'캐시 정리 작업이 종료되는 것을 기다리고 있습니다.';
-  toggle();if(!state.gateOpen&&!state.maintenance&&!applying&&!batchRunning&&!previewPlaying){if(current())await api('/updates/ack',{epoch:state.epoch,quiescent:true,batchRunning:false}).catch(()=>{});}
+  toggle();if(!state.gateOpen&&!state.maintenance&&!applying&&!batchRunning&&!previewPlaying&&!previewBusy){if(current())await api('/updates/ack',{epoch:state.epoch,quiescent:true,batchRunning:false}).catch(()=>{});}
   return current();
 }
-async function heartbeat(current=()=>true){if(!credentials||!state)return;const receipt=await api('/heartbeat',{hostIdentity:null,epoch:state.epoch,batchRunning,quiescent:!applying&&!previewPlaying,panelVersion:bundle.appVersion,bundleId:bundle.bundleId,protocolVersion:bundle.protocolVersion});if(!current())return;if(!receipt.gateOpen||receipt.stopEpoch!==null&&receipt.stopEpoch!==undefined){stopped=true;plan=null;toggle();}}
+async function heartbeat(current=()=>true){if(!credentials||!state)return;const receipt=await api('/heartbeat',{hostIdentity:null,epoch:state.epoch,batchRunning,quiescent:!applying&&!previewPlaying&&!previewBusy,panelVersion:bundle.appVersion,bundleId:bundle.bundleId,protocolVersion:bundle.protocolVersion});if(!current())return;if(!receipt.gateOpen||receipt.stopEpoch!==null&&receipt.stopEpoch!==undefined){stopped=true;plan=null;toggle();}}
 function periodicHeartbeat(){
   if(!heartbeatRequest){const next=heartbeat();heartbeatRequest=next;const clear=()=>{if(heartbeatRequest===next)heartbeatRequest=null;};next.then(clear,clear);}
   return heartbeatRequest;
@@ -929,9 +935,73 @@ async function pollSyncJob(active){
     if(statusRevision===token.guidanceRevision)say('싱크 분석 완료 · 확인이 필요한 소스를 검토하세요.');finishPolledJob(active);
   }finally{if(syncPoll===token)syncPoll=null;}
 }
+function examplePollScope(){
+  return [credentials,connected,connected?.snapshot.snapshotHash,connected?.snapshot.hostSnapshotHash,mode,job,state?.epoch,state?.gateOpen,state?.stopEpoch,state?.compatible,state?.appVersion,state?.bundleId,state?.protocolVersion,state?.maintenance,stopped,updateIntent,stopRevision,panelContextConflict,localEditPending,state?.applyRecovery?.blocked,applying,batchRunning,binding,projectRead,projectSelection,inputCapability,analysisState,analysisState?.analysisId,analysisState?.revision,analysisJob,plan,planInputHash,syncResult,syncJob,syncResultInputHash,settingsRestore,settingsSave,resourceRequest,cacheRequest,modelRequest,correctionRequest,validationRevision,validationCount];
+}
+async function pollExampleJob(active){
+  if(examplePoll||previewBusy)return;
+  const token={active,credential:credentials,epoch:state?.epoch,jobEpoch:active.epoch,scope:examplePollScope(),rows:selectedRows.slice(),guidanceRevision:statusRevision};examplePoll=token;
+  const owned=()=>examplePoll===token&&job===active&&credentials===token.credential&&state?.epoch===token.epoch;
+  const current=()=>{if(!owned())return false;const scope=examplePollScope();return token.scope.every((value,index)=>value===scope[index])&&selectedRows.length===token.rows.length&&token.rows.every((row,index)=>row===selectedRows[index]);};
+  const usable=()=>current()&&polledJobCurrent(active,token.epoch)&&!state.maintenance&&!batchRunning&&!binding&&!projectRead&&!!connected&&active.snapshotHash===connected.snapshot.snapshotHash&&!!analysisState&&analysisState.analysisId===active.analysisId&&analysisState.revision===active.revision;
+  const guide=()=>usable()&&statusRevision===token.guidanceRevision;
+  const queryFailure=()=>{if(guide())say('음성 샘플 작업 상태를 확인하지 못했습니다. 실제 종료를 확인할 때까지 다시 조회합니다.');};
+  const terminal=value=>!!value&&value.jobId===active.jobId&&value.kind==='example'&&value.epoch===token.jobEpoch&&value.drained===true&&['completed','canceled','failed','interrupted'].includes(value.status);
+  const cleanup=()=>{if(owned()&&(current()||canceledJobs.has(active.jobId)))finishPolledJob(active);};
+  try{
+    let value;
+    try{value=await api('/jobs/'+active.jobId);}catch(e){
+      if(current()&&((e.code==='EXAMPLE_SCOPE'&&usable())||canceledJobs.has(active.jobId))&&!['AUTH_REQUIRED','SESSION_EXPIRED'].includes(e.code)){
+        let receipt;try{receipt=await api('/state');}catch(_){queryFailure();return;}
+        if(!current())return;
+        const proof=Array.isArray(receipt?.jobs)?receipt.jobs.find(v=>v?.jobId===active.jobId):null;
+        if(receipt?.epoch===token.epoch&&receipt.appVersion===state.appVersion&&receipt.bundleId===state.bundleId&&receipt.protocolVersion===state.protocolVersion&&terminal(proof)){
+          if(guide())say('음성 샘플의 분석 내용이 변경됐습니다. 최신 화자 분석에서 다시 선택하세요.');cleanup();return;
+        }
+      }
+      if(usable()){queryFailure();if(['AUTH_REQUIRED','SESSION_EXPIRED'].includes(e.code)){setConnection(false,'편집 연결 복구 중');credentials=null;connection.reset();retryAt=Date.now()+1000;toggle();}}return;
+    }
+    if(!owned())return;
+    if(!value||value.jobId!==active.jobId||value.kind!=='example'||value.epoch!==token.jobEpoch||typeof value.drained!=='boolean'||!['running','canceling','completed','canceled','failed','interrupted'].includes(value.status)){queryFailure();return;}
+    if(!terminal(value)){if(guide())say(value.status==='canceling'?'음성 샘플 작업을 중단하고 있습니다.':value.status==='running'?'단독 발화 샘플을 준비하고 있습니다.':'음성 샘플 작업의 실제 종료를 확인하고 있습니다.');return;}
+    if(!usable()){cleanup();return;}
+    if(value.status!=='completed'){if(guide())say(value.status==='interrupted'?'음성 샘플 작업이 이전 연결에서 중단됐습니다. 샘플을 다시 선택하세요.':'음성 샘플 작업을 중단했습니다. 샘플을 다시 선택하세요.');cleanup();return;}
+    const sample=value.result,duration=sample?.durationSeconds;
+    if(!sample||sample.analysisId!==active.analysisId||sample.revision!==active.revision||typeof sample.path!=='string'||!sample.path.trim()||!['string','number'].includes(typeof duration)||typeof duration==='string'&&!duration.trim()||!Number.isFinite(Number(duration))||Number(duration)<=0||Number(duration)>2147483){if(guide())say('음성 샘플 정보를 확인하지 못했습니다. 샘플을 다시 선택하세요.');cleanup();return;}
+    let fresh;try{fresh=await ContentriumHost.snapshot();}catch(_){if(guide())say('음성 샘플의 타임라인을 확인하지 못했습니다. 샘플을 다시 선택하세요.');cleanup();return;}
+    if(!usable()){cleanup();return;}
+    if(fresh?.snapshot?.snapshotHash!==connected.snapshot.hostSnapshotHash){const show=guide();resetSequence();if(show)say('샘플 준비 중 타임라인이 변경됐습니다. 현재 시퀀스를 다시 읽어 주세요.');if(owned())finishPolledJob(active);return;}
+    const generation=++previewGeneration;let playIssued=false;previewBusy++;toggle();
+    try{
+      if(!await ContentriumHost.ppro.SourceMonitor.openFilePath(sample.path))throw new Error('SAMPLE_OPEN_FAILED');
+      if(!usable())return;
+      playIssued=true;const playing=await ContentriumHost.ppro.SourceMonitor.play(1);
+      if(!playing)throw new Error('SAMPLE_PLAY_FAILED');
+      // An issued Adobe call cannot be revoked. Track and stop its owned playback
+      // after completion, including when cancel/update arrived during the await.
+      if(generation!==previewGeneration)return;
+      previewPlaying=true;
+      if(!usable()){await stopPreview(()=>generation===previewGeneration);return;}
+      const guidance=guide();
+      if(guidance)say('Premiere 소스 모니터에서 단독 발화를 재생합니다.');
+      const revision=statusRevision;
+      setTimeout(()=>{
+        if(generation!==previewGeneration)return;
+        stopPreview(()=>generation===previewGeneration).catch(()=>{if(generation===previewGeneration&&statusRevision===revision)say('음성 미리보기가 멈추지 않으면 프로젝트를 저장하고 Premiere를 정상 종료하세요.');});
+      },Math.ceil(Number(duration)*1000)+250);
+    }catch(_){
+      // A rejected play may have reached Adobe. Keep playback non-idle until
+      // the owned stop confirms completion, or leave it available for retry.
+      if(playIssued&&generation===previewGeneration){previewPlaying=true;try{await stopPreview(()=>generation===previewGeneration);}catch(_){} }
+      if(guide())say('음성 샘플 재생을 완료하지 못했습니다. 샘플을 다시 선택하세요.');
+    }
+    finally{previewBusy--;cleanup();toggle();}
+  }finally{if(examplePoll===token)examplePoll=null;}
+}
 async function pollJob(){
   if(!job)return;
   if(job.kind==='sync'){await pollSyncJob(job);return;}
+  if(job.kind==='example'){await pollExampleJob(job);return;}
   if(job.kind==='model-setup'){await pollModelJob(job);return;}
   const active=job,inputScope=active.kind==='input-probe'?{selection:projectSelection,rows:selectedRows.slice(),epoch:state?.epoch}:null,analysisScope=active.kind==='analysis'?{connection:connected,snapshotHash:connected?.snapshot.snapshotHash,hostSnapshotHash:connected?.snapshot.hostSnapshotHash,epoch:state?.epoch,mode,analysisState,revision:analysisState?.revision}:null;let value;
   try{value=await api('/jobs/'+active.jobId);}catch(e){
@@ -971,14 +1041,6 @@ async function pollJob(){
       const sources=new Map(connected.snapshot.sources.map(s=>[s.assetId,basename(s.canonicalPath)]));
       $('sync-result').textContent=Object.entries(syncResult.sources).map(([id,evidence])=>sources.get(id)+' · '+(evidence.status==='accepted'?(Number(syncResult.offsets[id]).toFixed(3)+'초'):'확인 필요 · '+(evidence.reason||evidence.code||evidence.status))).join('\n');
       say('싱크 분석 완료 · 확인이 필요한 소스를 검토하세요.');
-    }else if(active.kind==='example'){
-      const sample=value.result;
-      if(stopped||!analysisState||analysisState.analysisId!==active.analysisId||analysisState.revision!==active.revision||sample.analysisId!==active.analysisId||sample.revision!==active.revision)throw new Error('EXAMPLE_SCOPE');
-      if(!await ContentriumHost.ppro.SourceMonitor.openFilePath(sample.path))throw new Error('음성 샘플을 열지 못했습니다.');
-      if(stopped)throw new Error('CANCELED');
-      if(!await ContentriumHost.ppro.SourceMonitor.play(1))throw new Error('음성 샘플을 재생하지 못했습니다.');
-      previewPlaying=true;setTimeout(()=>{previewPlaying=false;toggle();},Math.ceil(Number(sample.durationSeconds)*1000)+250);
-      say('Premiere 소스 모니터에서 단독 발화를 재생합니다.');
     }else if(active.kind==='input-probe'){
       try{
         const next=await api('/input/capabilities/result',{jobId:value.jobId,epoch:inputScope.epoch});
@@ -1105,9 +1167,9 @@ handler('update',async()=>{
   if(job?.kind==='model-setup'||modelRequest)modelInstallResult('canceling');
   say('Contentrium CUT 작업을 중단하고 업데이트를 시작합니다.');
   // Start the global stop independently of an unresponsive Adobe playback API.
-  const intent=updateIntent;
+  const intent=updateIntent,previewStopRevision=statusRevision,previewStopGeneration=previewGeneration;
   const start=api('/updates/start',{candidateId:intent.candidateId,manifestDigest:intent.manifestDigest,requestId:intent.requestId});
-  stopPreview().catch(()=>say('업데이트를 시작했습니다. 미리보기가 멈추지 않으면 프로젝트를 저장하고 Premiere를 정상 종료하세요.'));
+  stopPreview().catch(()=>{if(updateIntent===intent&&statusRevision===previewStopRevision&&previewGeneration===previewStopGeneration)say('업데이트를 시작했습니다. 미리보기가 멈추지 않으면 프로젝트를 저장하고 Premiere를 정상 종료하세요.');});
   try{await start;intent.accepted=true;await refresh();}
   catch(e){if(e.code==='UPDATE_CANDIDATE')updateIntent=null;throw e;}
   finally{intent.inFlight=false;toggle();}

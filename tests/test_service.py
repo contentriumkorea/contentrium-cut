@@ -205,6 +205,18 @@ class ServiceTests(unittest.TestCase):
                     self.service.jobs.processes.pop(value['jobId'])
             self.assertIs(self.service._public_job(value)['drained'], True)
 
+    def test_example_public_receipt_requires_process_drain_before_preview(self):
+        for status in ['running', 'canceling', 'completed', 'canceled', 'failed', 'interrupted']:
+            value = dict(jobId='owned-example', kind='example', status=status, epoch=0)
+            with self.service.jobs.lock:
+                self.service.jobs.processes[value['jobId']] = {'owned': True}
+            try:
+                self.assertIs(self.service._public_job(value)['drained'], False)
+            finally:
+                with self.service.jobs.lock:
+                    self.service.jobs.processes.pop(value['jobId'])
+            self.assertIs(self.service._public_job(value)['drained'], True)
+
     def test_job_read_cancel_and_plan_are_owned_by_authenticated_session(self):
         args = self.bind()
         job = self.completed_analysis(args)

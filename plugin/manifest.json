@@ -2,7 +2,7 @@
   "manifestVersion": 5,
   "id": "com.contentrium.cut",
   "name": "Contentrium CUT",
-  "version": "0.1.30",
+  "version": "0.1.31",
   "main": "index.html",
   "featureFlags": {
     "CSSNextSupport": [

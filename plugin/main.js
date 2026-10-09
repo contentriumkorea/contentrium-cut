@@ -272,7 +272,7 @@ function toggle(){
   for(const row of syncRows){for(const field of [row.check,row.stream,row.channel,row.offset,row.confirmed,row.clockId,row.date,row.fps,row.drop,row.clockConfirmed])field.disabled=locked||!connected;syncManualFeedback(row,locked);syncClockFeedback(row);}
   for(const row of selectedRows)selectedSourceFeedback(row,locked);
   $('speaker-count').disabled=workLocked()||mode!=='mixed';$('vad-threshold').disabled=workLocked()||mode!=='separate';
-  for(const row of calibrationRows)for(const field of [row.first,row.last])field.disabled=workLocked()||!calibrationActive(row);
+  for(const row of calibrationRows)for(const field of [row.first,row.last])field.disabled=workLocked()||!connected||!calibrationActive(row);
   for(const id of ['analyze','sync','plan','apply-sync','apply','save-settings','load-settings'])$(id).disabled=locked||!connected||(id==='plan'&&!analysisState)||(id==='apply'&&!plan)||(id==='apply-sync'&&!syncResult);
   for(const [id,active,idle,label] of [['save-settings',settingsSave&&!settingsSave.automatic,'저장','저장 중…'],['load-settings',settingsRestore,'불러오기','불러오는 중…']]){$(id).textContent=active?label:idle;$(id).setAttribute('aria-busy',active?'true':'false');}
   for(const id of ['read-project','read-selection','install-model','save-resources','prune-cache'])$(id).disabled=locked;
@@ -372,19 +372,23 @@ function calibrationFeedback(){
     const active=calibrationActive(row),a=row.first.value.trim(),b=row.last.value.trim(),first=Number(a),last=Number(b);
     const unused=a!==''&&b!==''&&first===0&&last===0;
     let text='';
-    if(active&&!unused){
+    if(active&&connected&&!unused){
       if(!a||!b||!Number.isSafeInteger(first)||!Number.isSafeInteger(last)||first<0||last<=first)text='시작·종료는 정수 프레임이며 종료가 시작보다 커야 합니다. 미사용은 0 / 0으로 두세요.';
       else if(BigInt(first)*BigInt(connected.perFrame)<BigInt(row.clip.startTicks)||BigInt(last)*BigInt(connected.perFrame)>BigInt(row.clip.endTicks))text='단독 발화 구간은 이 마이크 클립 안에 지정하세요.';
     }
     const flag=text?'true':'false';for(const field of [row.first,row.last])if(field.getAttribute('aria-invalid')!==flag)field.setAttribute('aria-invalid',flag);
     const message=text?row.title+' · '+text:'';if(row.issue.textContent!==message)row.issue.textContent=message;row.issue.className='hint input-error'+(message?'':' hidden');
-    const hint=active?'0 / 0은 미사용 · 구간은 이 마이크 클립 안의 프레임으로 지정하세요.':mode==='mixed'?'개별 마이크 녹음에서 사용합니다.':'이 마이크를 선택하면 사용할 수 있습니다.';
+    let hint=active?'0 / 0은 미사용 · 시퀀스 프레임 기준으로 입력하세요. 종료는 시작보다 커야 합니다.':mode==='mixed'?'개별 마이크 녹음에서 사용합니다.':'이 마이크를 선택하면 사용할 수 있습니다.';
+    if(active&&connected){
+      const frame=BigInt(connected.perFrame),start=(BigInt(row.clip.startTicks)+frame-1n)/frame,end=BigInt(row.clip.endTicks)/frame;
+      hint+=start<end?' 클립 범위: '+start+'–'+end+'프레임.':' 완전한 프레임 구간이 없어 0 / 0(미사용)으로 두세요.';
+    }
     if(row.hint.textContent!==hint)row.hint.textContent=hint;if(message&&!firstIssue)firstIssue=message;
   }
   return firstIssue;
 }
 function calibrationOptions(legacy=false){return calibrationRows.filter(r=>(legacy||calibrationActive(r))&&Number(r.last.value)>Number(r.first.value)).map(r=>({speakerId:r.speaker.value.trim(),inputKey:ContentriumHost.hash({instanceKey:r.instanceKey,streamIndex:Number(r.stream.value)-1,channelIndex:Number(r.channel.value)-1}),startFrame:Number(r.first.value),endFrame:Number(r.last.value)}));}
-function calibrationChanged(row){if(workLocked())return;if(calibrationActive(row))invalidateAnalysis();else {scheduleSettings();toggle();}}
+function calibrationChanged(row){if(!calibrationRows.includes(row)||workLocked()||!connected)return;if(calibrationActive(row))invalidateAnalysis();else {scheduleSettings();toggle();}}
 function microphoneFeedback(){
   const scalarIssue=analysisOptionsFeedback();
   const calibrationIssue=calibrationFeedback();
@@ -436,9 +440,9 @@ function renderSources(){
     const calibration=element('div',undefined,'source-row'),bounds=element('div',undefined,'row'),first=number(0),last=number(0);
     calibration.appendChild(element('div','A'+(track.index+1)+' · '+basename(assets.get(clip.assetId).canonicalPath),'source-title'));
     bounds.appendChild(label('단독 발화 시작 · 프레임',first));bounds.appendChild(label('종료 · 프레임',last));calibration.appendChild(bounds);
-    const calibrationHint=element('p','','hint'),calibrationIssue=element('p','','hint input-error hidden');calibrationIssue.id='calibration-error-'+calibrationRows.length;calibrationIssue.setAttribute('aria-live','polite');calibration.appendChild(calibrationHint);calibration.appendChild(calibrationIssue);$('calibration').appendChild(calibration);
+    const calibrationHint=element('p','','hint'),calibrationIssue=element('p','','hint input-error hidden');calibrationHint.id='calibration-guide-'+calibrationRows.length;calibrationIssue.id='calibration-error-'+calibrationRows.length;calibrationIssue.setAttribute('aria-live','polite');calibration.appendChild(calibrationHint);calibration.appendChild(calibrationIssue);$('calibration').appendChild(calibration);
     const calibrationRow={instanceKey:clip.instanceKey,clip,check,speaker,first,last,stream,channel,hint:calibrationHint,issue:calibrationIssue,title:'A'+(track.index+1)+' · '+track.name};calibrationRows.push(calibrationRow);
-    for(const field of [first,last]){field.min='0';field.step='1';field.setAttribute('aria-describedby',calibrationIssue.id);field.disabled=workLocked()||!calibrationActive(calibrationRow);field.oninput=field.onchange=()=>calibrationChanged(calibrationRow);}
+    for(const field of [first,last]){field.min='0';field.step='1';field.setAttribute('aria-describedby',calibrationIssue.id+' '+calibrationHint.id);field.disabled=workLocked()||!connected||!calibrationActive(calibrationRow);field.oninput=field.onchange=()=>calibrationChanged(calibrationRow);}
   }
   for(const track of s.tracks.filter(t=>t.mediaType==='video'&&s.clips.some(c=>c.trackRef===t.trackRef))){
     const row=element('div',undefined,'camera-row'),clips=s.clips.filter(c=>c.trackRef===track.trackRef),title='V'+(track.index+1)+' · '+track.name;

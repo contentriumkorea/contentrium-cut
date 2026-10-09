@@ -2569,3 +2569,21 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 종료 근거: 0.1.96 공개 업로드 native9632/exit0·실제3다운로드 native63066/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native18457/exit0·Setup native8361/exit0·추출 패키지 native71468/exit0/53.562초. 공개891파일 비공개패턴검사·신뢰키불변·52raw 동결 일치·설치0.1.0 hash동일·서명키 존재만확인·자동화ACTIVE15분·자체CLI0. Node737/Python496 정식 통과·독립76고유/78raw는 별도 집계.
 - 실패 원인/보존: 신규4 RED 안내부재/native1·첫GREEN3pass/1helper SyntaxError/native1(새 표의 eval mode 문자열 escape 소실)·해당helper만 교정 실패1pass/native0·통과재실행0·제품GREEN실패0·기존시험본문불변. 독립 fixture실패2와 수집helper QA append assertion실패는 원본보존/실패만교정·미해결0. 최초독립 live CIM 미수집도 그대로 기록하여 추정하지 않음. optional/torchcodec 경고 원본 보존·Community품질 근거 아님.
 - 이어갈 단계: actual-main 역전 원문10/1을0/300으로채운뒤 원문 미리보기와undo는사용가능하지만 되돌릴 대상이무효인 이유를 클릭전에 보여주는 별도안내 없음·nextprobe native0. 다음회차 무효 되돌리기 대상의 정수/종료순서/클립범위 오류 사전안내를 기획→설계·정확원문복원보존/잠금과identity/행별독립/읽기전용/반복live쓰기0/update즉시차단 수용조건→실패재현부터 진행. 이번제품동결 뒤 추가제품변경 없음. 실제 Premiere/UXP 화면·편집·스크린리더·기존0.1.0 설치 전환·Community-1 실제 품질 미검증. CUA/browser/Premiere 실행조작종료/사용자 설치활성화/terms/결제/token/media 외부 업로드 없음.
+
+
+## 96회차: 무효한 클립 범위 되돌리기 대상 사전 안내 — 0.1.97
+
+- 시작 clean HEAD221d97dd8ff6e02831403fb2d4cfc70fab9e2147/latest v0.1.96/release408416858/제목 Contentrium CUT/target9dde8557d35433a166b0bbf6fa40ff35d4bf92dc·자체 CLI0. 되돌릴 원문이 무효해도 클릭 전에 이유를 알 수 없는 불편을 개선한다.
+- 설계/수용 조건: 행별 undo 원문 안내 아래 별도 읽기 전용 status/polite 오류 사전안내와 aria-describedby를 연결한다. 기존 calibrationClipUndoReady/identity guard 공유. trim/Number/safe integer/시작>=0/종료>시작과 BigInt tick 클립 포함을 검사하여 정수·종료순서 또는 클립범위 오류 이유와 되돌린 후 교정 안내를 표시한다. 비어있지 않은 0/0은 미사용이므로 경고하지 않는다. 경고 자체는 정확원문복원/편집을 막지 않으며 현재 유효한 채운 입력의 aria-invalid/오류·설정·분석·plan·HTTP·snapshot을 변경하지 않는다. 임시잠금은 숨김/해제후복귀, 입력·설정·초기화·맥락·행수명·실제중단/update·undo후폐기. 반복 동일textContent쓰기0/마이크별독립. 신규 실패 재현→구현→관련/전체 Node/Python→읽기 전용 독립 리뷰→추출 패키지 실행→공개 발견/서명/3download size/hash/고정v0.1.1을 검증한다. 자율진행승인범위, CUA/browser/Premiere 실행조작종료/사용자 설치활성화/terms/결제/token/media외부업로드금지. 실제Premiere/UXP/스크린리더/0.1.0설치전환/Community-1품질미검증.
+
+- 신규4 RED/native1/127.5593ms: 사전 오류 안내 부재4fail·원본 시험/로그/exit 보존. raw bytes로 순수사전검사함수와 행별 status/feedback을 추가. 기존 undo/입력오류/분석/설정 동작 불변.
+
+- GREEN 초기3pass/1helperfail/native1/289.6498ms: 정확히0/300인 원문은 기존 fill이no-op여서 undo기록이없는데false로기대한 오류. 해당 신규표기대만교정하여 실패1만재검증했으나 같은표의 second mic end가110이라는 추정으로 또helperfail/native1/192.1024ms. 실제fixture100–200 확인·상한 초과201로교정→실패1pass/native0. 모든 원본시험/로그/exit보존·통과3재실행0·제품GREEN실패0·신규4고유/6GREEN raw·helper2. 기존시험본문불변·metadata5 0.1.97·52raw 동결.
+
+- 최종 정식 Node741/741/native89896/exit0/91006.1644ms·fail/cancel/skip/todo0. Python496고유/native75005/exit0/90.187초·fail/error/skip/excluded0·import중복41만제거. 관련52/52/native0/3153.7811ms. 신규4고유/6GREEN raw·helper2 보존·실패만교정·통과재실행0·기존시험본문불변. 독립 추가시험은 정식 집계 가산 없음.
+
+- 독립 최종 C/I/M/미해결0·소스 범위 병합가능. 106고유/109raw/현재106pass·첫103pass/3helperfail native1/625.689ms·실패3만교정pass native0/95.5238ms·통과재실행0·제품실패0·정식콜백0/618등록stub. helper3: 0/-0은 미사용, const selectedRows 재할당 대신push, idle cancel은/cancel HTTP가아닌cancelPending 관찰. 원본runner/실패로그/native receipts 보존. 34파일 seal bytes/SHA/root재검증·before/after52raw hashes/HEAD/index/status/main/fixture/freeze/current 동일·QA root372byte 추가만prefix 보존. report 4b46243b0d36efccd1e9bedc5bcf560526ff9391083819d83678423145cdf8a2·seal 63ce7e668cca4751cede99005cf586668a8cf0aa801edfaa30af81d19b4bd2a0·seal재검증native0/77.2393ms receipt별도SHA. 실제 UXP/스크린리더/설치/Community품질 미검증·패키지/공개는root 별도.
+
+- root 리뷰수집 helper native1: git status 일반 LF출력을 reviewer의 --porcelain -z NUL원문과 비교한 도우미 오류. HEAD와문자열내용불변 확인·수집명령에 -z만추가→collector native0. 원본수집source/tool출력/실패 JSON보존·제품/시험변경0·시험재실행0.
+
+- [0.1.97 패키지 검증](package-0.1.97-proof.json): runtime/CCX native6562/exit0·Setup native64408/exit0·추출 proof native92970/exit0·53.187초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.97·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.

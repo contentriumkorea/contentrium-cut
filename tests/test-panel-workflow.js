@@ -99,3 +99,21 @@ for(const unreadable of ['unavailable','corrupt']){
     await assert.rejects(w.run(operation(()=>{native=true;})),{code:unreadable==='unavailable'?'EDIT_INTENT_STORAGE_UNAVAILABLE':'EDIT_INTENT_CORRUPT'});assert.equal(native,false);
   });
 }
+
+
+for(const stage of ['read','recover','verify'])test('recovery scope discards '+stage+' completion and keeps record',async()=>{
+ const saved=storage(),raw=JSON.stringify({schemaVersion:1,kind:'edit',requestId:'old'});saved.rows.set(INTENT_KEY,raw);let active=true,release,reads=0,calls=0;const read=saved.getItem;
+ saved.getItem=async k=>{reads++;if(stage==='read'&&reads===1||stage==='verify'&&reads===2)await new Promise(r=>release=r);return read(k);};
+ const w=create({storage:saved,randomId:()=> 'unused',api:async()=>{calls++;if(stage==='recover')await new Promise(r=>release=r);return {resolved:true};}});
+ const run=w.recover({current:()=>active});for(let i=0;i<50&&!release;i++)await Promise.resolve();assert.equal(typeof release,'function');active=false;release();await assert.rejects(run,{code:'CANCELED'});assert.equal(saved.rows.get(INTENT_KEY),raw);assert.equal(calls,stage==='read'?0:1);
+});
+for(const raw of [JSON.stringify({schemaVersion:1,kind:'edit',requestId:'old'}),'{broken',null])test('recovery preserves replacement of '+raw,async()=>{
+ const f=fixture({api:async()=>{f.saved.rows.set(INTENT_KEY,'new record');return {resolved:true};}});if(raw!==null)f.saved.rows.set(INTENT_KEY,raw);await assert.rejects(f.w.recover(),{code:'EDIT_INTENT_CHANGED'});assert.equal(f.saved.rows.get(INTENT_KEY),'new record');
+});
+test('recovery serializes its pending storage and server work against another recovery or edit',async()=>{
+ let release;const f=fixture({api:async()=>{await new Promise(r=>release=r);return {resolved:true};}});const run=f.w.recover();for(let i=0;i<50&&!release;i++)await Promise.resolve();await assert.rejects(f.w.recover(),{code:'APPLY_BUSY'});await assert.rejects(f.w.run(operation(()=>{throw new Error('must not edit');})),{code:'APPLY_BUSY'});release();await run;await f.w.recover({current:()=>false}).then(()=>assert.fail('must reject'),e=>assert.equal(e.code,'CANCELED'));
+});
+for(const result of [null,[],{}, {resolved:1},{resolved:'true'}])test('recovery rejects nonapproved typed receipt '+JSON.stringify(result),async()=>{const f=fixture({api:async()=>result});f.saved.rows.set(INTENT_KEY,'{broken');await assert.rejects(f.w.recover(),{code:'APPLY_RECOVERY_REQUIRED'});assert.equal(f.saved.rows.get(INTENT_KEY),'{broken');});
+
+test('recovery compares exact bytes even when invalid UTF8 decodes the same',async()=>{const saved=storage();saved.rows.set(INTENT_KEY,new Uint8Array([255]));const w=create({storage:saved,randomId:()=> 'unused',api:async()=>{saved.rows.set(INTENT_KEY,new Uint8Array([254]));return {resolved:true};}});await assert.rejects(w.recover(),{code:'EDIT_INTENT_CHANGED'});assert.deepEqual(saved.rows.get(INTENT_KEY),new Uint8Array([254]));});
+test('recovery cannot remove a readable replacement after an unavailable first read',async()=>{const saved=storage();saved.rows.set(INTENT_KEY,'new record');let reads=0;const get=saved.getItem;saved.getItem=k=>{if(++reads===1)throw new Error('owned unavailable');return get(k);};const w=create({storage:saved,randomId:()=> 'unused',api:async()=>({resolved:true})});await assert.rejects(w.recover(),{code:'EDIT_INTENT_CHANGED'});assert.equal(saved.rows.get(INTENT_KEY),'new record');});

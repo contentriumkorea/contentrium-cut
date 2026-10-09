@@ -2362,3 +2362,66 @@ test('heartbeat discarded input creation cannot issue native authorization or cl
 test('heartbeat discarded initialization follower does not read sequence or start update lookup',async()=>{
  let armed=false,resume;const f=await updatePanel({request:p=>armed&&!resume&&p==='/heartbeat'?new Promise(r=>{resume=r;}):undefined});armed=true;const run=f.evaluate('initialize()');for(let i=0;i<80&&!resume;i++)await Promise.resolve();assert.equal(typeof resume,'function');await f.click('update');const before=refreshView(f),calls=f.calls.length;resume({epoch:0,gateOpen:true,stopEpoch:null});await run;assert.equal(refreshView(f),before);assert.equal(f.calls.length,calls);assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);
 });
+
+
+async function heldSelection(stage,mode='separate'){
+  let armed=false,resolve,reject;
+  const f=await selectedPanel({request:async(path)=>{
+    if(armed&&path===stage)return new Promise((a,b)=>{resolve=a;reject=b;});
+  }});
+  if(mode==='mixed')await f.click('mode-mixed');
+  f.state.update={updateState:'IDLE',updateEpoch:0,checkState:'AVAILABLE',candidate:{candidateId:'release:hash',manifestDigest:'a'.repeat(64),appVersion:'0.1.1'}};await f.tick();
+  const native={projectRef:'project-1',sources:[{assetId:'new-camera',name:'New camera',path:'D:/owned/new.mov'}]};
+  f.host.selectedSources=()=>stage==='native'&&armed?new Promise((a,b)=>{resolve=a;reject=b;}):Promise.resolve(native);
+  const before=inputSelectionState(f);armed=true;const run=f.click('read-selection');
+  for(let i=0;i<100&&!resolve;i++)await Promise.resolve();assert.ok(resolve,'stage reached '+stage);
+  return {f,run,before,resolve,reject,native};
+}
+for(const mode of ['separate','mixed'])for(const stage of ['native','/input/sources','/input/capabilities'])test('selection lifetime '+mode+' '+stage+' preserves selection and stop guidance',async()=>{
+  for(const action of ['cancel','update'])for(const failure of [false,true]){
+    const h=await heldSelection(stage,mode),{f}=h;
+    assert.equal(inputSelectionState(f),h.before,'old selection during preparation');
+    await f.click(action);const guide=f.get('status').textContent,reset=f.resetCalls;
+    if(failure)h.reject(Object.assign(new Error('Owned obsolete source error'),{code:'AUTH_REQUIRED'}));
+    else h.resolve(stage==='native'?h.native:stage==='/input/sources'?{selectionId:'new-selection'}:{jobId:'new-probe',kind:'input-probe',status:'running',epoch:0});
+    await h.run;
+    assert.equal(f.get('status').textContent,guide);assert.equal(inputSelectionState(f),h.before);assert.equal(f.resetCalls,reset);assert.equal(f.evaluate('stopped'),true);
+    if(!failure&&stage==='/input/capabilities')assert.equal(f.calls.filter(c=>c.path==='/jobs/new-probe/cancel').length,1);
+  }
+});
+test('selection preparation survives same-value state ticks and commits only valid final receipt',async()=>{
+  for(const stage of ['native','/input/sources','/input/capabilities']){
+    const h=await heldSelection(stage);await h.f.tick();await h.f.tick();
+    assert.equal(inputSelectionState(h.f),h.before);
+    h.resolve(stage==='native'?h.native:stage==='/input/sources'?{selectionId:'new-selection'}:{jobId:'new-probe',kind:'input-probe',status:'running',epoch:0});await h.run;
+    assert.equal(h.f.evaluate('projectSelection.sources[0].assetId'),'new-camera');assert.equal(h.f.evaluate('job.kind'),'input-probe');
+  }
+});
+test('selection malformed/current failure preserves prior choices and provides retry guidance',async()=>{
+  for(const stage of ['native','/input/sources','/input/capabilities'])for(const failure of [false,true]){
+    const h=await heldSelection(stage);if(failure)h.reject(new Error('Owned current query failure'));else h.resolve({});await h.run;
+    assert.equal(inputSelectionState(h.f),h.before);assert.match(h.f.get('status').textContent,/선택 소스.*다시/);assert.equal(h.f.evaluate('job'),null);
+  }
+});
+
+test('selection scoped completions preserve newer owner session values and guidance',async()=>{
+  for(const stage of ['native','/input/sources','/input/capabilities'])for(const failure of [false,true])for(const change of ['credentials={newSession:true}','state.epoch++','state.gateOpen=false','state.compatible=false','validationCount=1','localEditPending=true','state.applyRecovery.blocked=true','projectSelection={...projectSelection}','selectedRows.reverse()','selectedRows[0].audio.checked=!selectedRows[0].audio.checked','selectionRead={}']){
+    const h=await heldSelection(stage);h.f.evaluate(change+';say("Owned newer state")');const before=inputSelectionState(h.f),selection=h.f.evaluate('projectSelection');
+    if(failure)h.reject(Object.assign(new Error('Owned stale auth'),{code:'AUTH_REQUIRED'}));else h.resolve(stage==='native'?h.native:stage==='/input/sources'?{selectionId:'new-selection'}:{jobId:'new-probe',kind:'input-probe',status:'running',epoch:0});await h.run;
+    assert.equal(inputSelectionState(h.f),before,change);assert.equal(h.f.evaluate('projectSelection'),selection,change);assert.equal(h.f.get('status').textContent,'Owned newer state',change);assert.equal(h.f.resetCalls,0,change);
+    if(change.startsWith('credentials'))assert.equal(h.f.calls.filter(c=>c.path==='/jobs/new-probe/cancel').length,0);
+  }
+});
+test('selection job receipt rejects unsafe ids kind status and wrong epoch without partial commit',async()=>{
+  for(const receipt of [null,[],{}, {jobId:'../new',kind:'input-probe',status:'running'}, {jobId:'new',kind:'analysis',status:'running'}, {jobId:'new',kind:'input-probe',status:'failed'}, {jobId:'new',kind:'input-probe',status:'running',epoch:1}]){
+    const h=await heldSelection('/input/capabilities');h.resolve(receipt);await h.run;assert.equal(inputSelectionState(h.f),h.before);assert.equal(h.f.evaluate('job'),null);assert.match(h.f.get('status').textContent,/선택 소스.*다시/);
+  }
+});
+
+test('selection late job cleanup cannot cancel an already current job with that id',async()=>{
+  const h=await heldSelection('/input/capabilities');h.f.evaluate('job={jobId:"new-probe",kind:"input-probe",selectionId:"replacement"};say("Owned current probe")');const job=h.f.evaluate('job');h.resolve({jobId:'new-probe',kind:'input-probe',status:'running',epoch:0});await h.run;assert.equal(h.f.evaluate('job'),job);assert.equal(h.f.evaluate('canceledJobs.has("new-probe")'),false);assert.equal(h.f.calls.filter(c=>c.path==='/jobs/new-probe/cancel').length,0);assert.equal(h.f.get('status').textContent,'Owned current probe');
+});
+
+test('selection atomic commit preserves exact native project and item handles for input creation',async()=>{
+  const h=await heldSelection('native'),project={ownedProject:true},item={ownedItem:true};h.native.project=project;h.native.items=[item];h.resolve(h.native);await h.run;assert.equal(h.f.evaluate('projectSelection.project'),project);assert.equal(h.f.evaluate('projectSelection.items[0]'),item);assert.equal(h.f.evaluate('projectSelection.items'),h.native.items);
+});

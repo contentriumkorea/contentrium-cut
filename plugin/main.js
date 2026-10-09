@@ -262,6 +262,7 @@ function toggle(){
   for(const id of ['analyze','sync','plan','apply-sync','apply','save-settings','load-settings'])$(id).disabled=locked||!connected||(id==='plan'&&!analysisState)||(id==='apply'&&!plan)||(id==='apply-sync'&&!syncResult);
   for(const [id,active,idle,label] of [['save-settings',settingsSave&&!settingsSave.automatic,'저장','저장 중…'],['load-settings',settingsRestore,'불러오기','불러오는 중…']]){$(id).textContent=active?label:idle;$(id).setAttribute('aria-busy',active?'true':'false');}
   for(const id of ['read-project','read-selection','install-model','save-resources','prune-cache'])$(id).disabled=locked;
+  const budgetIssue=cacheBudgetFeedback();$('save-resources').disabled=locked||!!budgetIssue;
   const savingResources=!!resourceRequest?.save;$('save-resources').textContent=savingResources?(resourceRequest.phase==='checking'?'저장 결과 확인 중…':'자원 설정 저장 중…'):'자원 설정 저장';$('save-resources').setAttribute('aria-busy',savingResources?'true':'false');
   for(const el of document.querySelectorAll('[data-work]'))el.disabled=locked;
   $('add-override').disabled=locked||!connected;for(const row of overrideRows)row.remove.disabled=locked||!connected;
@@ -1429,6 +1430,14 @@ async function runModelInstall(){
 handler('install-model',()=>runModelInstall());
 for(const id of ['model-token','model-terms'])$(id).oninput=$(id).onchange=()=>{if(workLocked()||!modelReady())return;modelInputRevision++;};
 
+function cacheBudgetInput(){
+  const raw=$('cache-budget').value.trim(),bytes=raw?Math.round(Number(raw)*1073741824):null;
+  return {bytes,error:raw&&(!Number.isSafeInteger(bytes)||bytes<=0)?'캐시 예산을 양수로 입력하세요. 저장 가능한 바이트 범위의 값을 사용하세요.':''};
+}
+function cacheBudgetFeedback(){
+  const issue=cacheBudgetInput().error,node=$('cache-budget-error');$('cache-budget').setAttribute('aria-invalid',issue?'true':'false');
+  if(node.textContent!==issue)node.textContent=issue;node.className='hint input-error'+(issue?'':' hidden');return issue;
+}
 function resourceSettingsReady(save=false){
   return !!credentials&&!!state&&!updateIntent&&!panelContextConflict&&state.compatible!==false&&state.stopEpoch==null&&(!save||state.gateOpen&&!stopped&&!binding&&!projectRead&&!job&&!validationCount&&!applying&&!batchRunning&&!localEditPending&&!state.applyRecovery?.blocked);
 }
@@ -1448,8 +1457,8 @@ async function runResourceSettings(save=false){
   if(save)say('분석 자원 설정을 저장하고 있습니다.');let guidanceRevision=statusRevision;toggle();
   try{
     if(save){
-      const settings={device:$('analysis-device').value},raw=$('cache-budget').value.trim();
-      if(raw){const bytes=Math.round(Number(raw)*1073741824);if(!Number.isSafeInteger(bytes)||bytes<=0)throw new Error('캐시 예산을 양수로 입력하세요.');settings.cacheBudgetBytes=bytes;}
+      const settings={device:$('analysis-device').value},budget=cacheBudgetInput();
+      if(budget.error)throw new Error(budget.error);if(budget.bytes!==null)settings.cacheBudgetBytes=budget.bytes;
       await api('/resources',{settings,epoch:state.epoch});if(!current())return;
       token.phase='checking';if(statusRevision===guidanceRevision){say('저장된 분석 자원 설정과 캐시 상태를 확인하고 있습니다.');guidanceRevision=statusRevision;}toggle();
     }
@@ -1504,7 +1513,7 @@ handler('prune-cache',()=>runCache());
 handler('release-cache',()=>runCache(true));
 const showSettings=$('open-settings').onclick;
 $('open-settings').onclick=()=>{showSettings();if(view.current()==='settings'&&!resourceLoaded&&!resourceInputDirty)return runResourceSettings();};
-for(const id of ['analysis-device','cache-budget'])$(id).oninput=$(id).onchange=()=>{if(workLocked())return;resourceInputRevision++;resourceInputDirty=true;};
+for(const id of ['analysis-device','cache-budget'])$(id).oninput=$(id).onchange=()=>{if(workLocked())return;resourceInputRevision++;resourceInputDirty=true;toggle();};
 function changeRecordingMode(value){
   if(workLocked()||mode===value)return;
   const defaults=!microphoneSelectionCustomized&&microphoneRows.every(r=>r.check.checked===r.defaultChecked[mode]);

@@ -868,3 +868,13 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 독립 최종 승인 scoped Critical/Important/Minor0/0/0. actual-main matrix624/624·추가98/98·서명된 in-memory connection descriptor5/5, 총727/727; final panel305/305,32,558.4415ms,exit0·fail/cancel/skip/todo0. 자기 잠금/재개·current 오류·메타데이터 보존·자기 GET 뒤 microtask 중단/입력/view/새owner/새안내·늦은 finally를 확인했고 descriptor 복사를 바꾸어도 실제 take id/epoch가 바뀌지 않음과 count-only/callback throw/cancel/expiry를 확인했다. 독립 fixture24건은 invalid plan을 finally toggle이 자동 제거한 시험이라 scope mutation 직후 toggle을 정리하고 재검증했다. 초기 소스/로그를 보존했으며 제품 수용 기준/timeout을 낮추지 않았다. 검수한 main/connection SHA는 위 최종 값과 같다. Evidence %LOCALAPPDATA%/Temp/contentrium-cut-cycle34-independent-review. 전체 다른 action/실제 UXP/Premiere/설치/Community-1은 승인 범위 밖이다.
 
 - 엔진/CCX·Setup 빌드 exit0. 빌드 후 고정 입력52개 해시 동일·공개 파일619개 패턴 검사·신뢰 키 보존 통과. [0.1.35 패키지 증거](package-0.1.35-proof.json): ZIP/CCX CRC·경로·크기·비공개 자료 제외·CCX 소스 일치·Silero 해시·frozen engine29개/Setup26개 모듈·진입점2개 소스 일치, 추출 engine runtimeReady=true/0.1.35,Setup help exit0,59.422초. 기존 선택적 모듈/torchcodec 경고를 보존하며 Community-1 실제 품질 통과로 확대하지 않는다. 현재 단계: 기획·설계·구현·독립 검수·전체 회귀·패키지 실행 완료.0.1.35 공개 및 익명 발견/서명/실제 다운로드 해시·고정 v0.1.1 검증으로 진행한다.
+
+
+### 공개 결과
+
+- [v0.1.35](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.35): release `407418963`, 제목 `Contentrium CUT`, draft/prerelease 아님. 공개 시각 2026-10-09 10:52:16 KST (`2026-10-09T01:52:16Z`), target/tag commit `ed8125a3c8d7c51312fe3bfce3988c6f1a50ef1a`를 확인했다.
+- [공개 실제 재다운로드](release-0.1.35-proof.json): 익명 제품 경로에서0.1.34 →0.1.35 AVAILABLE. 서명과 실제 ZIP/CCX/Setup3개의 크기·SHA-256 일치.
+- [현재 버전](release-0.1.35-current-proof.json): 빈 상태에서0.1.35 CURRENT/후보 없음. 공개 자산5개 ID·크기·digest와 서명 문서 실제 바이트가 로컬과 일치.
+- [고정 복구 조회](migration-pinned-0.1.1-after-0.1.35-proof.json): latest0.1.35에서도 정확한 서명 v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 설치 전환은 하지 않았다.
+- 현재 단계: 기획 → 설계 → 구현 → 검증 →0.1.35 공개 및 공개 재검증 완료. 다음 회차는 모델 revision/install POST 응답의 소유권·중단·validation 전환·현재 오류·정상 model-setup job 승계를 설계한다. 두 모드×revision/install×성공/실패8/8에서 업데이트 즉시1회 뒤 늦은 안내/오류·추가 install 조회/새 job 반영을 재현했다(cycle34-next-inspect.js/.log). 실제 제공자/사용자 토큰/설치 호출은0이다. 다음 회차도 의미 있는 수정·설계·독립 검수·회귀·패키지/공개 검증을 수행하고 버전만 올리지 않는다. 이번 cache scope 승인으로 다른 model/전체 refresh lifetime 보호를 주장하지 않는다.
+- 활성 설치0.1.0의 active/journal/first-install 해시는 배포 전후 동일함을 읽기 전용 확인하고, 서명 키 존재·기존 ACTIVE/15분 자동화·기존 공개 파일·설정·실패 증거를 보존했다. 컴퓨터유즈·브라우저·Premiere 조작·재설치·제공자 접근 없음. 실제 UXP/Premiere 편집·설치 전환·Community-1 품질 미검증. 초기 one-shot hold/invalid plan/늦은 helper 교체 시험 구성 오류는 증거를 보존해 수정했고, 새 후보·모델·복구 메타데이터 지연 반영 RED를 해결했다. 기존 간헐 실패는 이번 전체 회귀에서 재현되지 않았고 원인은 미확정이다. Scoped 검수 남은 C/I/M0/0/0이며 이미 수행한 서버 캐시 삭제의 취소/rollback을 주장하지 않는다.

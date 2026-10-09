@@ -478,8 +478,14 @@ function syncManualFeedback(row,locked){
   if(row.manualHint.textContent!==text)row.manualHint.textContent=text;row.manualHint.className=text?'hint':'hint hidden';
   row.offsetValue=row.offset.value;row.confirmedValue=row.confirmed.checked;
 }
+function syncClockDateValid(value){
+  const match=/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(value.trim());if(!match)return false;
+  const [year,month,day]=match.slice(1).map(Number),days=[31,year%4===0&&(year%100!==0||year%400===0)?29:28,31,30,31,30,31,31,30,31,30,31];
+  return year>0&&month>=1&&month<=12&&day>=1&&day<=days[month-1];
+}
 function syncClockFeedback(row){
-  const active=$('sync-method').value==='timecode'&&row.check.checked,text=!active?'':!row.clockId.value.trim()?'공통 시계 이름을 입력하세요. 같은 시계의 소스만 타임코드로 연결할 수 있습니다.':!row.date.value.trim()?'촬영 날짜를 입력하세요. 날짜가 없는 소스는 싱크 결과에서 확인이 필요합니다.':!row.clockConfirmed.checked?'날짜와 공통 시계가 같고 촬영 중 리셋하지 않았는지 확인하세요. 미확인 정보는 싱크 결과에서 검토가 필요합니다.':'';
+  const active=$('sync-method').value==='timecode'&&row.check.checked,date=row.date.value.trim(),valid=syncClockDateValid(date),text=!active?'':!row.clockId.value.trim()?'공통 시계 이름을 입력하세요. 같은 시계의 소스만 타임코드로 연결할 수 있습니다.':!date?'촬영 날짜를 입력하세요. 날짜가 없는 소스는 싱크 결과에서 확인이 필요합니다.':!valid?'촬영 날짜를 YYYY-MM-DD 형식의 실제 날짜로 입력하세요. 잘못된 날짜는 싱크 결과에서 확인이 필요합니다.':!row.clockConfirmed.checked?'날짜와 공통 시계가 같고 촬영 중 리셋하지 않았는지 확인하세요. 미확인 정보는 싱크 결과에서 검토가 필요합니다.':'';
+  const invalid=active&&!valid?'true':'false';if(row.date.getAttribute('aria-invalid')!==invalid)row.date.setAttribute('aria-invalid',invalid);
   if(row.clockHint.textContent!==text)row.clockHint.textContent=text;row.clockHint.className=text?'hint':'hint hidden';
 }
 function syncFeedback(){

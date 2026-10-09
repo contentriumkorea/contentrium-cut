@@ -14,6 +14,7 @@ const microphoneRows=[],cameraRows=[],speakerRows=[],calibrationRows=[],override
 let microphoneSelectionCustomized=false;
 let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;let projectRead=null,nativePreparation=null,editingSubmission=null,correctionRequest=null,settingsRestore=null,settingsSave=null;
 let settingsWriteTail=Promise.resolve();
+let resourceRequest=null,resourceInputRevision=0,resourceViewRevision=0,resourceInputDirty=false,stopRevision=0;
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
 let analysisState=null;
 let planInputHash=null,planInvalidated=false;
@@ -238,6 +239,7 @@ function toggle(){
   for(const row of speakerRows)row.select.disabled=locked||!connected;
   for(const id of ['start-camera','reserve-camera'])$(id).disabled=locked||!connected;
   for(const id of ['range-start','range-end','min-shot','short-turn','overlap'])$(id).disabled=locked||!connected;
+  for(const id of ['analysis-device','cache-budget'])$(id).disabled=locked;
   for(const id of ['sync-method','sync-reference'])$(id).disabled=locked||!connected;
   for(const row of syncRows)for(const field of [row.check,row.stream,row.channel,row.offset,row.confirmed,row.clockId,row.date,row.fps,row.drop,row.clockConfirmed])field.disabled=locked||!connected;
   for(const row of selectedRows)selectedSourceFeedback(row,locked);
@@ -973,6 +975,7 @@ $('add-override').onclick=()=>editOverrides(()=>addOverride());
 $('override-filter').onclick=()=>{if($('override-filter').disabled||!overrideRows.some(r=>r.error.textContent))return;overrideErrorsOnly=!overrideErrorsOnly;overrideVisibleRows.clear();view.show('cut');view.openDisclosure('disclosure-6');overrideFeedback();};
 handler('undo-correction',()=>correct({type:'undo'}));
 handler('cancel',async()=>{
+  stopRevision++;
   if(job?.kind==='model-setup')modelInstallResult('canceling');
   stopped=true;plan=null;await stopPreview();
   const cancellations=[connection.cancelPending()];
@@ -988,7 +991,7 @@ handler('update',async()=>{
   if(updateIntent?.inFlight||updateIntent?.accepted)return;
   const candidate=state?.update?.candidate;if(!candidate&&!updateIntent)throw new Error('업데이트를 다시 확인하세요.');
   if(!updateIntent)updateIntent={candidateId:candidate.candidateId,manifestDigest:candidate.manifestDigest,requestId:requestId(),epoch:state.epoch};
-  updateIntent.inFlight=true;
+  updateIntent.inFlight=true;stopRevision++;
   stopped=true;plan=null;if(job)canceledJobs.add(job.jobId);toggle();
   if(job?.kind==='model-setup')modelInstallResult('canceling');
   say('Contentrium CUT 작업을 중단하고 업데이트를 시작합니다.');
@@ -1012,15 +1015,39 @@ handler('install-model',async()=>{
     job=await api('/models/community-1/install',{token,termsAccepted,revision:revision.revision,epoch});$('model-install-status').textContent='로컬 모델 설치 중';
   }catch(e){const canceled=['CANCELED','UPDATE_IN_PROGRESS'].includes(e.code);say(modelInstallResult(canceled?'canceled':'failed',e.code));}
 });
-async function loadResources(){
-  const value=await api('/resources');$('analysis-device').value=value.settings.device;const budget=value.settings.cacheBudgetBytes;$('cache-budget').value=Number.isSafeInteger(budget)&&budget>0?String(budget/1073741824):'';
-  $('cache-info').textContent='캐시 '+(value.status.cacheBytes/1073741824).toFixed(2)+' GB · 사용 가능 디스크 '+(value.status.freeDiskBytes/1073741824).toFixed(1)+' GB';resourceLoaded=true;
+function resourceSettingsReady(save=false){
+  return !!credentials&&!!state&&!updateIntent&&!panelContextConflict&&state.compatible!==false&&state.stopEpoch==null&&(!save||state.gateOpen&&!stopped&&!binding&&!projectRead&&!job&&!validationCount&&!applying&&!batchRunning&&!localEditPending&&!state.applyRecovery?.blocked);
 }
-handler('save-resources',async()=>{const settings={device:$('analysis-device').value},raw=$('cache-budget').value.trim();if(raw){const bytes=Math.round(Number(raw)*1073741824);if(!Number.isSafeInteger(bytes)||bytes<=0)throw new Error('캐시 예산을 양수로 입력하세요.');settings.cacheBudgetBytes=bytes;}await api('/resources',{settings,epoch:state.epoch});await loadResources();say('분석 자원 설정을 저장했습니다.');});
+function resourceScope(){return [credentials,connected,connected?.snapshot.snapshotHash,connected?.snapshot.hostSnapshotHash,mode,analysisState,analysisState?.revision,state?.epoch,state?.gateOpen,stopped,state?.compatible,state?.appVersion,state?.bundleId,state?.protocolVersion,localEditPending,state?.applyRecovery?.blocked,binding,projectRead,job,validationCount,validationRevision,applying,batchRunning,projectSelection,inputCapability,plan,planInputHash,syncResult,syncJob,syncResultInputHash,resourceInputRevision,resourceViewRevision,resourceInputDirty,stopRevision];}
+function resourceResponseGuard(token,save=false){
+  const scope=resourceScope(),rows=selectedRows.slice(),raw=JSON.stringify([$('analysis-device').value,$('cache-budget').value]);
+  return ()=>{if(resourceRequest!==token||!resourceSettingsReady(save))return false;const live=resourceScope();return scope.every((value,index)=>value===live[index])&&selectedRows.length===rows.length&&rows.every((row,index)=>row===selectedRows[index])&&JSON.stringify([$('analysis-device').value,$('cache-budget').value])===raw;};
+}
+async function loadResources(current=()=>true,accepted=()=>{}){
+  if(!current())return false;const value=await api('/resources');if(!current())return false;
+  const device=value.settings.device,budget=value.settings.cacheBudgetBytes,budgetText=Number.isSafeInteger(budget)&&budget>0?String(budget/1073741824):'',cacheInfo='캐시 '+(value.status.cacheBytes/1073741824).toFixed(2)+' GB · 사용 가능 디스크 '+(value.status.freeDiskBytes/1073741824).toFixed(1)+' GB';
+  $('analysis-device').value=device;$('cache-budget').value=budgetText;$('cache-info').textContent=cacheInfo;resourceLoaded=true;resourceInputDirty=false;accepted();return true;
+}
+async function runResourceSettings(save=false){
+  if(!resourceSettingsReady(save))return;
+  const token={},guidanceRevision=statusRevision;resourceRequest=token;let current=resourceResponseGuard(token,save);
+  try{
+    if(save){
+      const settings={device:$('analysis-device').value},raw=$('cache-budget').value.trim();
+      if(raw){const bytes=Math.round(Number(raw)*1073741824);if(!Number.isSafeInteger(bytes)||bytes<=0)throw new Error('캐시 예산을 양수로 입력하세요.');settings.cacheBudgetBytes=bytes;}
+      await api('/resources',{settings,epoch:state.epoch});if(!current())return;
+    }
+    if(!await loadResources(current,()=>{current=resourceResponseGuard(token,save);})||!current())return;
+    if(save&&statusRevision===guidanceRevision)say('분석 자원 설정을 저장했습니다.');
+  }catch(e){if(current()&&statusRevision===guidanceRevision)error(e);}
+  finally{if(resourceRequest===token)resourceRequest=null;}
+}
+handler('save-resources',()=>runResourceSettings(true));
 handler('prune-cache',async()=>{const value=await api('/resources/prune',{epoch:state.epoch});await loadResources();say('완료된 캐시 '+value.removed.length+'개 정리'+(value.budgetMet?'':' · 보존해야 하는 데이터가 있어 예산을 초과합니다.'));});
 handler('release-cache',async()=>{await api('/resources/prune',{epoch:state.epoch,action:'release'});await refresh();say('정리를 종료했습니다. 편집을 계속할 수 있습니다.');});
 const showSettings=$('open-settings').onclick;
-$('open-settings').onclick=()=>{showSettings();if(credentials&&!resourceLoaded)loadResources().catch(error);};
+$('open-settings').onclick=()=>{showSettings();if(view.current()==='settings'&&!resourceLoaded&&!resourceInputDirty)return runResourceSettings();};
+for(const id of ['analysis-device','cache-budget'])$(id).oninput=$(id).onchange=()=>{if(workLocked())return;resourceInputRevision++;resourceInputDirty=true;};
 function changeRecordingMode(value){
   if(workLocked()||mode===value)return;
   const defaults=!microphoneSelectionCustomized&&microphoneRows.every(r=>r.check.checked===r.defaultChecked[mode]);
@@ -1070,7 +1097,7 @@ async function initialize({manual=false}={}){
     }else $('boot-status').querySelector('p').textContent=e.code==='BOOTSTRAP_MISSING'?'설치 정보를 찾지 못했습니다. Contentrium CUT 설치 복구가 필요합니다.':'편집 기능을 준비하고 있습니다. 잠시 후 자동으로 다시 확인합니다.';
   }finally{initializing=false;toggle();}
 }
-view.onChange(toggle);
+view.onChange(()=>{resourceViewRevision++;toggle();});
 initialize();
 function pollError(e){if(e.code==='PANEL_CONTEXT_CONFLICT')contextConflict();else{setConnection(false,'편집 연결 복구 중');if(e.code==='AUTH_REQUIRED'||e.code==='SESSION_EXPIRED'||!e.code){credentials=null;connection.reset();retryAt=Date.now()+1000;}if(job||applying){stopped=true;error(e);}toggle();}}
 setInterval(async()=>{

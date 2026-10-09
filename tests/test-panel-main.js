@@ -2306,6 +2306,36 @@ async function heldCache(mode,action,stage='post',setup=null){
  return {f,run,resume,reject,value:stage==='post'?(action==='release-cache'?{released:true}:{removed:['owned-fixture'],budgetMet:true}):action==='prune-cache'?{settings:{device:'cpu',cacheBudgetBytes:1073741824},status:{cacheBytes:0,freeDiskBytes:10737418240}}:{...structuredClone(f.state),gateOpen:true,maintenance:null}};
 }
 function cacheState(f){return JSON.stringify({resource:resourceState(f),state:f.evaluate('JSON.stringify(state)'),connection:f.get('connection').textContent,maintenance:f.get('cache-maintenance').className});}
+async function heldCachePreviewStop(mode){
+ const h=await heldExample(mode),f=h.f;h.resume(exampleReceipt(f));await h.run;await f.click('open-settings');
+ assert.equal(f.evaluate('previewPlaying'),true);assert.equal(f.evaluate('job'),null);assert.equal(f.get('prune-cache').disabled,false);
+ let resume;f.host.ppro.SourceMonitor.play=()=>new Promise(resolve=>{resume=resolve;});f.timeouts.at(-1)();for(let i=0;i<100;i++)await Promise.resolve();
+ assert.equal(typeof resume,'function');assert.equal(f.evaluate('previewBusy'),1);return {f,resume};
+}
+test('cache prune direct callback waits for actual preview stop and resumes after drain',async()=>{
+ for(const mode of ['separate','mixed']){
+  const {f,resume}=await heldCachePreviewStop(mode),before=cacheState(f),calls=f.calls.length;
+  assert.equal(f.get('prune-cache').disabled,true);await f.click('prune-cache');assert.equal(f.calls.length,calls,'held preview must reject cache mutation');assert.equal(cacheState(f),before);assert.equal(f.evaluate('cacheRequest'),null);
+  resume(true);for(let i=0;i<100;i++)await Promise.resolve();assert.equal(f.evaluate('previewBusy'),0);assert.equal(f.evaluate('previewPlaying'),false);assert.equal(f.get('prune-cache').disabled,false);
+  const request=f.evaluate('connection.request');f.evaluate('connection').request=(p,...args)=>p==='/resources/prune'?Promise.resolve({removed:[],budgetMet:true}):request(p,...args);
+  await f.click('prune-cache');assert.match(f.get('status').textContent,/완료된 캐시 0개 정리/);assert.equal(f.evaluate('cacheRequest'),null);assert.equal(f.get('prune-cache').disabled,false);
+ }
+});
+test('cache release UI and direct callback wait for preview stop despite server drain',async()=>{
+ for(const mode of ['separate','mixed']){
+  const {f,resume}=await heldCachePreviewStop(mode);f.state.gateOpen=false;f.state.maintenance={id:'c'.repeat(32),status:'canceled',drained:true,canRelease:true};await f.evaluate('refresh()');
+  const before=cacheState(f),calls=f.calls.length;assert.equal(f.get('release-cache').disabled,true);await f.click('release-cache');assert.equal(f.calls.length,calls);assert.equal(cacheState(f),before);assert.equal(f.evaluate('cacheRequest'),null);
+  resume(true);for(let i=0;i<100;i++)await Promise.resolve();assert.equal(f.evaluate('previewBusy'),0);assert.equal(f.get('release-cache').disabled,false);
+  const request=f.evaluate('connection.request');f.evaluate('connection').request=(p,...args)=>{if(p==='/resources/prune'){assert.deepEqual(JSON.parse(JSON.stringify(args[0])),{epoch:0,action:'release'});f.state.gateOpen=true;f.state.maintenance=null;return Promise.resolve({released:true});}return request(p,...args);};
+  await f.click('release-cache');assert.match(f.get('status').textContent,/정리를 종료했습니다/);assert.equal(f.evaluate('state.gateOpen'),true);assert.equal(f.evaluate('cacheRequest'),null);
+ }
+});
+test('held preview cache lock preserves immediate update start and stopped state after drain',async()=>{
+ for(const mode of ['separate','mixed']){
+  const {f,resume}=await heldCachePreviewStop(mode);assert.equal(f.get('update').disabled,false);await f.click('update');assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.equal(f.evaluate('stopped'),true);assert.equal(f.evaluate('previewBusy')>0,true);
+  const calls=f.calls.length;await f.click('prune-cache');await f.click('release-cache');assert.equal(f.calls.length,calls);resume(true);for(let i=0;i<100;i++)await Promise.resolve();assert.equal(f.get('prune-cache').disabled,true);assert.equal(f.get('release-cache').disabled,true);assert.equal(f.evaluate('stopped'),true);
+ }
+});
 test('unsaved resource edits block cache prune and preserve inputs without requests',async()=>{
  for(const mode of ['separate','mixed'])for(const [id,value] of [['cache-budget','2.25'],['cache-budget',''],['cache-budget','-1'],['analysis-device','cuda']]){
   const f=await updatePanel();if(mode==='mixed')await f.click('mode-mixed');await f.click('open-settings');assert.equal(f.get(id).disabled,false);f.get(id).value=value;f.get(id).oninput();

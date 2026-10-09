@@ -3129,3 +3129,41 @@ test('cache cancellation real queue leaves update click immediate while preservi
   assert.equal(peer.calls.filter(c=>c.path==='/updates/start').length,1);assert.equal(f.evaluate('updateIntent.accepted'),true);assert.equal(f.get('release-cache').disabled,true);assert.equal(f.evaluate('stopped'),true);
  }
 });
+
+async function protectedCoveragePlan(mode){
+ const f=await updatePanel({native:twoCameraNative()});if(mode==='mixed')await f.click('mode-mixed');
+ const camera=f.evaluate('cameraRows[1]');camera.covered.value='A';camera.covered.oninput();camera.role.value='protected';camera.role.onchange();
+ await f.click('analyze');await f.tick();f.evaluate('cameraRows[0].covered.value="A";speakerRows[0].select.value="video:0";speakerRows[0].select.onchange()');await f.click('plan');assert.ok(f.evaluate('plan'));return {f,camera};
+}
+test('protected coverage preserves accepted edit plan and stored input while explaining disabled control',async()=>{
+ for(const mode of ['separate','mixed']){
+  const {f,camera}=await protectedCoveragePlan(mode);assert.equal(camera.covered.disabled,true);assert.match(camera.hint.textContent,/보호/);assert.match(camera.hint.textContent,/자동 컷/);assert.equal(camera.covered.getAttribute('aria-describedby'),camera.hint.id);
+  const value=camera.covered.value,plan=f.evaluate('plan'),analysis=f.evaluate('analysisState'),hash=f.evaluate('planInputHash'),timer=f.evaluate('settingsTimer'),before=f.calls.length,mapping=f.evaluate('JSON.stringify(mapping())');
+  for(const handler of ['oninput','onchange']){camera.covered.value='A, B';camera.covered[handler]();assert.equal(camera.covered.value,value);assert.equal(f.evaluate('plan'),plan);assert.equal(f.evaluate('analysisState'),analysis);assert.equal(f.evaluate('planInputHash'),hash);assert.equal(f.evaluate('settingsTimer'),timer);assert.equal(f.calls.length,before);assert.equal(f.evaluate('JSON.stringify(mapping())'),mapping);}
+  camera.role.value='speaker';camera.role.onchange();assert.equal(camera.covered.disabled,false);assert.equal(camera.covered.value,value);assert.equal(camera.hint.textContent,'');assert.equal(f.evaluate('plan'),null);
+  await f.click('plan');assert.ok(f.evaluate('plan'));camera.covered.value='B';camera.covered.oninput();assert.equal(f.evaluate('plan'),null);
+ }
+});
+test('protected coverage settings restore and update locks retain role feedback and values',async()=>{
+ for(const mode of ['separate','mixed']){
+  const {f,camera}=await protectedCoveragePlan(mode);await f.click('save-settings');const value=camera.covered.value;
+  camera.role.value='speaker';camera.role.onchange();camera.covered.value='B';camera.covered.oninput();await f.click('load-settings');const restored=f.evaluate('cameraRows[1]');assert.equal(restored.role.value,'protected');assert.equal(restored.covered.value,value);assert.equal(restored.covered.disabled,true);assert.match(restored.hint.textContent,/보호/);
+  for(const lock of ['pending','applying','localEditPending']){f.evaluate(lock+'=true;toggle()');assert.equal(restored.role.disabled,true);assert.equal(restored.covered.disabled,true);const plan=f.evaluate('plan'),calls=f.calls.length;restored.covered.value='private obsolete input';restored.covered.oninput();assert.equal(restored.covered.value,value);assert.equal(f.evaluate('plan'),plan);assert.equal(f.calls.length,calls);f.evaluate(lock+'=false;toggle()');assert.equal(restored.role.disabled,false);assert.equal(restored.covered.disabled,true);}
+  await f.click('update');assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.equal(restored.covered.disabled,true);assert.equal(restored.role.disabled,true);
+ }
+});
+test('authenticated peer reconnect resets session counter after cancel transport loss',async()=>{
+ for(const mode of ['separate','mixed']){
+  const h=await heldAuthenticatedCacheCancel(mode),{f,peer}=h;await h.settle('OWNED_TRANSPORT_LOSS');const start=peer.calls.length;
+  await f.evaluate('connection.request("/resources/prune",{epoch:0,action:"release"})');await f.evaluate('connection.request("/state")');
+  assert.deepEqual(peer.calls.slice(start).map(c=>c.path),['/auth/challenge','/auth/session','/resources/prune','/state']);assert.deepEqual(JSON.parse(peer.calls[start+2].body),{epoch:0,action:'release'});assert.notEqual(peer.calls[start+2].session,peer.calls[start-1].session);assert.deepEqual(peer.calls.slice(start+2).map(c=>c.counter),[1,2]);assert.equal(f.state.gateOpen,true);assert.equal(f.state.maintenance,null);assert.deepEqual(peer.activity,[1,0]);peer.close();
+ }
+});
+test('protected coverage starts disabled for muted tracks and obsolete camera callbacks preserve current panel',async()=>{
+ for(const mode of ['separate','mixed']){
+  const native=twoCameraNative();native.snapshot.tracks.find(t=>t.trackRef==='video:1').muted=true;delete native.snapshot.snapshotHash;native.snapshot.snapshotHash=hash(native.snapshot);
+  const f=await panel({native});if(mode==='mixed')await f.click('mode-mixed');const old=f.evaluate('cameraRows[1]');assert.equal(old.role.value,'protected');assert.equal(old.covered.disabled,true);assert.match(old.hint.textContent,/보호/);
+  await f.click('read-project');const current=f.evaluate('cameraRows[1]');assert.notEqual(current,old);const before=syncState(f),timer=f.evaluate('settingsTimer'),calls=f.calls.length,raw=f.evaluate('JSON.stringify(cameraRows.map(r=>[r.role.value,r.covered.value,r.hint.textContent]))');
+  old.role.value='speaker';old.role.onchange();old.covered.value='B';old.covered.oninput();old.covered.onchange();assert.equal(syncState(f),before);assert.equal(f.evaluate('settingsTimer'),timer);assert.equal(f.calls.length,calls);assert.equal(f.evaluate('JSON.stringify(cameraRows.map(r=>[r.role.value,r.covered.value,r.hint.textContent]))'),raw);
+ }
+});

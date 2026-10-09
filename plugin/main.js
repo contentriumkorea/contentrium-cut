@@ -185,7 +185,7 @@ async function loadSavedSettings(){
   }catch(e){if(current())error(e);}finally{if(settingsRestore===token)settingsRestore=null;}
 }
 async function api(path,body,method){return connection.request(path,body,method);}
-function admitted(){if(!credentials||!connected)throw new Error('Premiere에서 편집할 시퀀스를 열어 주세요.');if(!state?.gateOpen||stopped)throw new Error('현재 작업 상태를 확인한 뒤 다시 실행하세요.');if(localEditPending||state?.applyRecovery?.blocked)throw Object.assign(new Error('APPLY_RECOVERY_REQUIRED'),{code:'APPLY_RECOVERY_REQUIRED'});}
+function admitted(){if(initializing||initializationIncomplete)throw new Error('편집 연결 확인을 마친 뒤 다시 실행하세요.');if(!credentials||!connected)throw new Error('Premiere에서 편집할 시퀀스를 열어 주세요.');if(!state?.gateOpen||stopped)throw new Error('현재 작업 상태를 확인한 뒤 다시 실행하세요.');if(localEditPending||state?.applyRecovery?.blocked)throw Object.assign(new Error('APPLY_RECOVERY_REQUIRED'),{code:'APPLY_RECOVERY_REQUIRED'});}
 function missingModelGuidance(){
   if(state?.models?.[mode==='separate'?'silero':'community-1']?.status==='error')return mode==='separate'?'발화 모델 정보를 확인하지 못했습니다. Contentrium CUT Setup으로 설치를 복구하세요.':'혼합 녹음 모델 정보를 확인하지 못했습니다. 설정에서 모델을 다시 설치하세요.';
   return mode==='separate'?'발화 모델을 찾지 못했습니다. Contentrium CUT Setup으로 설치를 복구하세요.':'설정에서 혼합 녹음 모델을 준비하세요.';
@@ -205,6 +205,8 @@ function actionGuidance(){
   if(['RECOVERY_REQUIRED','FAILED'].includes(update))return '설정에서 업데이트 복구 상태를 확인하세요. 새 편집은 차단되어 있습니다.';
   if(updateIntent||update&&!['IDLE','COMPLETE','CANCELED','FAILED_BEFORE_REPLACE','ROLLED_BACK','UNAVAILABLE'].includes(update))return '업데이트를 진행하고 있습니다. 완료될 때까지 새 편집은 차단됩니다.';
   if(panelContextConflict)return messages.PANEL_CONTEXT_CONFLICT;
+  if(initializing)return '편집 연결과 중단 작업 기록을 확인하고 있습니다.';
+  if(initializationIncomplete)return '편집 연결 확인이 끝나지 않았습니다. 새로고침으로 다시 확인하세요.';
   if(!credentials)return 'Premiere 편집 연결을 준비하고 있습니다. 연결 안내를 확인하세요.';
   if(state?.admissionError?.code==='COMPONENT_MISMATCH'||state&&(state.appVersion!==bundle.appVersion||state.bundleId!==bundle.bundleId||state.protocolVersion!==bundle.protocolVersion))return '플러그인과 분석 엔진 버전이 맞지 않습니다. 설정에서 업데이트 상태를 확인하세요.';
   if(state?.compatible===false)return 'Premiere 편집 연결을 확인하고 있습니다. 잠시 후 연결 상태를 다시 확인하세요.';
@@ -228,7 +230,7 @@ function actionGuidance(){
   if(step==='review')return plan?'전체 편집안을 검토한 뒤 Premiere에 적용하세요.':'컷 편집 단계에서 편집안을 먼저 만드세요.';
   return step==='settings'?'모델·분석 자원·업데이트 설정을 확인하세요.':'카메라와 마이크를 지정한 뒤 화자 단계로 이동하세요.';
 }
-function inputLocked(){return binding||pending||applying||!!job||previewBusy>0||validationCount>0||stopped||!credentials||!state?.gateOpen;}
+function inputLocked(){return initializing||initializationIncomplete||binding||pending||applying||!!job||previewBusy>0||validationCount>0||stopped||!credentials||!state?.gateOpen;}
 function workLocked(){return inputLocked()||state?.compatible===false||!!updateIntent||localEditPending||!!state?.applyRecovery?.blocked;}
 function toggle(){
   if(syncJob&&syncResult&&!syncResultMatches())invalidateSyncResult();
@@ -258,11 +260,11 @@ function toggle(){
   $('add-override').disabled=locked||!connected;for(const row of overrideRows)row.remove.disabled=locked||!connected;
   for(const row of overrideRows)for(const field of [row.first,row.last,row.camera])field.disabled=locked||!connected;
   $('override-filter').disabled=locked||!overrideRows.some(r=>r.error.textContent);
-  $('create-input').disabled=locked||!projectSelection||!inputCapability;$('cancel').disabled=!job&&!applying&&!previewPlaying&&!previewBusy&&!validationCount&&(!modelRequest||stopped||!!updateIntent);
+  $('create-input').disabled=locked||!projectSelection||!inputCapability;$('cancel').disabled=!initializing&&!job&&!applying&&!previewPlaying&&!previewBusy&&!validationCount&&(!modelRequest||stopped||!!updateIntent);
   $('undo-correction').disabled=locked||!analysisState||activeCorrections().length===0;
   $('recover-apply').disabled=busy||!credentials||!(localEditPending||state?.applyRecovery?.blocked);
   $('release-cache').disabled=busy||!cacheReady(true);
-  $('progress').className=job||applying||pending||validationCount?'running':'';
+  $('progress').className=initializing||job||applying||pending||validationCount?'running':'';
   const update=state?.update,available=update?.candidate&&['AVAILABLE','CHECKING'].includes(update.checkState);
   $('update').disabled=!credentials||!!updateIntent?.inFlight||!!updateIntent?.accepted||(!updateIntent&&!available)||!!update&& !['IDLE','COMPLETE','CANCELED','FAILED_BEFORE_REPLACE','ROLLED_BACK'].includes(update.updateState);
   $('update-banner-button').disabled=$('update').disabled;
@@ -456,7 +458,7 @@ function syncResultMatches(){return !!syncJob&&!!syncResult&&typeof syncResultIn
 function invalidateSyncResult(){clearSyncResult();syncInvalidated=true;say(messages.SYNC_INPUT_CHANGED);scheduleSettings();}
 function rejectStaleSync(){invalidateSyncResult();throw Object.assign(new Error(messages.SYNC_INPUT_CHANGED),{code:'SYNC_INPUT_CHANGED'});}
 function workButton(text,fn){const button=element('button',text,'full');button.setAttribute('data-work','true');button.onclick=()=>runAction(fn);return button;}
-async function runAction(fn){if(pending||applying||job)return;pending=true;toggle();try{await fn();}catch(e){error(e);}finally{pending=false;toggle();}}
+async function runAction(fn){if(initializing||initializationIncomplete||pending||applying||job)return;pending=true;toggle();try{await fn();}catch(e){error(e);}finally{pending=false;toggle();}}
 function activeCorrections(){const active=[];for(const item of analysisState?.history||[]){if(item.operation.type==='undo')active.pop();else active.push(item);}return active;}
 function addExamples(parent,id,candidate=false){
   const examples=(analysisState?.examples||[]).filter(e=>(candidate?e.candidateSpeakerId:e.speakerId)===id);
@@ -644,7 +646,7 @@ function rejectStalePlan(){clearPolicyPlan();planInvalidated=true;throw Object.a
 function requireReviewedPlan(reviewed,inputHash){if(plan!==reviewed||planInputHash!==inputHash||!planMatches())rejectStalePlan();}
 function projectScope(){return {connection:connected,snapshotHash:connected?.snapshot.snapshotHash,hostSnapshotHash:connected?.snapshot.hostSnapshotHash,mode,analysisState,revision:analysisState?.revision,epoch:state?.epoch,credentials};}
 function projectScopeCurrent(scope,allowApplying=false){return !!credentials&&credentials===scope.credentials&&!!state?.gateOpen&&!stopped&&!updateIntent&&state?.compatible!==false&&!panelContextConflict&&(!applying||allowApplying)&&!job&&!validationCount&&!localEditPending&&!state?.applyRecovery?.blocked&&(state?.stopEpoch===null||state?.stopEpoch===undefined)&&state?.epoch===scope.epoch&&connected===scope.connection&&connected?.snapshot.snapshotHash===scope.snapshotHash&&connected?.snapshot.hostSnapshotHash===scope.hostSnapshotHash&&mode===scope.mode&&analysisState===scope.analysisState&&analysisState?.revision===scope.revision;}
-async function readProject({fresh=null,automatic=false,guardFactory=null,onSettledRead=null}={}){
+async function readProject({fresh=null,automatic=false,guardFactory=null,onSettledRead=null,guidanceCurrent=()=>true}={}){
   if(applying||job)throw new Error('현재 작업을 마친 뒤 시퀀스를 변경하세요.');
   const scope=projectScope();if(!projectScopeCurrent(scope))return false;
   const token={};projectRead=token;binding=true;toggle();
@@ -680,7 +682,7 @@ async function readProject({fresh=null,automatic=false,guardFactory=null,onSettl
     $('range-start').value=String(start);$('range-end').value=String(end);
     clearAnalysis();clearSyncResult();savedSpeakerMappings={};overrideRows.length=0;overrideErrorsOnly=false;overrideVisibleRows.clear();$('overrides').innerHTML='';
     renderSources();if(same&&settings)restoreSettings(settings);else if(saved){try{restoreSettings(saved);}catch(_){/* An invalid optional saved preset must not prevent connecting. */}}
-    toggle();say('트랙을 확인하고 분석할 마이크와 카메라를 지정하세요.');receipt=projectScope();return receipt;
+    toggle();if(guidanceCurrent())say('트랙을 확인하고 분석할 마이크와 카메라를 지정하세요.');receipt=projectScope();return receipt;
   }catch(e){if(!committed&&!current())return false;failed=true;if(e.code==='RANGE_INPUT_INVALID')preserveSettings=true;else resetSequence();throw e;}
   finally{if(projectRead===token){projectRead=null;binding=false;toggle();if(preserveSettings||committed&&settingsQueued&&connected&&prior&&connected.snapshot.projectRef===prior.snapshot.projectRef&&connected.snapshot.sequenceRef===prior.snapshot.sequenceRef)scheduleSettings();if((receipt||failed)&&onSettledRead)onSettledRead(receipt);}}
 }
@@ -1116,7 +1118,7 @@ async function pollJob(){
 }
 function handler(id,fn){
   const serial=!['refresh','check-update','update','cancel','recover-update'].includes(id);
-  $(id).onclick=async()=>{if(serial&&pending)return;if(serial){pending=true;toggle();}try{await fn();}catch(e){error(e);}finally{if(serial)pending=false;toggle();}};
+  $(id).onclick=async()=>{if(serial&&(pending||initializing||initializationIncomplete))return;if(serial){pending=true;toggle();}try{await fn();}catch(e){error(e);}finally{if(serial)pending=false;toggle();}};
 }
 async function performNative(kind,body,native,receipt,beginPath='/apply/begin'){
   if(updateIntent||stopped||!state?.gateOpen)throw Object.assign(new Error('Update stop is active.'),{code:'UPDATE_IN_PROGRESS'});
@@ -1132,7 +1134,7 @@ async function performNative(kind,body,native,receipt,beginPath='/apply/begin'){
   }
 }
 function savedReceipt(approved,result,source){return {planHash:approved.plan.planHash,sourceSnapshotHash:source.snapshotHash,resultSnapshotHash:result.snapshot.snapshotHash,resultSequenceRef:result.sequenceRef,sourceUnchanged:result.originalUnchanged,readback:{verified:result.audioAndOverlaysUnchanged===true||result.readbackVerified===true},saved:true};}
-handler('refresh',async()=>{if(credentials)await refresh();else await initialize({manual:true});});
+handler('refresh',async()=>{if(credentials&&!initializationIncomplete)await refresh();else await initialize({manual:true});});
 handler('read-project',()=>readProject());
 handler('analyze',async()=>{
   admitted();const issue=microphoneFeedback();if(issue)throw new Error(issue);
@@ -1181,7 +1183,7 @@ function selectionReadScope(){
   // normal periodic read must not starve a longer native selection query.
   return refreshScope().filter((_,index)=>index!==1).concat(JSON.stringify(selectedRows.map(r=>[r.role.value,r.audio.checked])));
 }
-function selectionReadReady(){return !!credentials&&!!state?.gateOpen&&state.stopEpoch==null&&state.compatible!==false&&!stopped&&!updateIntent&&!job&&!applying&&!localEditPending&&!state.applyRecovery?.blocked&&!panelContextConflict&&!binding&&!projectRead&&!previewBusy&&!validationCount;}
+function selectionReadReady(){return !initializing&&!initializationIncomplete&&!!credentials&&!!state?.gateOpen&&state.stopEpoch==null&&state.compatible!==false&&!stopped&&!updateIntent&&!job&&!applying&&!localEditPending&&!state.applyRecovery?.blocked&&!panelContextConflict&&!binding&&!projectRead&&!previewBusy&&!validationCount;}
 function validSelectionJob(value,epoch){return !!value&&typeof value==='object'&&!Array.isArray(value)&&typeof value.jobId==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(value.jobId)&&value.kind==='input-probe'&&['running','completed'].includes(value.status)&&(value.epoch===undefined||value.epoch===epoch);}
 async function readSelection(){
   if(!selectionReadReady())throw new Error('현재 작업 상태를 확인하세요.');
@@ -1398,36 +1400,77 @@ $('version').textContent=bundle.appVersion;
 $('header-version').textContent=bundle.appVersion;
 $('update-banner-button').onclick=()=>$('update').onclick();
 $('update-later').onclick=()=>{dismissedCandidate=state?.update?.candidate?.candidateId;$('update-banner').className='hidden';};
-let initializing=false,retryAt=0,retryDelay=1000,sequencePollAt=0,enrollmentDeadline=0;
+let initializing=false,initializationIncomplete=false,initializationRequest=null,retryAt=0,retryDelay=1000,sequencePollAt=0,enrollmentDeadline=0;
+function initializationScope(){return refreshScope().filter((_,index)=>index!==1).concat(initializationIncomplete);}
+function sameInitializationScope(scope){const now=initializationScope();return scope.every((value,index)=>value===now[index]);}
 async function initialize({manual=false}={}){
-  if(initializing||panelContextConflict&&!manual)return;initializing=true;
-  toggle();
-  if(manual)enrollmentDeadline=0;
+  if(initializing||panelContextConflict&&!manual)return false;
+  initializing=true;initializationIncomplete=true;
+  const token={credential:credentials,stop:stopRevision,update:updateIntent,updateText:JSON.stringify(updateIntent),scope:initializationScope(),guidanceRevision:statusRevision};initializationRequest=token;
+  const alive=()=>initializationRequest===token&&credentials===token.credential&&stopRevision===token.stop&&updateIntent===token.update&&JSON.stringify(updateIntent)===token.updateText;
+  const current=()=>alive()&&sameInitializationScope(token.scope);
+  const accepted=()=>{token.scope=initializationScope();};
+  const guide=()=>statusRevision===token.guidanceRevision;
+  toggle();if(manual)enrollmentDeadline=0;
   try{
-    await connection.connect();credentials={};panelContextConflict=false;retryDelay=1000;enrollmentDeadline=0;
-    try{localEditPending=!!await workflow.pending();localIntentError=null;}catch(e){if(!isIntentReadError(e))throw e;localEditPending=true;localIntentError=e.code;}
-    if(!await refresh()||!await heartbeat())return;if(localIntentError)error({code:localIntentError});
-    if(!localEditPending&&!state?.applyRecovery?.blocked){try{await readProject();}catch(e){say(/PROJECT_REQUIRED|SEQUENCE_REQUIRED/.test(String(e))?'Premiere에서 편집할 시퀀스를 열어 주세요.':String(e));}}
-    api('/updates/check',{}).then(refresh).catch(()=>{});
+    await connection.connect();if(!current())return false;
+    credentials={};token.credential=credentials;panelContextConflict=false;retryDelay=1000;enrollmentDeadline=0;accepted();
+    try{
+      const intent=await workflow.pending();if(!current())return false;
+      if(intent!==null&&(!intent||typeof intent!=='object'||Array.isArray(intent)||intent.schemaVersion!==1||typeof intent.requestId!=='string'||!intent.requestId||!['edit','sync','input'].includes(intent.kind)))throw Object.assign(new Error('Invalid persisted intent'),{code:'EDIT_INTENT_CORRUPT'});
+      localEditPending=intent!==null;localIntentError=null;
+    }catch(e){if(!current())return false;if(!isIntentReadError(e))throw e;localEditPending=true;localIntentError=e.code;}
+    accepted();
+    if(!await refresh(alive)||!alive())return false;accepted();
+    if(!await heartbeat(current)||!current())return false;
+    if(localIntentError&&guide()){error({code:localIntentError});token.guidanceRevision=statusRevision;}
+    if(!localEditPending&&!state?.applyRecovery?.blocked&&!stopped&&!updateIntent&&state?.gateOpen&&state.compatible!==false){
+      try{
+        const receipt=await readProject({guardFactory:()=>{const scope=initializationScope();return ()=>alive()&&sameInitializationScope(scope);},onSettledRead:()=>{if(alive())accepted();},guidanceCurrent:guide});
+        if(!alive()||!receipt)return false;accepted();
+      }catch(e){
+        if(!current())return false;
+        if(guide())say(/PROJECT_REQUIRED|SEQUENCE_REQUIRED/.test(String(e?.code||e))?'Premiere에서 편집할 시퀀스를 열어 주세요.':'시퀀스를 확인하지 못했습니다. 새로고침으로 다시 확인하세요.');
+      }
+    }
+    if(!current())return false;
+    // Local readiness is complete. A network update check must not hold the
+    // editing controls, but its late response still belongs to this owner.
+    initializationIncomplete=false;initializing=false;accepted();toggle();
+    if(updateIntent||!state?.gateOpen)return true;
+    try{await api('/updates/check',{});if(!current())return false;return await refresh(alive);}catch(_){return false;}
   }catch(e){
-    if(e.code==='PANEL_CONTEXT_CONFLICT'){contextConflict();return;}
-    credentials=null;retryAt=Date.now()+retryDelay;retryDelay=Math.min(30000,retryDelay*2);setConnection(false,'편집 준비 중');$('boot-status').className='notice';
+    if(!current())return false;
+    if(e.code==='PANEL_CONTEXT_CONFLICT'){contextConflict(guide());return false;}
+    credentials=null;retryAt=Date.now()+retryDelay;retryDelay=Math.min(30000,retryDelay*2);
+    // Retry safety is independent of who owns the visible guidance.
     if(e.code==='INSTALLATION_PENDING'){
       if(!enrollmentDeadline)enrollmentDeadline=Date.now()+600000;
-      setConnection(false,'설치 연결 준비 중');
       if(Date.now()>=enrollmentDeadline)retryAt=Infinity;
+    }else if(['BOOTSTRAP_INVALID','INSTALLATION_ENROLLMENT_INVALID'].includes(e.code))retryAt=Infinity;
+    if(!guide())return false;
+    setConnection(false,'편집 준비 중');$('boot-status').className='notice';
+    if(e.code==='INSTALLATION_PENDING'){
+      setConnection(false,'설치 연결 준비 중');
       $('boot-status').querySelector('p').textContent=retryAt===Infinity?'설치 연결 대기를 마쳤습니다. Setup을 다시 열고 새로고침해 주세요.':'설치 연결을 준비하고 있습니다. Contentrium CUT Setup 창을 열어 둔 채 잠시 기다려 주세요.';
     }else if(['BOOTSTRAP_INVALID','INSTALLATION_ENROLLMENT_INVALID'].includes(e.code)){
       retryAt=Infinity;setConnection(false,'설치 복구 필요');
       $('boot-status').querySelector('p').textContent='설치 연결 정보를 검증하지 못했습니다. 같은 Contentrium CUT Setup으로 설치 복구를 진행해 주세요.';
     }else $('boot-status').querySelector('p').textContent=e.code==='BOOTSTRAP_MISSING'?'설치 정보를 찾지 못했습니다. Contentrium CUT 설치 복구가 필요합니다.':'편집 기능을 준비하고 있습니다. 잠시 후 자동으로 다시 확인합니다.';
-  }finally{initializing=false;toggle();}
+    return false;
+  }finally{
+    if(initializationRequest===token){
+      if(initializationIncomplete&&credentials===token.credential&&stopRevision!==token.stop)retryAt=Infinity;
+      initializationRequest=null;initializing=false;toggle();
+    }
+  }
 }
 view.onChange(()=>{resourceViewRevision++;toggle();});
 initialize();
 function pollError(e){if(e.code==='PANEL_CONTEXT_CONFLICT')contextConflict();else{setConnection(false,'편집 연결 복구 중');if(e.code==='AUTH_REQUIRED'||e.code==='SESSION_EXPIRED'||!e.code){credentials=null;connection.reset();retryAt=Date.now()+1000;}if(job||applying){stopped=true;error(e);}toggle();}}
 setInterval(async()=>{
   if(!credentials){if(Date.now()>=retryAt)await initialize();return;}
+  if(initializing&&!updateIntent)return;
   try{if(!await periodicHeartbeat())return;}catch(e){pollError(e);return;}
   if(polling)return;
   polling=true;

@@ -3033,3 +3033,52 @@ test('update UI guides reconnect after current auth failures and preserves newer
 test('update UI retains accepted start and phase guidance while requesting reconnect after state auth failure',async()=>{
  for(const mode of ['separate','mixed'])for(const phase of ['IDLE','DOWNLOADING','WAITING_HOST_EXIT','RECOVERY_REQUIRED'])for(const code of ['AUTH_REQUIRED','SESSION_EXPIRED','PANEL_CONTEXT_CONFLICT']){const h=await heldUpdateUI(mode);if(phase!=='IDLE'){h.f.state.update.updateState=phase;h.f.state.update.updateEpoch=1;h.f.state.epoch=1;h.f.state.gateOpen=false;h.f.state.stopEpoch=1;await h.f.tick();}const request=h.f.evaluate('connection.request');h.f.evaluate('connection').request=(p,...a)=>p==='/state'?Promise.reject(Object.assign(new Error('private accepted auth'),{code})):request(p,...a);const intent=h.f.evaluate('updateIntent'),id=intent.requestId;h.resume({});await h.run;assert.equal(h.f.evaluate('credentials'),null);assert.equal(h.f.evaluate('updateIntent'),intent);assert.equal(intent.accepted,true);assert.equal(intent.requestId,id);assert.equal(intent.inFlight,false);assert.match(h.f.get('update-info').textContent,/새로고침.*연결.*업데이트/,mode+phase+code);if(phase==='IDLE')assert.match(h.f.get('update-info').textContent,/접수/);if(phase==='WAITING_HOST_EXIT')assert.match(h.f.get('update-info').textContent,/Premiere.*정상 종료/);if(phase==='RECOVERY_REQUIRED')assert.match(h.f.get('update-info').textContent,/설치 복구/);assert.equal(h.f.get('update').disabled,true);assert.equal(h.f.calls.filter(c=>c.path==='/updates/start').length,1);assert.doesNotMatch(h.f.get('update-info').textContent,/private/);}
 });
+
+
+async function heldCacheInitialization(mode='separate'){
+ let armed=false,resume;
+ const f=await updatePanel({request:p=>armed&&p==='/heartbeat'&&!resume?new Promise(resolve=>{resume=resolve;}):undefined});
+ if(mode==='mixed')await f.click('mode-mixed');
+ f.state.gateOpen=false;f.state.maintenance={id:'c'.repeat(32),status:'canceled',drained:true,canRelease:true};
+ armed=true;const run=f.evaluate('initialize({manual:true})');
+ for(let i=0;i<150&&!resume;i++)await Promise.resolve();
+ assert.equal(typeof resume,'function');assert.equal(f.evaluate('initializing'),true);assert.equal(f.evaluate('initializationIncomplete'),true);
+ return {f,run,resume:()=>resume({epoch:0,gateOpen:false,stopEpoch:null})};
+}
+
+test('cache initialization UI and callbacks share admission until actual heartbeat completes',async()=>{
+ for(const mode of ['separate','mixed']){
+  const h=await heldCacheInitialization(mode),f=h.f;
+  assert.equal(f.get('release-cache').disabled,true);assert.equal(f.get('prune-cache').disabled,true);
+  assert.equal(f.evaluate('cacheReady(true)'),false);assert.equal(f.evaluate('cacheReady(false)'),false);
+  const before=cacheState(f),calls=f.calls.length;
+  await f.click('release-cache');await f.click('prune-cache');await f.evaluate('runCache(true)');await f.evaluate('runCache(false)');
+  assert.equal(f.calls.length,calls);assert.equal(cacheState(f),before);assert.equal(f.evaluate('cacheRequest'),null);
+  h.resume();await h.run;assert.equal(f.evaluate('initializing'),false);assert.equal(f.evaluate('initializationIncomplete'),false);assert.equal(f.get('release-cache').disabled,false);
+  const request=f.evaluate('connection.request');f.evaluate('connection').request=(p,...args)=>{
+   if(p==='/resources/prune'){assert.deepEqual(JSON.parse(JSON.stringify(args[0])),{epoch:0,action:'release'});f.state.gateOpen=true;f.state.maintenance=null;return Promise.resolve({released:true});}
+   return request(p,...args);
+  };
+  await f.click('release-cache');assert.match(f.get('status').textContent,/정리를 종료했습니다/);assert.equal(f.evaluate('cacheRequest'),null);assert.equal(f.evaluate('state.gateOpen'),true);
+ }
+});
+
+test('cache initialization incomplete after actual cancel stays locked until manual reconnection',async()=>{
+ for(const mode of ['separate','mixed']){
+  const h=await heldCacheInitialization(mode),f=h.f;await f.click('cancel');h.resume();await h.run;
+  assert.equal(f.evaluate('initializing'),false);assert.equal(f.evaluate('initializationIncomplete'),true);assert.notEqual(f.evaluate('credentials'),null);
+  assert.equal(f.get('release-cache').disabled,true);assert.equal(f.evaluate('cacheReady(true)'),false);
+  const before=cacheState(f),calls=f.calls.length;await f.click('release-cache');await f.evaluate('runCache(true)');assert.equal(f.calls.length,calls);assert.equal(cacheState(f),before);
+  await f.click('refresh');assert.equal(f.evaluate('initializationIncomplete'),false);assert.equal(f.get('release-cache').disabled,false);
+ }
+});
+
+test('cache initialization lock preserves immediate update and late initializer cannot unlock it',async()=>{
+ for(const mode of ['separate','mixed']){
+  const h=await heldCacheInitialization(mode),f=h.f;assert.equal(f.get('update').disabled,false);await f.click('update');
+  assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.equal(f.evaluate('stopped'),true);
+  const guide=f.get('status').textContent,calls=f.calls.length;h.resume();await h.run;
+  assert.equal(f.get('status').textContent,guide);assert.equal(f.evaluate('stopped'),true);assert.equal(f.get('release-cache').disabled,true);
+  await f.click('release-cache');await f.evaluate('runCache(true)');assert.equal(f.calls.length,calls);
+ }
+});

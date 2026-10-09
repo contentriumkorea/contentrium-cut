@@ -17,7 +17,7 @@ let settingsWriteTail=Promise.resolve();
 let modelRequest=null,modelInputRevision=0,modelPoll=null;
 let cacheRequest=null,syncPoll=null,examplePoll=null,refreshRequest=null,updateCheckRequest=null,updateRecoveryRequest=null,applyRecoveryRequest=null,cancelRequest=null,updateStartRequest=null;
 let previewBusy=0,previewGeneration=0;
-let resourceRequest=null,resourceInputRevision=0,resourceViewRevision=0,resourceInputDirty=false,resourceBudgetMissing=false,stopRevision=0;
+let resourceRequest=null,resourceInputRevision=0,resourceViewRevision=0,resourceInputDirty=false,resourceBudgetMissing=false,resourceSuggestedBudget=null,stopRevision=0;
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
 let analysisState=null;
 let planInputHash=null,planInvalidated=false;
@@ -263,6 +263,8 @@ function toggle(){
   for(const [id,active,idle,label] of [['save-settings',settingsSave&&!settingsSave.automatic,'저장','저장 중…'],['load-settings',settingsRestore,'불러오기','불러오는 중…']]){$(id).textContent=active?label:idle;$(id).setAttribute('aria-busy',active?'true':'false');}
   for(const id of ['read-project','read-selection','install-model','save-resources','prune-cache'])$(id).disabled=locked;
   const budgetIssue=cacheBudgetFeedback();$('save-resources').disabled=locked||!!budgetIssue;
+  const suggestion=Number.isSafeInteger(resourceSuggestedBudget)&&resourceSuggestedBudget>0?'권장 캐시 예산 '+String(resourceSuggestedBudget/1073741824)+' GB · 입력 후 자원 설정을 저장해야 적용됩니다.':'';
+  if($('cache-suggestion-info').textContent!==suggestion)$('cache-suggestion-info').textContent=suggestion;$('cache-suggestion-info').className='hint'+(suggestion?'':' hidden');$('use-cache-suggestion').disabled=!cacheSuggestionReady();
   $('prune-cache').disabled=locked||resourceInputDirty||resourceBudgetMissing;
   const saveInfo=!resourceRequest?.save&&!resourceRequest?.discard?(resourceInputDirty?'변경한 분석 자원 설정을 먼저 저장하세요. 캐시 정리는 저장된 예산을 사용합니다.':resourceBudgetMissing?'캐시 예산이 설정되지 않았습니다. 캐시 예산을 입력하고 자원 설정을 저장하면 정리할 수 있습니다.':''):'';
   if($('resource-save-info').textContent!==saveInfo)$('resource-save-info').textContent=saveInfo;$('resource-save-info').className='hint'+(saveInfo?'':' hidden');
@@ -1448,6 +1450,7 @@ function cacheBudgetFeedback(){
 function resourceSettingsReady(save=false){
   return !!credentials&&!!state&&!updateIntent&&!panelContextConflict&&state.compatible!==false&&state.stopEpoch==null&&(!save||state.gateOpen&&!stopped&&!binding&&!projectRead&&!job&&!validationCount&&!applying&&!batchRunning&&!previewBusy&&!localEditPending&&!state.applyRecovery?.blocked);
 }
+function cacheSuggestionReady(){return !workLocked()&&resourceSettingsReady(true)&&!resourceRequest&&!cacheRequest&&Number.isSafeInteger(resourceSuggestedBudget)&&resourceSuggestedBudget>0;}
 function resourceScope(){return [credentials,connected,connected?.snapshot.snapshotHash,connected?.snapshot.hostSnapshotHash,mode,analysisState,analysisState?.revision,state?.epoch,state?.gateOpen,stopped,state?.compatible,state?.appVersion,state?.bundleId,state?.protocolVersion,localEditPending,state?.applyRecovery?.blocked,binding,projectRead,job,validationCount,validationRevision,applying,batchRunning,projectSelection,inputCapability,plan,planInputHash,syncResult,syncJob,syncResultInputHash,resourceInputRevision,resourceViewRevision,resourceInputDirty,stopRevision];}
 function resourceResponseGuard(token,save=false){
   const scope=resourceScope(),rows=selectedRows.slice(),raw=JSON.stringify([$('analysis-device').value,$('cache-budget').value]);
@@ -1456,7 +1459,8 @@ function resourceResponseGuard(token,save=false){
 async function loadResources(current=()=>true,accepted=()=>{}){
   if(!current())return false;const value=await api('/resources');if(!current())return false;
   const device=value.settings.device,budget=value.settings.cacheBudgetBytes,budgetText=Number.isSafeInteger(budget)&&budget>0?String(budget/1073741824):'',cacheInfo='캐시 '+(value.status.cacheBytes/1073741824).toFixed(2)+' GB · 사용 가능 디스크 '+(value.status.freeDiskBytes/1073741824).toFixed(1)+' GB';
-  $('analysis-device').value=device;$('cache-budget').value=budgetText;$('cache-info').textContent=cacheInfo;resourceLoaded=true;resourceInputDirty=false;resourceBudgetMissing=budgetText==='';accepted();return true;
+  const suggested=value.status.suggestedCacheBudgetBytes,suggestedBudget=Number.isSafeInteger(suggested)&&suggested>0?suggested:null;
+  $('analysis-device').value=device;$('cache-budget').value=budgetText;$('cache-info').textContent=cacheInfo;resourceLoaded=true;resourceInputDirty=false;resourceBudgetMissing=budgetText==='';resourceSuggestedBudget=suggestedBudget;accepted();return true;
 }
 async function runResourceSettings(save=false,discard=false){
   const editing=save||discard;if(!resourceSettingsReady(editing)||discard&&(!resourceInputDirty||resourceRequest))return;
@@ -1526,6 +1530,7 @@ handler('release-cache',()=>runCache(true));
 const showSettings=$('open-settings').onclick;
 $('open-settings').onclick=()=>{showSettings();if(view.current()==='settings'&&!resourceLoaded&&!resourceInputDirty)return runResourceSettings();};
 for(const id of ['analysis-device','cache-budget'])$(id).oninput=$(id).onchange=()=>{if(workLocked())return;resourceInputRevision++;resourceInputDirty=true;toggle();};
+$('use-cache-suggestion').onclick=()=>{if(!cacheSuggestionReady())return;const value=String(resourceSuggestedBudget/1073741824);if($('cache-budget').value===value)return;$('cache-budget').value=value;$('cache-budget').oninput();say('권장 캐시 예산을 입력했습니다. 자원 설정을 저장하면 적용됩니다.');};
 function changeRecordingMode(value){
   if(workLocked()||mode===value)return;
   const defaults=!microphoneSelectionCustomized&&microphoneRows.every(r=>r.check.checked===r.defaultChecked[mode]);

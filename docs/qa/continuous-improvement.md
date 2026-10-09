@@ -2467,3 +2467,13 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 최종정식 Node723/723/native52393/exit0/94951.8985ms·fail/cancel/skip/todo0. Python496고유/native92882/exit0/96.969초·fail/error/skip/excluded0·import중복41만제거. 신규4/4·관련25/25/native0·helper교정/통과재실행0. 독립matrix는정식집계가산없음·Community품질근거아님.
 
 - [0.1.93 패키지 검증](package-0.1.93-proof.json): runtime/CCX native38061/exit0·Setup native97737/exit0·추출 proof native67313/exit0·54.172초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.93·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.
+
+
+### 공개 결과
+
+- [v0.1.93](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.93): release408390730·제목 Contentrium CUT·공개2026-10-09T22:18:06Z·target/tag 65714d9fa7f1c09a00e5c924a957c56681d911a6·draft/prerelease 아님. [실제 재다운로드](release-0.1.93-proof.json): 익명0.1.92→0.1.93 AVAILABLE·서명·ZIP/CCX/Setup3개 실제 size/SHA 일치. [현재 조회](release-0.1.93-current-proof.json): CURRENT/후보 없음·5자산 ID/size/digest/서명 바이트 일치. [고정 복구](migration-pinned-0.1.1-after-0.1.93-proof.json): latest0.1.93에도 서명v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+- 기획→설계→구현→검증→0.1.93 공개/재검증 완료. 정식 Node723/Python496·독립 검수는 별도 evidence와 집계를 따른다. 신규4 RED/native1→GREEN4/4/native0·helper교정/재실행0·관련25/25 native0. 실제 Premiere/UXP 화면·편집·기존0.1.0 설치 업데이트 전환·Community-1 품질 미검증. 사용자 설치/활성화·컴퓨터유즈/브라우저/Premiere 조작·provider 동의/토큰/미디어 업로드 없음.
+
+- 종료근거: 업로드 native38928/exit0·실제3다운로드 native77513/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native38061/exit0·Setup native97737/exit0·추출패키지 native67313/exit0/54.172초. 공개879파일 비공개패턴검사·신뢰키불변·최종52raw일치·설치0.1.0 hash동일·서명키존재만확인·자동화ACTIVE15분·자체CLI0. Node723/native52393/exit0/94951.8985ms·Python496고유/native92882/exit0/96.969초. 독립 native600 정확히1회·추가106고유/116raw·미해결0·source52/peer10/hash seal 확인.
+- 실패원인보존: 신규4 RED/native1은복원길이안내문부재4fail/162.6291ms. GREEN4/4/native0/333.9974ms·helper수정/재실행0·기존시험본문기대변경0. 관련25/25/native0/1477.0606ms. 독립helper실패가있으면검수기록/seal에별도보존. optional/torchcodec/Silero-SAPI는Community품질근거아님.
+- 이어갈 단계: actual-main 마이크clip범위안내는있으나범위값을직접입력해야하며clip완전프레임범위를한번에입력하는명시적버튼없음·raw/hash불변·probe native0. 다음회차클립범위입력편의를기획→설계·ceil시작/floor종료·safeInteger/완전프레임없는클립차단·원문/오디오보존·사용자확인용편집가능구간·입력/분석/plan무효화·행수명/worklocks/update즉시차단 수용조건→실패재현부터진행. 이번동결뒤추가제품변경없음·probe/독립matrix는정식집계가산없음. 실제Premiere/UXP/스크린리더/기존0.1.0설치전환/Community품질미검증. CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/결제/token/media외부업로드없음.

@@ -2363,3 +2363,13 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 검수기록root helper 첫실행/native1은declined_to_judge가없는스키마조회오류; 실제declined_judgments목록으로reader만교정·fixed/native0·원본log/marker보존·제품/native/독립시험재실행없음. 독립static helper 첫실패는parameterized native584와직접선언수를혼동; 4신규선언비교로교정·원본봉인·소스시험재실행없음.
 
 - [0.1.89 패키지 검증](package-0.1.89-proof.json): runtime/CCX native93277/exit0·Setup native73941/exit0·추출 proof native35271/exit0·52.000초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.89·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.
+
+
+### 공개 결과
+
+- [v0.1.89](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.89): release408345189·제목 Contentrium CUT·공개2026-10-09T21:04:16Z·target/tag 2d9963ca920715daf826d0df01862ad67f87def6·draft/prerelease 아님. [실제 재다운로드](release-0.1.89-proof.json): 익명0.1.88→0.1.89 AVAILABLE·서명·ZIP/CCX/Setup3개 실제 size/SHA 일치. [현재 조회](release-0.1.89-current-proof.json): CURRENT/후보 없음·5자산 ID/size/digest/서명 바이트 일치. [고정 복구](migration-pinned-0.1.1-after-0.1.89-proof.json): latest0.1.89에도 서명v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+- 기획→설계→구현→검증→0.1.89 공개/재검증 완료. 정식 Node707/Python496·독립 검수는 별도 evidence와 집계를 따른다. 신규4 RED/native1→GREEN4/native0·관련12/12 native0. 실제 Premiere/UXP 화면·편집·기존0.1.0 설치 업데이트 전환·Community-1 품질 미검증. 사용자 설치/활성화·컴퓨터유즈/브라우저/Premiere 조작·provider 동의/토큰/미디어 업로드 없음.
+
+- 종료근거: 업로드 native78192/exit0·실제3다운로드 native44920/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native93277/exit0·Setup native73941/exit0·추출패키지 native35271/exit0/52.000초. 공개863파일 비공개패턴검사·신뢰키불변·최종52raw일치·설치0.1.0 hash동일·서명키존재만확인·자동화ACTIVE15분·자체CLI0. Node707/native49208/exit0/123953.7606ms·Python496고유/native78418/exit0/100.922초. 독립 native584 정확히1회·추가57고유/58raw·미해결0·source52/peer10/hash seal 확인.
+- 실패원인보존: 신규4 RED/native1은reset버튼부재4fail. GREEN4/4/native0/239.9303ms·관련12/12/native0/884.4238ms·기존시험기대/제품추가수정없음. 문서준비helper의한단락언어오기는검수시작전한국어로정정·제품/시험재실행없음. optional/torchcodec/Silero-SAPI는Community-1품질근거아님. 독립helper실패가있으면해당검수보고서/raw seal에보존.
+- 이어갈 단계: actual-main 미사용초기화뒤0 / 0으로변경되며현재행에는start/end/reset3개만있고복원action없음·raw/hash불변·probe native0. 다음회차명시적초기화직전raw구간을현재행에서되돌리는기능을기획→설계·행수명/입력추가수정/설정로드·연결·모드·작업잠금/accepted결과자동부활금지/즉시update보존수용조건→실패재현부터진행. 이번동결뒤제품추가변경없음·probe/독립matrix는정식집계가산없음. 실제Premiere/UXP 화면·편집·스크린리더·기존0.1.0 업데이트설치전환·Community-1품질미검증. CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/결제/token/media외부업로드없음.

@@ -377,6 +377,13 @@ function calibrationJumpTicks(row,edge){
   return String(edge==='start'?start:end-frame);
 }
 function calibrationJumpReady(row){return !workLocked()&&calibrationRows.includes(row)&&calibrationJumpTicks(row,'start')!==null;}
+function calibrationLengthText(row){
+  if(calibrationJumpTicks(row,'start')===null)return '';
+  const fps=connected.snapshot.fps;
+  if(!Number.isSafeInteger(fps?.num)||!Number.isSafeInteger(fps?.den)||fps.num<=0||fps.den<=0)return '';
+  const frames=BigInt(Number(row.last.value))-BigInt(Number(row.first.value)),num=BigInt(fps.num),milliseconds=(frames*BigInt(fps.den)*1000n+num/2n)/num;
+  return '단독 발화 길이: '+frames+'프레임 · 약 '+milliseconds/1000n+'.'+String(milliseconds%1000n).padStart(3,'0')+'초';
+}
 function calibrationFeedback(){
   let firstIssue='';
   for(const row of calibrationRows){
@@ -395,6 +402,7 @@ function calibrationFeedback(){
       hint+=start<end?' 클립 범위: '+start+'–'+end+'프레임.':' 완전한 프레임 구간이 없어 0 / 0(미사용)으로 두세요.';
     }
     if(row.hint.textContent!==hint)row.hint.textContent=hint;if(message&&!firstIssue)firstIssue=message;
+    if(row.lengthHint){const length=calibrationLengthText(row);if(row.lengthHint.textContent!==length)row.lengthHint.textContent=length;row.lengthHint.className='hint'+(length?'':' hidden');}
   }
   return firstIssue;
 }
@@ -459,6 +467,7 @@ function renderSources(){
     bounds.appendChild(label('단독 발화 시작 · 프레임',first));bounds.appendChild(label('종료 · 프레임',last));calibration.appendChild(bounds);
     const calibrationHint=element('p','','hint'),calibrationIssue=element('p','','hint input-error hidden');calibrationHint.id='calibration-guide-'+calibrationRows.length;calibrationIssue.id='calibration-error-'+calibrationRows.length;calibrationIssue.setAttribute('aria-live','polite');calibration.appendChild(calibrationHint);calibration.appendChild(calibrationIssue);$('calibration').appendChild(calibration);
     const calibrationRow={instanceKey:clip.instanceKey,clip,check,speaker,first,last,stream,channel,hint:calibrationHint,issue:calibrationIssue,title:'A'+(track.index+1)+' · '+track.name+' · '+microphoneNames.get(clip.assetId)+(position?' · '+position:'')};calibrationRows.push(calibrationRow);
+    const lengthHint=element('p','','hint hidden');lengthHint.id='calibration-length-'+(calibrationRows.length-1);lengthHint.setAttribute('role','status');lengthHint.setAttribute('aria-live','polite');calibration.appendChild(lengthHint);calibrationRow.lengthHint=lengthHint;
     const jumpHint=element('p','끝 확인은 종료 직전의 마지막 포함 프레임으로 이동합니다.','hint'),jumps=element('div',undefined,'row');jumpHint.id='calibration-jump-guide-'+(calibrationRows.length-1);calibration.appendChild(jumpHint);
     for(const [edge,text,key] of [['start','시작 확인','startJump'],['end','끝 확인','endJump']]){
       const jump=element('button',text);jump.setAttribute('data-work','true');jump.setAttribute('data-calibration-jump',edge);jump.setAttribute('aria-describedby',calibrationIssue.id+' '+calibrationHint.id+' '+jumpHint.id+(positionGuide?' '+positionGuide.id:''));jump.setAttribute('aria-label',(edge==='start'?'단독 발화 시작 확인':'단독 발화 마지막 포함 프레임 확인')+' · '+calibrationRow.title);jump.disabled=!calibrationJumpReady(calibrationRow);jump.onclick=()=>{if(!calibrationJumpReady(calibrationRow))return;return runAction(()=>seekCalibration(calibrationRow,edge));};jumps.appendChild(jump);calibrationRow[key]=jump;

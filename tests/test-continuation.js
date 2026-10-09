@@ -3,26 +3,29 @@ const test=require('node:test'),assert=require('node:assert/strict'),{spawn}=req
 const connection=require('../plugin/connection');
 const bundle={appVersion:'0.1.0',bundleId:'bundle-test',protocolVersion:1};
 const bootstrap={schemaVersion:1,productId:'com.contentrium.cut',installationId:'install-test',keyId:'key-test',authProtocol:1,endpoint:'http://127.0.0.1:41737',secret:Buffer.from(Array.from({length:32},(_,i)=>i)).toString('base64')};
-async function fixture(t,scenario='success',{loseTake=false}={}){
+async function fixture(t,scenario='success',{loseTake=false,pausePoll=false}={}){
   const process=spawn(path.join(__dirname,'../.build-venv/Scripts/python.exe'),['-B',path.join(__dirname,'continuation_auth_bridge.py'),scenario],{cwd:path.join(__dirname,'..'),env:{...global.process.env,PYTHONPATH:'companion;tests'},windowsHide:true,stdio:['pipe','pipe','pipe']});
   const queue=[],calls=[],activity=[],descriptors=[];let exited=false,stderr='';const lines=createInterface({input:process.stdout});
   process.stderr.on('data',v=>{stderr=(stderr+v.toString()).slice(-2000);});
   lines.on('line',line=>{const next=queue.shift();if(next)next.resolve(JSON.parse(line));});
   process.on('error',e=>{while(queue.length)queue.shift().reject(e);});
   process.on('exit',code=>{exited=true;while(queue.length)queue.shift().reject(new Error('Fixture exited '+code+': '+stderr));});
-  const oldFetch=global.fetch,oldCrypto=Object.getOwnPropertyDescriptor(globalThis,'crypto');Object.defineProperty(globalThis,'crypto',{configurable:true,value:crypto.webcrypto});
+  const oldFetch=global.fetch,oldSetTimeout=global.setTimeout;let pollTimer;
+  if(pausePoll)global.setTimeout=(fn,ms,...args)=>{if(ms===50){assert.equal(pollTimer,undefined);pollTimer=()=>fn(...args);return {ownedPollTimer:true};}return oldSetTimeout(fn,ms,...args);};
+  const releasePoll=()=>{if(pollTimer){const fn=pollTimer;pollTimer=undefined;fn();}};
+  const oldCrypto=Object.getOwnPropertyDescriptor(globalThis,'crypto');Object.defineProperty(globalThis,'crypto',{configurable:true,value:crypto.webcrypto});
   global.fetch=async(url,options)=>{
     const request={path:new URL(url).pathname,method:options.method,headers:{Host:'127.0.0.1:41737',...options.headers},body:options.body||''};calls.push(request);
     const response=await new Promise((resolve,reject)=>{queue.push({resolve,reject});process.stdin.write(JSON.stringify(request)+'\n');});
     if(loseTake&&request.path.endsWith('/take'))throw new Error('Lost consumed response');
     return {status:response.status,text:async()=>JSON.stringify(response.body)};
   };
-  t.after(async()=>{global.fetch=oldFetch;if(oldCrypto)Object.defineProperty(globalThis,'crypto',oldCrypto);if(!exited){process.stdin.end();const timeout=setTimeout(()=>process.kill(),3000);await new Promise(resolve=>process.once('exit',resolve));clearTimeout(timeout);}lines.close();});
+  t.after(async()=>{global.setTimeout=oldSetTimeout;releasePoll();global.fetch=oldFetch;if(oldCrypto)Object.defineProperty(globalThis,'crypto',oldCrypto);if(!exited){process.stdin.end();const timeout=setTimeout(()=>process.kill(),3000);await new Promise(resolve=>process.once('exit',resolve));clearTimeout(timeout);}lines.close();});
   const files=new Map([['contentrium-bootstrap.json',JSON.stringify(bootstrap)]]),entry=name=>({name,isFile:true,read:async()=>files.get(name),write:async value=>files.set(name,value)});
   const uxp={storage:{localFileSystem:{getDataFolder:async()=>({getEntries:async()=>[...files.keys()].map(entry),createFile:async name=>{files.set(name,'');return entry(name);}})}}};
   const client=connection.create(uxp,bundle,{onValidation:(count,active)=>{activity.push(count);descriptors.push(active);}});
-  const started=async()=>{for(let i=0;i<200&&!calls.some(c=>c.path==='/continuations/'+'c'.repeat(32));i++)await new Promise(resolve=>setTimeout(resolve,5));};
-  return {client,calls,activity,descriptors,started};
+  const started=async()=>{for(let i=0;i<(pausePoll?2000:200)&&(pausePoll?!pollTimer:!calls.some(c=>c.path==='/continuations/'+'c'.repeat(32)));i++)await new Promise(resolve=>oldSetTimeout(resolve,5));if(pausePoll)assert.ok(pollTimer,'verified pending continuation reached its owned poll timer');};
+  return {client,calls,activity,descriptors,started,releasePoll};
 }
 test('signed validation continuation is consumed once with captured epoch and no original replay',async t=>{
   const f=await fixture(t);assert.deepEqual(await f.client.request('/fixture/work',{}),{execute:true,restored:true,count:1});
@@ -42,7 +45,7 @@ test('lost final take response remains unknown and never repeats original work o
   assert.equal(f.calls.filter(c=>c.path==='/fixture/work').length,1);assert.equal(f.calls.filter(c=>c.path.endsWith('/take')).length,1);assert.equal(f.activity.at(-1),0);
 });
 test('reset while pending never transfers a continuation to a new authenticated session',async t=>{
-  const f=await fixture(t,'hold'),pending=f.client.request('/fixture/work',{});const denied=assert.rejects(pending,e=>e.code==='SESSION_EXPIRED');await f.started();f.client.reset();await denied;
+  const f=await fixture(t,'hold',{pausePoll:true}),pending=f.client.request('/fixture/work',{});const denied=assert.rejects(pending,e=>e.code==='SESSION_EXPIRED');await f.started();f.client.reset();f.releasePoll();await denied;
   assert.equal(f.calls.some(c=>c.path.endsWith('/take')),false);assert.equal(f.calls.filter(c=>c.path==='/fixture/work').length,1);
 });
 test('failed or malformed continuation cannot activate restored work',async t=>{

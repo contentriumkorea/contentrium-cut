@@ -471,9 +471,9 @@ function syncInputEdited(){if(workLocked()||!connected)return;if(syncResultMatch
 function syncMethodEdited(){if(!workLocked()&&connected)syncMethodChanged();}
 function syncManualReference(row){return $('sync-method').value==='manual'&&row.source.assetId===$('sync-reference').value;}
 function syncManualFeedback(row,locked){
-  const reference=syncManualReference(row),text=reference?'기준 소스의 상대 오프셋은 0초입니다. 입력값과 확인 상태는 보관되며 기준 소스를 바꾸면 사용할 수 있습니다.':'';
+  const reference=syncManualReference(row),active=$('sync-method').value==='manual'&&row.check.checked,text=reference?'기준 소스의 상대 오프셋은 0초입니다. 입력값과 확인 상태는 보관되며 기준 소스를 바꾸면 사용할 수 있습니다.':!active?'':!row.offset.value.trim()?'오프셋을 입력하세요. 입력하지 않은 소스는 싱크 결과에서 확인이 필요합니다.':!row.confirmed.checked?'기준 대비 오프셋을 확인한 뒤 확인 항목을 선택하세요. 미확인 소스는 싱크 결과에서 확인이 필요합니다.':'';
   row.offset.disabled=row.confirmed.disabled=locked||!connected||reference;
-  if(row.manualHint.textContent!==text)row.manualHint.textContent=text;row.manualHint.className=reference?'hint':'hint hidden';
+  if(row.manualHint.textContent!==text)row.manualHint.textContent=text;row.manualHint.className=text?'hint':'hint hidden';
   row.offsetValue=row.offset.value;row.confirmedValue=row.confirmed.checked;
 }
 function syncFeedback(){

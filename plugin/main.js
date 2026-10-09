@@ -22,7 +22,7 @@ let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,
 let analysisState=null;
 let planInputHash=null,planInvalidated=false;
 let overrideSerial=0,overrideErrorsOnly=false,overrideVisibleRows=new Set();
-let validationCount=0,validationRevision=0,statusRevision=0,heartbeatRequest=null,heartbeatOwner=null,updateIntent=null;
+let validationCount=0,validationRevision=0,statusRevision=0,heartbeatRequest=null,heartbeatOwner=null,selectionRead=null,updateIntent=null;
 let reviewPage=0,reviewWindow=null;
 let microphoneIssue='',rangeIssue='',syncIssue='',policyIssue='',syncResultInputHash=null,syncInvalidated=false;
 const selectedRows=[];
@@ -1176,21 +1176,55 @@ handler('apply-sync',async()=>{
   },(approved,result)=>savedReceipt(approved,result,source));
   clearAnalysis();clearSyncResult();say('싱크 적용 완료 · '+result.sequenceName+' / 원본 보존 확인');
 });
-handler('read-selection',async()=>{
-  if(!credentials||!state?.gateOpen||stopped||job||applying||localEditPending)throw new Error('현재 작업 상태를 확인하세요.');
-  if(!await heartbeat()||stopped||updateIntent)return;projectSelection=null;inputCapability=null;selectedRows.length=0;$('selected-sources').innerHTML='';
-  const selection=await ContentriumHost.selectedSources();
-  const bound=await api('/input/sources',{projectRef:selection.projectRef,sources:selection.sources,epoch:state.epoch});
-  projectSelection={...selection,...bound};
+function selectionReadScope(){
+  // Compare service state values, not the fresh /state object's identity: a
+  // normal periodic read must not starve a longer native selection query.
+  return refreshScope().filter((_,index)=>index!==1).concat(JSON.stringify(selectedRows.map(r=>[r.role.value,r.audio.checked])));
+}
+function selectionReadReady(){return !!credentials&&!!state?.gateOpen&&state.stopEpoch==null&&state.compatible!==false&&!stopped&&!updateIntent&&!job&&!applying&&!localEditPending&&!state.applyRecovery?.blocked&&!panelContextConflict&&!binding&&!projectRead&&!previewBusy&&!validationCount;}
+function validSelectionJob(value,epoch){return !!value&&typeof value==='object'&&!Array.isArray(value)&&typeof value.jobId==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(value.jobId)&&value.kind==='input-probe'&&['running','completed'].includes(value.status)&&(value.epoch===undefined||value.epoch===epoch);}
+async function readSelection(){
+  if(!selectionReadReady())throw new Error('현재 작업 상태를 확인하세요.');
+  const token={credential:credentials,epoch:state.epoch,scope:selectionReadScope(),rows:selectedRows.slice(),guidanceRevision:statusRevision};selectionRead=token;
+  const current=()=>{if(selectionRead!==token||!selectionReadReady()||credentials!==token.credential)return false;const scope=selectionReadScope();return token.scope.every((value,index)=>value===scope[index])&&selectedRows.length===token.rows.length&&token.rows.every((row,index)=>selectedRows[index]===row);};
+  const text=value=>typeof value==='string'&&value.trim().length>0;
+  try{
+    if(!await heartbeat(current)||!current())return;
+    const selection=await ContentriumHost.selectedSources();if(!current())return;
+    if(!selection||!text(selection.projectRef)||!Array.isArray(selection.sources)||!selection.sources.length||selection.sources.some(source=>!source||!text(source.assetId)||!text(source.name)||!text(source.path||source.canonicalPath))||new Set(selection.sources.map(source=>source.assetId)).size!==selection.sources.length)throw new Error('Invalid source selection');
+    const bound=await api('/input/sources',{projectRef:selection.projectRef,sources:selection.sources,epoch:token.epoch});if(!current())return;
+    if(!bound||!text(bound.selectionId))throw new Error('Invalid selection registration');
+    const rows=[],nodes=[];
   for(const source of selection.sources){
     const row=element('div',undefined,'source-row'),role=element('select'),audio=checkbox(),info=element('p','스트림 확인 중','hint');
     options(role,[['camera','카메라 영상'],['audio','독립 오디오'],['exclude','제외']]);
-    const selectionHint=element('p','', 'hint');selectionHint.id='selected-source-hint-'+selectedRows.length;selectionHint.setAttribute('role','status');selectionHint.setAttribute('aria-live','polite');for(const field of [role,audio])field.setAttribute('aria-describedby',selectionHint.id);
+    const selectionHint=element('p','', 'hint');selectionHint.id='selected-source-hint-'+rows.length;selectionHint.setAttribute('role','status');selectionHint.setAttribute('aria-live','polite');for(const field of [role,audio])field.setAttribute('aria-describedby',selectionHint.id);
     const value={source,role,audio,info,selectionHint};role.oninput=role.onchange=()=>{if(selectedSourceEditable(value))toggle();};audio.oninput=audio.onchange=()=>{if(selectedSourceEditable(value)&&selectedSourceMedia(value).hasAudio===true&&role.value!=='exclude')toggle();};
-    row.appendChild(element('div',source.name,'source-title'));row.appendChild(info);row.appendChild(label('소스 역할',role));row.appendChild(label('이 파일의 오디오를 결과에 출력',audio));row.appendChild(selectionHint);selectedRows.push(value);selectedSourceFeedback(value);$('selected-sources').appendChild(row);
+    row.appendChild(element('div',source.name,'source-title'));row.appendChild(info);row.appendChild(label('소스 역할',role));row.appendChild(label('이 파일의 오디오를 결과에 출력',audio));row.appendChild(selectionHint);rows.push(value);nodes.push(row);
   }
-  job={...await api('/input/capabilities',{selectionId:bound.selectionId,epoch:state.epoch}),selectionId:bound.selectionId};say('선택한 소스의 미디어 구성을 확인합니다.');
-});
+    const accepted=await api('/input/capabilities',{selectionId:bound.selectionId,epoch:token.epoch});
+    if(!current()){
+      // This response can arrive after stop was sent. Cancel only this owned
+      // job in the original session; never authenticate cleanup as a new one.
+      if(credentials===token.credential&&job?.jobId!==accepted?.jobId&&validSelectionJob(accepted,token.epoch)){
+        canceledJobs.add(accepted.jobId);try{await api('/jobs/'+accepted.jobId+'/cancel',{});}catch(_){}
+      }
+      return;
+    }
+    if(!validSelectionJob(accepted,token.epoch))throw new Error('Invalid media probe receipt');
+    projectSelection={...selection,selectionId:bound.selectionId};inputCapability=null;
+    selectedRows.length=0;selectedRows.push(...rows);$('selected-sources').innerHTML='';for(const node of nodes)$('selected-sources').appendChild(node);
+    job={...accepted,selectionId:bound.selectionId};
+    if(statusRevision===token.guidanceRevision)say('선택한 소스의 미디어 구성을 확인합니다.');
+  }catch(e){
+    if(!current())return;
+    const guide=statusRevision===token.guidanceRevision;
+    if(e?.code==='PANEL_CONTEXT_CONFLICT'){contextConflict(guide);return;}
+    if(['AUTH_REQUIRED','SESSION_EXPIRED'].includes(e?.code)){credentials=null;stopped=true;connection.reset();retryAt=Date.now()+1000;setConnection(false,'편집 연결 복구 중');}
+    if(guide)say('선택 소스를 확인하지 못했습니다. 기존 목록을 보존했습니다. 소스를 다시 읽어 주세요.');
+  }finally{if(selectionRead===token)selectionRead=null;}
+}
+handler('read-selection',readSelection);
 handler('create-input',async()=>{
   if(!state?.gateOpen||stopped||!projectSelection||!inputCapability)throw new Error('선택 소스 확인을 먼저 마쳐 주세요.');
   const selection=projectSelection,capability=inputCapability,choices=inputSourceChoices();

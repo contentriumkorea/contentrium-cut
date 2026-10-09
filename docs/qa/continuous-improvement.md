@@ -1854,3 +1854,11 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - [0.1.72 패키지 검증](package-0.1.72-proof.json): runtime/CCX native23185/exit0·Setup native69022/exit0·추출 proof native15092/exit0·63.625초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.72·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.
 
 - 연결전환 Important 수정 후 최종 정식 Node648/648/native98583/exit0·112432.2526ms·fail/cancel/skip/todo0. Python496/496/native9103/exit0·128.718초는 변경 없는 Python 입력에 대한 결과로 유지. 초기647 및 독립pre-edge524 전체시험을 최종 고유수에 중복 가산하지 않음. 관련4/4/native0와 독립 실패/신규delta까지 포함해 최신 UI 입력 증거를 갖춤.
+
+
+### 공개 결과
+
+- [v0.1.72](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.72): release408065798·제목 Contentrium CUT·공개2026-10-09T15:45:13Z·target/tag bd9821a3019891554953a62107478b249f19fc02·draft/prerelease 아님. [실제 재다운로드](release-0.1.72-proof.json): 익명0.1.71→0.1.72 AVAILABLE·서명·ZIP/CCX/Setup3개 실제 size/SHA 일치. [현재 조회](release-0.1.72-current-proof.json): CURRENT/후보 없음·5자산 ID/size/digest/서명 바이트 일치. [고정 복구](migration-pinned-0.1.1-after-0.1.72-proof.json): latest0.1.72에도 서명v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+- 기획→설계→구현→검증→0.1.72 공개/재검증 완료. 정식 Node648/Python496·독립 검수는 별도 evidence와 집계를 따른다. RED3/native1 및 optional/torchcodec 경고 보존. 실제 Premiere/UXP 화면·편집·기존0.1.0 설치 업데이트 전환·Community-1 품질 미검증. 사용자 설치/활성화·컴퓨터유즈/브라우저/Premiere 조작·provider 동의/토큰/미디어 업로드 없음.
+
+- 최종 업로드 native24964/exit0·실제3다운로드 native88787/exit0·CURRENT/5자산/고정v0.1.1 closeout 즉시 완료 exit0/session 없음. 추출 패키지 native15092/exit0·63.625초, 최종CCX 재포장 source 일치. 공개795파일 비공개 패턴·신뢰키·52raw 입력 불변, 설치0.1.0 해시 동일·서명키 존재만 확인·자동화 ACTIVE15분·helper 종료 후 순차 자체CLI0. 정식최종648/496·독립pre-edge524 및 추가122고유(130raw)·Important1해결/미해결0. 최초제품4/독립TEMPcrossVM4실패·rootRED3/helper미정의1 및 영향displayRED1/edgeRED1·TEMP parser·없는파일조회 원본보존, 초기전체647 및 추가중복 재시험은 고유 집계 제외. optional/torchcodec 경고 보존. 이어갈 단계: both modes -1.5/0/+1.5 실제6행에서 재현한 기준 대비 오프셋 설명과 양수부호 표시 기획→설계. coordinator offset은 현재클립 이동량이 아니므로 이동/늦춤으로 표현하지 않는다. raw숫자/정밀도/reference/이름/hash/apply/locks/update를 보존한다. 실제Premiere/UXP 편집·설치업데이트전환·Community-1 품질 미검증. CUA/브라우저/Premiere 조작·사용자 재설치/활성화·동의/결제/token/media외부업로드 없음.

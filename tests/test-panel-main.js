@@ -3345,3 +3345,53 @@ test('timecode missing FPS guidance stays quiet through locks obsolete rows and 
   await f.click('read-project');const current=syncRow(f,1),before=syncState(f),calls=f.calls.length,hint=current.clockHint.textContent;row.fps.value='60000/1001';row.fps.oninput();row.drop.onchange();assert.equal(syncState(f),before);assert.equal(f.calls.length,calls);assert.equal(current.clockHint.textContent,hint);f.state.update={updateState:'IDLE',updateEpoch:0,checkState:'AVAILABLE',candidate:{candidateId:'release:hash',manifestDigest:'a'.repeat(64),appVersion:'0.1.70'}};await f.tick();await f.click('update');assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.equal(current.fps.disabled,true);
  }
 });
+
+const syncReviewGuides={
+ TIMECODE_FPS_MISMATCH:'타임코드 FPS를 확인하지 못했거나 소스·기준 소스와 다릅니다. FPS 설정을 확인하세요.',
+ TIMECODE_DROPFRAME_MISMATCH:'Drop-frame 설정이 타임코드 또는 기준 소스와 다릅니다. FPS와 Drop-frame 설정을 확인하세요.',
+ TIMECODE_DATE_REQUIRED:'촬영 날짜를 확인하지 못했습니다. 실제 촬영 날짜를 YYYY-MM-DD로 입력하세요.',
+ TIMECODE_CLOCK_REQUIRED:'공통 시계 이름이 없습니다. 같은 시계의 소스에 동일한 이름을 입력하세요.',
+ TIMECODE_CLOCK_MISMATCH:'기준 소스와 공통 시계가 다릅니다. 시계 설정을 확인하거나 수동 싱크로 보정하세요.',
+ TIMECODE_CONFIRMATION_REQUIRED:'타임코드 정보를 확인하지 않았습니다. 날짜와 공통 시계 정보를 확인하세요.',
+ TIMECODE_RESET:'타임코드가 리셋되었거나 리셋 여부를 확인하지 못했습니다. 정보를 확인하고 수동 싱크로 보정하세요.',
+ TIMECODE_INVALID:'타임코드 형식 또는 프레임 값이 올바르지 않습니다. 소스 타임코드와 FPS를 확인하세요.',
+ TIMECODE_METADATA_CONFLICT:'소스 타임코드 정보가 서로 맞지 않습니다. 소스를 확인하고 수동 싱크로 보정하세요.',
+ TIMECODE_MISSING:'소스에 타임코드 정보가 없습니다. 오디오 싱크 또는 수동 싱크를 사용하세요.',
+ TIMECODE_DATE_AMBIGUOUS:'촬영 날짜와 시간 차이를 확정하지 못했습니다. 날짜를 확인하거나 수동 싱크로 보정하세요.',
+ TIMECODE_AUDIO_CONFLICT:'타임코드와 오디오 싱크 결과가 다릅니다. 소스를 확인하고 수동 싱크로 보정하세요.',
+ MANUAL_SYNC_CONFIRMATION_REQUIRED:'수동 싱크 시간값을 확인하지 않았습니다. 보정값을 확인하세요.',
+ MANUAL_SYNC_INVALID:'수동 싱크 시간값 또는 대응 지점이 올바르지 않습니다. 입력값을 확인하세요.',
+ MANUAL_SYNC_DRIFT:'대응 지점의 시간 차이가 일정하지 않습니다. 앞뒤 지점을 확인하고 수동 싱크로 보정하세요.',
+ SYNC_DRIFT:'녹음 중 시간 차이가 변합니다. 앞뒤 싱크를 확인하고 수동 싱크로 보정하세요.',
+ SYNC_GRAPH_CONFLICT:'소스 간 싱크 결과가 서로 맞지 않습니다. 기준 소스를 확인하고 수동 싱크로 보정하세요.',
+ SYNC_ACCUMULATED_UNCERTAINTY:'여러 소스를 거친 시간 차이의 신뢰도가 낮습니다. 기준 소스와 직접 비교하거나 수동 싱크로 보정하세요.',
+ SYNC_PATH_UNCERTAIN:'기준 소스까지의 싱크 연결을 확정하지 못했습니다. 오디오 채널을 확인하거나 수동 싱크로 보정하세요.',
+ SYNC_UNRESOLVED:'기준 소스와 맞출 구간을 찾지 못했습니다. 오디오 채널을 확인하거나 수동 싱크로 보정하세요.'
+};
+function syncReviewReceipt(result){return {jobId:'job-1',kind:'sync',epoch:0,status:'completed',drained:true,result};}
+test('sync review guidance translates direct timecode manual and audio reasons in both modes without changing result',async()=>{
+ for(const mode of ['separate','mixed'])for(const [code,guide] of Object.entries(syncReviewGuides))for(const field of ['reason','code']){
+  const result={sources:{camera:{status:'accepted',reason:code},mic:{status:'review',[field]:code}},offsets:{camera:'1.23456'},reviews:[]},raw=JSON.stringify(result);
+  const f=await completedSync({mode,request:async path=>path==='/jobs/job-1'?syncReviewReceipt(result):undefined});
+  assert.equal(f.get('sync-result').textContent,'camera.mov · 1.235초\nmic.wav · 확인 필요 · '+guide,mode+' '+code+' '+field);assert.equal(f.evaluate('JSON.stringify(syncResult)'),raw);assert.equal(f.evaluate('syncResultMatches()'),true);assert.equal(f.evaluate('job'),null);
+ }
+});
+test('sync review guidance scopes engine reviews deduplicates in order and keeps unknown codes as text',async()=>{
+ for(const mode of ['separate','mixed']){
+  const result={sources:{camera:{status:'accepted'},mic:{status:'review',reason:'TIMECODE_FPS_MISMATCH',code:'IGNORED_CODE'}},offsets:{camera:0},reviews:[{assetId:'other',code:'TIMECODE_RESET'},{code:'GLOBAL_CODE'},{assetIds:['mic','camera'],code:'SYNC_DRIFT'},{assetId:'mic',code:'TIMECODE_FPS_MISMATCH'},{assetId:'mic',code:'<b>UNKNOWN</b>'},{assetId:'mic',code:'toString'},{assetId:'mic',code:'SYNC_DRIFT'},null,{assetId:'mic',code:42}]},raw=JSON.stringify(result);
+  const f=await completedSync({mode,request:async path=>path==='/jobs/job-1'?syncReviewReceipt(result):undefined});
+  assert.equal(f.get('sync-result').textContent,'camera.mov · 0.000초\nmic.wav · 확인 필요 · '+syncReviewGuides.TIMECODE_FPS_MISMATCH+' · '+syncReviewGuides.SYNC_DRIFT+' · <b>UNKNOWN</b> · toString');assert.equal(f.evaluate('JSON.stringify(syncResult)'),raw);assert.equal(f.get('sync-result').children.length,0);
+  for(const reviews of [undefined,null,{},'bad']){const plain={sources:{camera:{status:'accepted'},mic:{status:'review'}},offsets:{camera:0},reviews};assert.equal(f.evaluate('stagedSyncDisplay('+JSON.stringify(plain)+',["camera","mic"],connected)').split('\n')[1],'mic.wav · 확인 필요 · 싱크 연결을 확인하고 수동 싱크로 보정하세요.');}
+  const engine={sources:{camera:{status:'accepted'},mic:{status:'review'}},offsets:{camera:0},reviews:[{assetId:'mic',code:'TIMECODE_DATE_REQUIRED'}]};assert.equal(f.evaluate('stagedSyncDisplay('+JSON.stringify(engine)+',["camera","mic"],connected)').split('\n')[1],'mic.wav · 확인 필요 · '+syncReviewGuides.TIMECODE_DATE_REQUIRED);
+ }
+});
+test('sync review guidance preserves accepted offset validation status fallback and immediate update under work locks',async()=>{
+ for(const mode of ['separate','mixed']){
+  const result={sources:{camera:{status:'accepted'},mic:{status:'review'}},offsets:{camera:0},reviews:[{assetId:'mic',code:'SYNC_UNRESOLVED'}]},f=await completedSync({mode,request:async path=>path==='/jobs/job-1'?syncReviewReceipt(result):undefined});
+  assert.match(f.get('sync-result').textContent,/기준 소스와 맞출 구간/);const raw=f.evaluate('JSON.stringify(syncResult)'),display=f.get('sync-result').textContent;
+  for(const lock of trackLocks){const locked=await completedSync({mode,request:async path=>path==='/jobs/job-1'?syncReviewReceipt(structuredClone(result)):undefined});const before=locked.evaluate('JSON.stringify(syncResult)'),shown=locked.get('sync-result').textContent;locked.evaluate(lock+';toggle()');for(const field of syncControls(locked)){field.oninput?.();field.onchange?.();}assert.equal(locked.evaluate('JSON.stringify(syncResult)'),before);assert.equal(locked.get('sync-result').textContent,shown);}
+  for(const offset of [null,'',Infinity]){const invalid=structuredClone(result);invalid.offsets.camera=offset;assert.throws(()=>f.evaluate('stagedSyncDisplay('+JSON.stringify(invalid)+',["camera","mic"],connected)'),/싱크 시간/);}
+  assert.equal(f.evaluate('syncReviewReason({reviews:[]},"mic",{status:"future-status"})'),'future-status');
+  f.state.update={updateState:'IDLE',checkState:'AVAILABLE',candidate:{candidateId:'release:hash',manifestDigest:'a'.repeat(64),appVersion:'0.1.1'}};await f.tick();await f.click('update');assert.ok(f.calls.some(v=>v.path==='/updates/start'));assert.equal(f.get('sync').disabled,true);
+ }
+});

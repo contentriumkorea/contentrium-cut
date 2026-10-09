@@ -1013,3 +1013,13 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 빌드 후 최초 고정52개 byte 검사 실패를 기록했다. build_runtime.py의 기본 Windows write_text가 config.json/plugin bundle.json/manifest.json3개를 LF→CRLF로 다시 작성했다. 세 파일 모두 CRLF를 LF로 정규화한 SHA가 최초 고정값과 일치하며 다른49개 physical bytes는 동일하다. 최초 freeze와 차이 JSON·실패 기록을 보존했고, 논리/의미 변경 없이 최종 실제 byte freeze를 별도 cycle39-build-final-source-hashes.json으로 만들었다. 이후 최종 패키지의 설정/소스 raw bytes와 final freeze를 검사한다. 공개 payload를 덮어쓰거나 재빌드하지 않았다.
 
 - 엔진/CCX·Setup 빌드 exit0. [0.1.40 패키지 증거](package-0.1.40-proof.json): ZIP/CCX CRC·경로·크기·비공개 자료 제외·CCX 최종 raw 소스·Silero 해시·frozen runtime29개/Setup26개·진입점2개 소스 일치, 추출 engine runtimeReady=true/0.1.40·Setup help exit0,51.203초. 최종52개 byte freeze 일치 및 신뢰 키 보존을 확인한다. optional/torchcodec 경고를 보존하며 실제 Community-1 품질 증거로 확대하지 않는다. 현재 단계: 기획·설계·구현·전체 회귀·독립 검수·패키지 실행 완료.0.1.40 공개 후 익명 업데이트 발견·서명·실제 다운로드 해시·CURRENT/고정v0.1.1 재검증으로 이어간다. 사용자 설치/활성화 없음.
+
+
+### 공개 결과
+
+- [v0.1.40](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.40): release `407494106`, 제목 `Contentrium CUT`, draft/prerelease 아님. 공개 시각 2026-10-09 13:03:32 KST (`2026-10-09T04:03:32Z`), target/tag commit `0296ccc63b677657fc33cb5ac737ab80bc0acbd2` 확인.
+- [공개 실제 재다운로드](release-0.1.40-proof.json): 익명 제품 경로0.1.39 →0.1.40 AVAILABLE·서명·실제 ZIP/CCX/Setup3개 크기/SHA-256 일치.
+- [현재 버전](release-0.1.40-current-proof.json): 빈 상태0.1.40 CURRENT/후보 없음. 공개 자산5개 ID·크기·digest 및 서명 문서 실제 바이트 일치.
+- [고정 복구 조회](migration-pinned-0.1.1-after-0.1.40-proof.json): latest0.1.40에서도 정확한 서명 v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+- 현재 단계: 기획 → 설계 → 구현 → 검증 →0.1.40 공개 및 공개 재검증 완료. 다음 회차는 heartbeat/초기 연결의 exact scope·오류·후속 단계 수명 설계. actual periodic heartbeat wait에서 credential 교체 뒤 늦은 AUTH_REQUIRED가 새 연결을 reset한 두 모드2/4를 재현했다(cycle39-next-inspect.js/.log). 성공2개는 뒤 refresh가 stopped 표시를 복구해 이 시험의 최종 변화 없음. 실제 host/provider/install0; 새 기획·유효 실패 재현·구현·독립 검수·회귀·패키지/공개 검증을 이어간다. 이번 refresh 승인으로 전체 init/heartbeat 수명·native 호출 취소/rollback을 보장하지 않는다.
+- 활성0.1.0 active/journal/first-install 해시 동일·서명 키 존재·ACTIVE/15분 자동화·이전 공개 파일/설정/실패 증거 보존. 컴퓨터유즈·브라우저·Premiere 조작·재설치·제공자 접근 없음. 실제 UXP/Premiere 편집·설치 전환·Community-1 품질 미검증. 원본 refresh6/8·독립 original RED4/4·실제 reconnect ABA 결함을 해결하고 Node473/Python496/독립540/패널364 통과. 초기 전체468/472의 fixture/계약4건과472/473의 boolean fixture1건, 독립363/364의 같은 fixture 실패를 구별하여 바로잡고 증거 보존. Scoped C/I/M0/0/0. 기존 간헐 실패는 이번 회귀에서 재현되지 않았고 원인은 미확정이다.

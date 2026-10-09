@@ -2587,3 +2587,13 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - root 리뷰수집 helper native1: git status 일반 LF출력을 reviewer의 --porcelain -z NUL원문과 비교한 도우미 오류. HEAD와문자열내용불변 확인·수집명령에 -z만추가→collector native0. 원본수집source/tool출력/실패 JSON보존·제품/시험변경0·시험재실행0.
 
 - [0.1.97 패키지 검증](package-0.1.97-proof.json): runtime/CCX native6562/exit0·Setup native64408/exit0·추출 proof native92970/exit0·53.187초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.97·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.
+
+
+### 공개 결과
+
+- [v0.1.97](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.97): release408422913·제목 Contentrium CUT·공개2026-10-09T23:30:12Z·target/tag 3b792d49cdef389b0d7fddd16ed3b85fe8d6c3dc·draft/prerelease 아님. [실제 재다운로드](release-0.1.97-proof.json): 익명0.1.96→0.1.97 AVAILABLE·서명·ZIP/CCX/Setup3개 실제 size/SHA 일치. [현재 조회](release-0.1.97-current-proof.json): CURRENT/후보 없음·5자산 ID/size/digest/서명 바이트 일치. [고정 복구](migration-pinned-0.1.1-after-0.1.97-proof.json): latest0.1.97에도 서명v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+- 기획→설계→구현→검증→0.1.97 공개/재검증 완료. 정식 Node741/Python496·독립 검수는 별도 집계. 신규4 RED 안내부재/native1→첫GREEN3pass1helperfail/native1→실패1helperfail/native1→실패1교정pass/native0·신규4고유/6GREEN raw·helper2·통과재실행0·관련52/52. 실제 Premiere/UXP 화면·편집·스크린리더·기존0.1.0 설치 전환·Community-1 품질 미검증. 사용자 설치/활성화·컴퓨터유즈/브라우저/Premiere 조작·terms/결제/token/미디어 외부 업로드 없음.
+
+- 종료 근거: 0.1.97 공개 업로드 native8133/exit0·실제3다운로드 native21386/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native6562/exit0·Setup native64408/exit0·추출 패키지 native92970/exit0/53.187초. 공개895파일 비공개패턴검사·신뢰키불변·52raw 동결 일치·설치0.1.0 hash동일·서명키 존재만확인·자동화ACTIVE15분·자체CLI0. Node741/Python496 정식 통과·독립106고유/109raw는 별도 집계.
+- 실패 원인/보존: 신규4 RED 안내부재/native1·첫GREEN3pass/1helperfail/native1(동일0/300 원문은 기존 fill no-op/undo기록없음인데기대한오류)·실패1 재검증helperfail/native1(반복mic end200을110으로추정)·해당신규표만교정→실패1pass/native0·통과재실행0·제품GREEN실패0·기존시험본문불변·신규4고유/6GREEN raw/helper2. 독립 helper실패3는 원본보존/실패만교정·미해결0. optional/torchcodec 경고 원본 보존·Community품질 근거 아님.
+- 이어갈 단계: actual-main 원문7/19를0/300으로채운뒤 원문 안내와undo는사용가능하고오류경고는없지만 되돌릴 유효구간12프레임/초 길이를 클릭전에 보여주는 별도안내 없음·nextprobe native0. 다음회차 유효 되돌리기 대상 길이 사전안내를 기획→설계·정확원문복원보존/유리fps와BigInt반올림/무효·미사용숨김/잠금과identity/행별독립/읽기전용/반복live쓰기0/update즉시차단 수용조건→실패재현부터 진행. 이번제품동결 뒤 추가제품변경 없음. 실제 Premiere/UXP 화면·편집·스크린리더·기존0.1.0 설치 전환·Community-1 실제 품질 미검증. CUA/browser/Premiere 실행조작종료/사용자 설치활성화/terms/결제/token/media 외부 업로드 없음.

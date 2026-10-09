@@ -924,3 +924,13 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 다음 후보 actual-main 두 모드×update/cancel×싱크 poll running/error8/8에서 늦은 싱크 진행/오류 안내가 업데이트/중단 안내를 덮는 문제를 재현했다(cycle36-next-inspect.js/.log). 업데이트 start각1회(총4), 실제 provider/host/install 호출0. 다음 회차는 sync poll의 current ownership/progress/error/terminal·원본 싱크 설정·후속 result/native snapshot scope를 설계한다. 이번 model poll 승인은 sync/example/전체 refresh lifetime 보호를 뜻하지 않는다. 최초 private inspect helper 생성의 substring 찾기 오류는 제품 실패와 구별하며 원본 로그를 보존했다.
 
 - 엔진/CCX·Setup 빌드 exit0. 빌드 후 고정 입력52개 해시 동일·공개 파일629개 패턴 검사·신뢰 키 보존 통과. [0.1.37 패키지 증거](package-0.1.37-proof.json): ZIP/CCX CRC·경로·크기·비공개 자료 제외·CCX 최종 소스·Silero 해시·frozen engine29개/Setup26개 모듈·진입점2개 소스 일치, 추출 engine runtimeReady=true/0.1.37,Setup help exit0,67.250초. 선택적 모듈/torchcodec 경고를 보존하며 Community-1 품질 통과로 확대하지 않는다. 현재 단계: 기획·설계·구현·독립 검수·전체 회귀·패키지 실행 완료.0.1.37 공개와 익명 발견/서명/실제 다운로드 해시·고정v0.1.1 확인으로 진행한다.
+
+
+### 공개 결과
+
+- [v0.1.37](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.37): release `407439405`, 제목 `Contentrium CUT`, draft/prerelease 아님. 공개 시각 2026-10-09 11:40:09 KST (`2026-10-09T02:40:09Z`), target/tag commit `0c2b9595574b135917211f4c9f32c69b0038046e`를 확인했다.
+- [공개 실제 재다운로드](release-0.1.37-proof.json): 익명 제품 경로에서0.1.36 →0.1.37 AVAILABLE. 서명과 실제 ZIP/CCX/Setup3개의 크기·SHA-256 일치.
+- [현재 버전](release-0.1.37-current-proof.json): 빈 상태에서0.1.37 CURRENT/후보 없음. 공개 자산5개 ID·크기·digest와 서명 문서 실제 바이트가 로컬과 일치.
+- [고정 복구 조회](migration-pinned-0.1.1-after-0.1.37-proof.json): latest0.1.37에서도 정확한 서명 v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 설치 전환은 하지 않았다.
+- 현재 단계: 기획 → 설계 → 구현 → 검증 →0.1.37 공개 및 공개 재검증 완료. 다음 회차는 sync poll의 current ownership/progress/error/terminal 및 원본 싱크 설정·후속 result/native snapshot scope를 설계한다. 두 모드×update/cancel×싱크 running/error8/8에서 이전 응답이 새 안내를 덮는 문제를 재현했다(cycle36-next-inspect.js/.log). update start각1회, 실제 provider/host/install0. 의미 있는 수정·설계·독립 검수·회귀·패키지/공개 검증을 이어가며 버전만 올리지 않는다. 이번 model poll 승인으로 sync/example/전체 refresh lifetime 보호를 주장하지 않는다.
+- 활성 설치0.1.0의 active/journal/first-install 해시는 배포 전후 동일함을 읽기 전용 확인했다. 서명 키 존재·기존 ACTIVE/15분 자동화·이전 공개 파일·설정·실패 증거를 보존했다. 컴퓨터유즈·브라우저·Premiere 조작·재설치·제공자 접근 없음. 실제 UXP/Premiere 편집·설치 전환·Community-1 품질 미검증. 늦은 상태 안내·malformed/transport/drain·중복 query RED와 독립 Important1 interrupted 문제를 해결하고 실패 증거를 보존했다. 최초 전체 회귀는 추가 interrupted 교정 전 결과로 구별하고 최종 Node431/Python494를 재검증했다. Scoped 잔여 C/I/M0/0/0. 기존 간헐 실패는 이번 회귀에서 재현되지 않았고 원인은 미확정이다. 이미 서버에 제출한 설치 작업을 취소/rollback했다고 주장하지 않는다.

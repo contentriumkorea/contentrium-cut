@@ -2199,3 +2199,23 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 종료근거: 업로드 native8647/exit0·실제3다운로드 native42982/exit0·CURRENT/5자산/고정v0.1.1 closeout 즉시exit0/session없음. package native60788/exit0·55.704초·runtime53390/Setup39847 모두0. 공개839파일/비공개패턴·신뢰키불변·52raw일치·설치0.1.0 hash동일·서명키존재만확인·자동화ACTIVE15분·helper종료뒤순차자체CLI0. 정식Node682/Python496 최초각1회allpass·독립559+189고유(actual-main186/static3/raw197)별도·C/I/M/미해결0·통과fixture/native재실행0.
 - 실패원인보존: 신규3 RED/native1·178.7601ms은basename-only label·구분맥락부재. 관련14/14 native0·1050.783ms·기존test기대변경없음. 독립fixture8은기존disconnected audioGuide 빈문자열동작에대한기대오류·failed8만정정통과·labelzero-writes2 신규완료·제품/test수정0. 원본script/log/native/seal 보존. rootprobe/보고서검증/빌드/패키지/공개 검증 실패없음. optional/torchcodec 경고보존·Community품질근거아님.
 - 이어갈 단계: actual-main 양mode×같은audio트랙3clips에서파일label은폴더로구분되나두invalid채널오류문구는같은track명만표시해동일하며source filename없음. 다음회차오류요약에동일표시파일맥락을연결하는기획→설계·priority/aria/raw/settings/hash/선택/acceptedanalysisplan/현재rowguards/76locks/60late/즉시update 보존부터검증. 이번동결뒤제품추가변경없음·추가probe/독립은정식집계가산없음. 실제Premiere/UXP 화면/편집·스크린리더·사용자0.1.0 업데이트설치전환·Community-1실제품질미검증. 컴퓨터유즈/browser/Premiere실행조작종료/사용자재설치활성화/terms/결제/token/media외부업로드없음.
+
+
+## 83회차: 마이크·단독 발화 오류의 파일 맥락 표시 — 0.1.84
+
+- 시작 cleanHEAD96097d61e247dfbc89d4122c331502b248110368/latestv0.1.83/release408249088/제목Contentrium CUT/target3529cbb9794093aabc63d8481eeb3666b21e34c6·자체진행CLI0. 직전actual-main 동일audio트랙3clips에서서로다른파일의invalid채널오류가같음.
+- 기획/설계: microphoneRows/calibrationRows의기존error title에현재표시mic파일명(최소폴더구분)을이어붙임. 기존track명/번호유지·같은error문구/priority/aria/텍스트쓰기최적화유지. 별도helper/DOM/CSS/API없음. source/raw/settings/inputhash/selection/analysisplan/connected-currentrowguards/즉시update 불변. 동일asset복수clip는기존같은이름유지(클립시간구분은후속후보). 전체path불필요노출없음.
+- 수용: 양mode×같은track동명이소스의채널/스트림/화자·separate단독발화오류plain-text파일맥락·미선택숨김/오류priority/설명IDs/0-0/복원/raw/hash/acceptedidentity/idempotence/worklocks/stalecal/update. 신규3RED→관련→정식각1회→독립검수→패키지실행→공개AVAILABLE/CURRENT/서명/실제3download/고정v0.1.1. 사용자자율승인이회차별설계대기보다우선. 원본/오디오/별도자막/최상단개별컷보존·로고graphics관여없음. CUA/browser/Premiere실행조작종료/사용자재설치활성화/terms/결제/token/media외부업로드없음. 실제Premiere/UXP/install/스크린리더/Community1품질미검증.
+
+- 신규3 RED는파일맥락부재2fail/보존회귀1pass/native1·원본log보존. 기존row error title2곳에표시file이름연결·metadata5 0.1.84·기존시험기대변경없음. 첫2실패와기존관련만재검증하며초기통과1은정식시험에서확인.
+
+- 신규3 RED/native1·370.3414ms(2파일맥락부재fail/1보존회귀pass). 관련최초12중11pass/1fixturefail native1·940.2497ms은새시험의channel aria-describedby 기대에서기존selectionHint ID누락. 신규시험기대만정정·제품/기존시험수정없음·실패1만재검증1/1 native0·151.2463ms·통과11/신규초기pass1재실행없음. 신규/관련13고유최종통과·원본test/log/native보존. 52raw동결후정식각1회/독립/패키지진행.
+
+- 최종정식 Node685/685/native98764/exit0·76140.642ms·fail/cancel/skip/todo0; Python496/496/native28435/exit0·93.484초·fail/error/skip/excluded0. 신규3 RED/native1(2fail/1pass)·관련12중11pass/1fixturefail뒤failed1재검증통과·13고유최종통과 보존·기존test기대변경없음. 정식시험각1회·추가matrix/관련재검증/중복import를합산하지않음. optional/torchcodec경고보존·Community-1품질근거아님.
+
+- 다음개선후보actual-main 양mode×같은audio트랙3순차clips native0: 동일asset파일의서로다른시작ticks 두클립은이번파일맥락추가뒤에도같은오류문구·같은label. raw불변·동결뒤제품추가변경없음·정식집계가산없음. 다음회차해당클립의시퀀스위치안내기획→설계·프레임정밀도/짧은문구/privacy/errorpriority/aria/settings/hash/acceptedresult/update보존 검증부터진행. 실제hostQA아님.
+
+- 독립최종 C/I/M/미해결0. panel562/562 정확히1회 PID153056/native0/wall89907ms/TAP89838.2229ms. 추가193고유=actual-main190/static3·raw195·최종193pass·assertion36032(전체attempt36035)·passed/native재실행0·정식685/496과합산없음. 최초193/191pass/2staticfixturefail PID173420/native1·1705ms, failed2만 PID166412/native0·409ms. static비교CRLF/LF 차이로새fixture기대만normalize후재검증·제품/test수정0·29seal파일hash root재확인.
+- 독립양mode/3-4audio·같은track28이름/error본문/plainp·기존helper/최소folder·오류priority/선택제외/aria3설명·rawrestore/hash/freshnonnullacceptedidentity(loadpolicy별도)/idempotence·76locks/60late/2actualsignedqueue 통과. 소스10/HEAD/index/status 불변·root52/52·metadata5parsed version-only·VM/timer/peer/ownprocess0. root보고서reader의이전schema coverage KeyError와cp949출력UnicodeEncodeError2회/빈findings배열을숫자로기대한reader assertion은원본tooloutput보존·현재schema/ASCII출력정정·제품/시험재실행없음. 실제host/install/screenreader/Community/package/public은독립범위밖.
+
+- [0.1.84 패키지 검증](package-0.1.84-proof.json): runtime/CCX native2153/exit0·Setup native62939/exit0·추출 proof native18777/exit0·52.234초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.84·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.

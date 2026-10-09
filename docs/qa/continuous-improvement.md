@@ -1980,3 +1980,21 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 종료근거: 업로드 native9704/exit0·실제3다운로드 native73414/exit0·CURRENT/5자산/고정v0.1.1 closeout 즉시exit0/session없음. package native66078/exit0·55.016초·runtime16852/Setup79632 모두0. 공개811파일/비공개패턴·신뢰키불변·52raw 일치·설치0.1.0 hash동일·서명키존재만확인·자동화ACTIVE15분·helper종료후순차자체CLI0. 정식Node660/Python496·독립537+188고유(actual-main186/static2/raw201) 별도집계·C/I/M/미해결0.
 - 실패근거보존: 신규3 RED/native1 제품안내부재→관련10/10 native0. root package record helper 기본cp949 읽기오류1과빌드전미존재ZIP readonly조회1은제품0사례/tool원본보존·제품/native시험재실행없음. 독립TEMP작성오류13(슬래시경로6/기존clock-date trim기대6/CRLF-LF metadata비교1)과잘못hash경로readonly조회1 보존·failed13만정정검증·passed/native재실행0. optional/torchcodec 경고보존·Community-1품질근거아님.
 - 이어갈 단계: actual-main3source 양모드에서제외된기준소스 경고명/해결법은정상이나 sync-reference aria-invalid 부재를확인한2행증거를바탕으로기준선택의오류상태전달을기획→설계. 입력우선순위/count/coexistence·raw설정/hash/result·18잠금/연결준비·즉시update/late응답을유지하는수용조건부터진행. 이번동결뒤제품추가변경없음. 실제Premiere/UXP 편집·사용자설치전환·screenreader·Community-1 품질은미검증. 컴퓨터유즈/브라우저/Premiere조작·사용자재설치/활성화·terms/결제/token/media외부업로드 없음.
+
+
+## 76회차: 싱크 기준 선택 오류 상태 전달 — 0.1.77
+
+- 시작: clean HEADe5729fd61de8be7697ed4f72dd1bdcb022fcc5af·latest v0.1.76/release408147479/제목Contentrium CUT/target1236b0b08097626c0582cf3dfd790fb53cdacfd9·자체진행CLI0. 지난actual-main3source 양모드2행에서 제외기준의이름/해결안내는정상이나기준dropdown aria-invalid 부재를확인.
+- 기획/설계: 연결되고cached syncRows가존재하면 현재기준이선택된행중없는경우 sync-reference aria-invalid=true, 선택된경우false. 연결없음/행없음은false. unknown/blank/제외기준도true이며 최소2개/stream/channel 경고우선순위와별도로컨트롤자체유효성을전달한다. selected기준은다른소스오류/최소개수경고만으로invalid가되지않는다. 기존error문구·role=status/aria-live=polite/aria-describedby 유지. attr값같으면다시쓰지않음. 공통cached referenceField/selected여부만사용·snapshot/이름재계산없음. class/focus/설정/raw/options/hash/results/request/admission/update변경없음.
+- 수용: actual-main3source 양모드×audio/manual/timecode의초기유효/제외/기준교체/재선택·unknown/blank·minimum/stream/channel우선순위/연결없음/행없음. 설정restore sync범위 exact raw/hash·attr idempotence·stale/replacement·실제workLocked18원인+연결준비1·즉시update/held late성공에러. 신규3 RED→관련→정식 Node/Python각1회→독립검수→추출package실행→공개AVAILABLE/CURRENT/서명/3download/고정v0.1.1. 동일범위자율승인으로설계대기없음. 실제Premiere/UXP 편집·screenreader·사용자설치전환·Community-1품질미검증. CUA/browser/Premiere/사용자설치활성화·terms/결제/token/media외부업로드없음.
+
+- 신규3 RED/native1·156.3505ms 모두실제기준컨트롤 aria-invalid 부재로실패. cached referenceField/selected 여부와 idempotent attr setter만추가·기존issue조건에서동일selected여부재사용. 관련12/12 native0·807.9319ms·fail/cancel/skip/todo0·기존test기대변경없음. metadata5 0.1.77·52raw동결·공개811패턴/신뢰키불변확인후정식/독립/패키지로진행.
+
+- 다음개선후보 actual-main 양모드×audio/timecode4행 native0: 현재기준은dropdown에서유효하게선택되고aria-invalid=false이나source row제목은displayName만보여기준소스인지구분문구가없음. raw sync설정/hash불변·동결후제품추가변경없음·정식집계가산없음. 다음회차 소스목록내기준표시/기준교체/제외/잠금/연결준비동작수용부터기획→설계. 실제Premiere나시각QA 아닌metadata/HTTP/Adobe/timer doubles근거.
+
+- 최종정식 Node663/663/native7531/exit0·86992.5225ms·fail/cancel/skip/todo0; Python496/496/native63716/exit0·101.375초·fail/error/skip/excluded0. 신규3 RED/native1·관련12/12 native0 보존·기존test기대변경없음. 정식시험각1회·추가matrix/관련재검증/중복import를합산하지않음. optional/torchcodec경고보존·Community-1품질근거아님.
+
+- 독립최종 C/I/M/미해결0. panel540/540 정확히1회 PID105140/native0/wall62079ms/TAP62021.6774ms. 추가216고유/raw216=actual-main214/static2·PID121952/native0·1517ms·fail/rerun0·정식663/496과합산없음. 모든raw/script/name/exit 보존. 18 workLocked원인×bothmodes×유효/보관invalid72+연결준비1조건4 별도·held save/load/submit/query/snapshot×update/cancel/replacement×성공/에러×bothmodes60·실제connection signed queue/continuation2.
+- 독립10raw/HEAD/indexdigest/scopedstatus 동일·최종52/52. VM214/timer214/timeout164 정리·held/interval잔여0·두childreaped. 유효3/4source/literal markup/모든method/unknown/blank/emptyrows/독립errorpriority/rawsync restore/attr idempotence/stale/result/update 검증. 실제Premiere/스크린리더/사용자설치/Community/package/public은독립범위밖.
+
+- [0.1.77 패키지 검증](package-0.1.77-proof.json): runtime/CCX native5694/exit0·Setup native23775/exit0·추출 proof native8795/exit0·57.610초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.77·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.

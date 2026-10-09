@@ -82,6 +82,85 @@ async function heldManualUpdate(stage='/updates/check',mode='separate'){
   return {f,run,resume:value=>resume(value===undefined?(stage==='/state'?structuredClone(f.state):{}):value),reject:code=>reject(Object.assign(new Error('private old update detail'),{code}))};
 }
 
+async function recoveryPanel(extra={},mode='separate'){
+  const f=await updatePanel(extra);if(mode==='mixed')await f.click('mode-mixed');
+  f.state.update.updateState='RECOVERY_REQUIRED';f.state.gateOpen=false;f.state.stopEpoch=0;await f.evaluate('refresh()');return f;
+}
+async function heldUpdateRecovery(stage='/updates/recover',mode='separate'){
+  let armed=false,resume,reject;
+  const f=await recoveryPanel({request:path=>armed&&!resume&&path===stage?new Promise((a,b)=>{resume=a;reject=b;}):undefined},mode);
+  armed=true;const run=f.click('recover-update');for(let i=0;i<100&&!resume;i++)await Promise.resolve();assert.equal(typeof resume,'function');
+  return {f,run,resume:value=>resume(value===undefined?(stage==='/state'?structuredClone(f.state):{}):value),reject:code=>reject(Object.assign(new Error('private obsolete recovery detail'),{code}))};
+}
+
+test('update recovery disables duplicate recovery and new editing actions while preserving progress',async()=>{
+  for(const mode of ['separate','mixed']){
+    const {f,run,resume}=await heldUpdateRecovery('/updates/recover',mode);assert.equal(f.get('recover-update').disabled,true);assert.equal(f.get('recover-update').getAttribute('aria-busy'),'true');assert.match(f.get('recover-update').textContent,/복구.*중/);assert.match(f.get('action-readiness').textContent,/복구.*확인/);
+    const calls=f.calls.length;await f.click('recover-update');await f.click('check-update');await f.click('analyze');await f.click('recover-apply');assert.equal(f.calls.length,calls);
+    f.state.gateOpen=true;f.state.stopEpoch=null;await f.tick();assert.equal(f.get('analyze').disabled,true);assert.equal(f.get('check-update').disabled,true);assert.equal(f.get('recover-apply').disabled,true);assert.match(f.get('action-readiness').textContent,/설치 복구 상태/);
+    resume();await run;assert.equal(f.get('recover-update').getAttribute('aria-busy'),'false');assert.equal(f.get('recover-update').textContent,'설치 복구');
+  }
+});
+
+test('update recovery discards stopped and superseded scopes at recover and state waits',async()=>{
+  const changes=['stopRevision++','credentials={...credentials}','state.epoch++','state.gateOpen=true','state.stopEpoch=null','state.update.updateEpoch=2','state.update.updateState="DOWNLOADING"','updateIntent={inFlight:true}','mode="mixed"','connected={...connected}','connected.snapshot.snapshotHash="new"','analysisState={revision:5}','job={jobId:"new",kind:"analysis"}','validationRevision++','panelContextConflict=true'];
+  for(const stage of ['/updates/recover','/state'])for(const change of changes)for(const outcome of ['success','AUTH_REQUIRED','PANEL_CONTEXT_CONFLICT']){
+    const {f,run,resume,reject}=await heldUpdateRecovery(stage);f.evaluate(change+';say("New recovery scope guidance")');const credential=f.evaluate('credentials'),status=f.get('connection').textContent,resets=f.resetCalls,states=f.calls.filter(c=>c.path==='/state').length;
+    if(outcome==='success')resume();else reject(outcome);await run;
+    assert.equal(f.get('status').textContent,'New recovery scope guidance',stage+change);assert.equal(f.evaluate('credentials'),credential);assert.equal(f.get('connection').textContent,status);assert.equal(f.resetCalls,resets);assert.equal(f.calls.filter(c=>c.path==='/state').length,states);
+  }
+});
+
+test('update recovery current errors preserve newer guidance and authentication safety',async()=>{
+  for(const stage of ['/updates/recover','/state'])for(const code of ['AUTH_REQUIRED','SESSION_EXPIRED','PANEL_CONTEXT_CONFLICT','CURRENT_RECOVERY_FAILURE'])for(const newer of [false,true]){
+    const {f,run,reject}=await heldUpdateRecovery(stage);if(newer)f.evaluate('say("Owned newer recovery guide")');const resets=f.resetCalls;reject(code);await run;
+    if(newer)assert.equal(f.get('status').textContent,'Owned newer recovery guide');else assert.doesNotMatch(f.get('status').textContent,/private obsolete recovery detail/);
+    if(['AUTH_REQUIRED','SESSION_EXPIRED'].includes(code)){assert.equal(f.evaluate('credentials'),null);assert.equal(f.resetCalls,resets+1);}
+    else if(code==='PANEL_CONTEXT_CONFLICT'){assert.equal(f.evaluate('credentials'),null);assert.equal(f.evaluate('panelContextConflict'),true);}
+    else assert.notEqual(f.evaluate('credentials'),null);
+    assert.equal(f.evaluate('stopped'),true);assert.equal(f.get('recover-update').getAttribute('aria-busy'),'false');
+  }
+});
+
+test('update recovery admission blocks busy unavailable and nonrecovery states but accepts stopped recovery',async()=>{
+  const changes=['credentials=null','initializing=true','initializationIncomplete=true','state.update.updateState="IDLE"','applying=true','batchRunning=true','previewPlaying=true','previewBusy=1','job={jobId:"busy",kind:"analysis"}','validationCount=1','pending=true','updateIntent={inFlight:true}'];
+  for(const change of changes){const f=await recoveryPanel();f.evaluate(change+';toggle()');const count=f.calls.filter(c=>c.path==='/updates/recover').length;assert.equal(f.get('recover-update').disabled,true,change);await f.click('recover-update');assert.equal(f.calls.filter(c=>c.path==='/updates/recover').length,count,change);}
+  for(const phase of ['RECOVERY_REQUIRED','FAILED']){const f=await recoveryPanel();f.state.update.updateState=phase;await f.evaluate('refresh()');assert.equal(f.get('recover-update').disabled,false);await f.click('recover-update');assert.equal(f.calls.filter(c=>c.path==='/updates/recover').length,1);}
+});
+
+test('update recovery cleanup keeps replacement owner progress and guidance',async()=>{
+  for(const stage of ['/updates/recover','/state'])for(const outcome of ['success','AUTH_REQUIRED']){
+    const {f,run,resume,reject}=await heldUpdateRecovery(stage),replacement=f.evaluate('updateRecoveryRequest={};say("Replacement recovery guidance");toggle();updateRecoveryRequest');
+    const count=f.calls.filter(c=>c.path==='/state').length;if(outcome==='success')resume();else reject(outcome);await run;
+    assert.equal(f.evaluate('updateRecoveryRequest'),replacement);assert.equal(f.get('status').textContent,'Replacement recovery guidance');assert.equal(f.get('recover-update').disabled,true);assert.equal(f.get('recover-update').getAttribute('aria-busy'),'true');assert.equal(f.calls.filter(c=>c.path==='/state').length,count);
+  }
+});
+
+test('update recovery accepts verified terminal state and retains incomplete recovery lock',async()=>{
+  for(const mode of ['separate','mixed'])for(const phase of ['RECOVERY_REQUIRED','ROLLED_BACK','FAILED_BEFORE_REPLACE']){
+    const {f,run,resume}=await heldUpdateRecovery('/state',mode),receipt=structuredClone(f.state);receipt.update.updateState=phase;receipt.update.updateEpoch=1;
+    if(phase!=='RECOVERY_REQUIRED'){receipt.gateOpen=true;receipt.stopEpoch=null;receipt.epoch=1;}
+    resume(receipt);await run;assert.equal(f.evaluate('state.update.updateState'),phase);assert.equal(f.get('recover-update').getAttribute('aria-busy'),'false');assert.equal(f.get('recover-update').disabled,phase!=='RECOVERY_REQUIRED');assert.equal(f.get('analyze').disabled,phase==='RECOVERY_REQUIRED');
+    if(phase==='RECOVERY_REQUIRED')assert.doesNotMatch(f.get('status').textContent,/복구를 완료|복구가 완료|복구 완료/);
+  }
+});
+
+test('update recovery allows equal state ticks and preserves immediate stop and update admission',async()=>{
+  for(const action of ['cancel','update'])for(const outcome of ['success','AUTH_REQUIRED'])for(const mode of ['separate','mixed']){
+    const {f,run,resume,reject}=await heldUpdateRecovery('/updates/recover',mode);await f.tick();await f.tick();
+    if(action==='update'){f.state.gateOpen=true;f.state.stopEpoch=null;f.state.update.updateState='ROLLED_BACK';await f.evaluate('refresh()');assert.equal(f.get('update').disabled,false);}
+    await f.click(action);const guide=f.get('status').textContent;assert.equal(f.evaluate('stopped'),true);if(action==='update')assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);
+    if(outcome==='success')resume();else reject(outcome);await run;assert.equal(f.get('status').textContent,guide);assert.equal(f.evaluate('stopped'),true);
+  }
+});
+
+test('update recovery keeps automatic settings writes stopped even if periodic state opens the gate',async()=>{
+  const {f,run,resume}=await heldUpdateRecovery();f.state.gateOpen=true;f.state.stopEpoch=null;await f.tick();
+  const before=JSON.stringify([...f.saved.rows]);f.evaluate('settingsTimer=null;scheduleSettings()');assert.equal(f.evaluate('settingsTimer'),null);
+  await f.evaluate('saveSettings()');assert.equal(JSON.stringify([...f.saved.rows]),before);assert.equal(f.get('cancel').disabled,false);
+  resume();await run;
+});
+
 test('manual update check preserves stop and update guidance at check and state waits',async()=>{
   for(const mode of ['separate','mixed'])for(const stage of ['/updates/check','/state'])for(const action of ['cancel','update'])for(const outcome of ['success','AUTH_REQUIRED','PANEL_CONTEXT_CONFLICT','OLD_UPDATE_FAILURE']){
     const {f,run,resume,reject}=await heldManualUpdate(stage,mode);await f.click(action);

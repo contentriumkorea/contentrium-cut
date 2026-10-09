@@ -15,7 +15,7 @@ let microphoneSelectionCustomized=false;
 let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;let projectRead=null,nativePreparation=null,editingSubmission=null,correctionRequest=null,settingsRestore=null,settingsSave=null;
 let settingsWriteTail=Promise.resolve();
 let modelRequest=null,modelInputRevision=0,modelPoll=null;
-let cacheRequest=null,syncPoll=null,examplePoll=null,refreshRequest=null,updateCheckRequest=null;
+let cacheRequest=null,syncPoll=null,examplePoll=null,refreshRequest=null,updateCheckRequest=null,updateRecoveryRequest=null;
 let previewBusy=0,previewGeneration=0;
 let resourceRequest=null,resourceInputRevision=0,resourceViewRevision=0,resourceInputDirty=false,stopRevision=0;
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
@@ -72,7 +72,7 @@ function options(select,values,empty){select.innerHTML='';if(empty){const e=elem
 function label(text,input){const e=element('label',text);e.appendChild(input);return e;}
 function basename(path){return path.split(/[\\/]/).pop();}
 function settingsKey(){return 'cut-settings-'+ContentriumHost.hash({projectRef:connected.snapshot.projectRef,sequenceRef:connected.snapshot.sequenceRef});}
-function settingsWriteReady(){return !!connected&&!!credentials&&!!state?.gateOpen&&!stopped&&!updateIntent&&state?.compatible!==false&&!panelContextConflict&&!localEditPending&&!state?.applyRecovery?.blocked&&!binding&&!projectRead&&!applying&&!batchRunning&&(state?.stopEpoch===null||state?.stopEpoch===undefined);}
+function settingsWriteReady(){return !!connected&&!!credentials&&!!state?.gateOpen&&!stopped&&!updateIntent&&!updateRecoveryRequest&&state?.compatible!==false&&!panelContextConflict&&!localEditPending&&!state?.applyRecovery?.blocked&&!binding&&!projectRead&&!applying&&!batchRunning&&(state?.stopEpoch===null||state?.stopEpoch===undefined);}
 function scheduleSettings(){
   if(settingsTimer){clearTimeout(settingsTimer);settingsTimer=null;}
   if(!settingsWriteReady())return;
@@ -185,7 +185,7 @@ async function loadSavedSettings(){
   }catch(e){if(current())error(e);}finally{if(settingsRestore===token)settingsRestore=null;}
 }
 async function api(path,body,method){return connection.request(path,body,method);}
-function admitted(){if(initializing||initializationIncomplete)throw new Error('편집 연결 확인을 마친 뒤 다시 실행하세요.');if(!credentials||!connected)throw new Error('Premiere에서 편집할 시퀀스를 열어 주세요.');if(!state?.gateOpen||stopped)throw new Error('현재 작업 상태를 확인한 뒤 다시 실행하세요.');if(localEditPending||state?.applyRecovery?.blocked)throw Object.assign(new Error('APPLY_RECOVERY_REQUIRED'),{code:'APPLY_RECOVERY_REQUIRED'});}
+function admitted(){if(updateRecoveryRequest)throw new Error('설치 복구 상태를 확인한 뒤 다시 실행하세요.');if(initializing||initializationIncomplete)throw new Error('편집 연결 확인을 마친 뒤 다시 실행하세요.');if(!credentials||!connected)throw new Error('Premiere에서 편집할 시퀀스를 열어 주세요.');if(!state?.gateOpen||stopped)throw new Error('현재 작업 상태를 확인한 뒤 다시 실행하세요.');if(localEditPending||state?.applyRecovery?.blocked)throw Object.assign(new Error('APPLY_RECOVERY_REQUIRED'),{code:'APPLY_RECOVERY_REQUIRED'});}
 function missingModelGuidance(){
   if(state?.models?.[mode==='separate'?'silero':'community-1']?.status==='error')return mode==='separate'?'발화 모델 정보를 확인하지 못했습니다. Contentrium CUT Setup으로 설치를 복구하세요.':'혼합 녹음 모델 정보를 확인하지 못했습니다. 설정에서 모델을 다시 설치하세요.';
   return mode==='separate'?'발화 모델을 찾지 못했습니다. Contentrium CUT Setup으로 설치를 복구하세요.':'설정에서 혼합 녹음 모델을 준비하세요.';
@@ -200,6 +200,7 @@ function modelInstallResult(status,code){
   const text=modelInstallMessage(status,code);$('model-install-status').textContent=text;return text;
 }
 function actionGuidance(){
+  if(updateRecoveryRequest)return '설치 복구 상태를 확인하고 있습니다. 완료 후 현재 버전과 연결 상태를 확인하세요.';
   const update=state?.update?.updateState;
   if(update==='WAITING_HOST_EXIT')return '프로젝트를 저장하고 Premiere를 정상 종료하면 업데이트가 계속됩니다.';
   if(['RECOVERY_REQUIRED','FAILED'].includes(update))return '설정에서 업데이트 복구 상태를 확인하세요. 새 편집은 차단되어 있습니다.';
@@ -230,7 +231,7 @@ function actionGuidance(){
   if(step==='review')return plan?'전체 편집안을 검토한 뒤 Premiere에 적용하세요.':'컷 편집 단계에서 편집안을 먼저 만드세요.';
   return step==='settings'?'모델·분석 자원·업데이트 설정을 확인하세요.':'카메라와 마이크를 지정한 뒤 화자 단계로 이동하세요.';
 }
-function inputLocked(){return initializing||initializationIncomplete||binding||pending||applying||!!job||previewBusy>0||validationCount>0||stopped||!credentials||!state?.gateOpen;}
+function inputLocked(){return !!updateRecoveryRequest||initializing||initializationIncomplete||binding||pending||applying||!!job||previewBusy>0||validationCount>0||stopped||!credentials||!state?.gateOpen;}
 function workLocked(){return inputLocked()||state?.compatible===false||!!updateIntent||localEditPending||!!state?.applyRecovery?.blocked;}
 function toggle(){
   if(syncJob&&syncResult&&!syncResultMatches())invalidateSyncResult();
@@ -260,18 +261,19 @@ function toggle(){
   $('add-override').disabled=locked||!connected;for(const row of overrideRows)row.remove.disabled=locked||!connected;
   for(const row of overrideRows)for(const field of [row.first,row.last,row.camera])field.disabled=locked||!connected;
   $('override-filter').disabled=locked||!overrideRows.some(r=>r.error.textContent);
-  $('create-input').disabled=locked||!projectSelection||!inputCapability;$('cancel').disabled=!initializing&&!job&&!applying&&!previewPlaying&&!previewBusy&&!validationCount&&(!modelRequest||stopped||!!updateIntent);
+  $('create-input').disabled=locked||!projectSelection||!inputCapability;$('cancel').disabled=!updateRecoveryRequest&&!initializing&&!job&&!applying&&!previewPlaying&&!previewBusy&&!validationCount&&(!modelRequest||stopped||!!updateIntent);
   $('undo-correction').disabled=locked||!analysisState||activeCorrections().length===0;
-  $('recover-apply').disabled=busy||!credentials||!(localEditPending||state?.applyRecovery?.blocked);
+  $('recover-apply').disabled=!!updateRecoveryRequest||busy||!credentials||!(localEditPending||state?.applyRecovery?.blocked);
   $('release-cache').disabled=busy||!cacheReady(true);
-  $('progress').className=initializing||job||applying||pending||validationCount?'running':'';
+  $('progress').className=updateRecoveryRequest||initializing||job||applying||pending||validationCount?'running':'';
   const update=state?.update,available=update?.candidate&&['AVAILABLE','CHECKING'].includes(update.checkState);
   $('update').disabled=!credentials||!!updateIntent?.inFlight||!!updateIntent?.accepted||(!updateIntent&&!available)||!!update&& !['IDLE','COMPLETE','CANCELED','FAILED_BEFORE_REPLACE','ROLLED_BACK'].includes(update.updateState);
   $('update-banner-button').disabled=$('update').disabled;
   $('review-previous').disabled=locked||!plan||!reviewWindow?.previous;
   $('review-next').disabled=locked||!plan||!reviewWindow?.next;
   $('review-clear').disabled=locked||!plan;
-  $('check-update').disabled=!credentials||initializing||initializationIncomplete||!!updateCheckRequest||!!updateIntent||update?.checkState==='CHECKING';
+  $('check-update').disabled=!credentials||initializing||initializationIncomplete||!!updateRecoveryRequest||!!updateCheckRequest||!!updateIntent||update?.checkState==='CHECKING';
+  $('recover-update').disabled=!updateRecoveryReady();$('recover-update').textContent=updateRecoveryRequest?'복구 확인 중…':'설치 복구';$('recover-update').setAttribute('aria-busy',updateRecoveryRequest?'true':'false');
   if(!['ready','installed'].includes(state?.models?.[mode==='separate'?'silero':'community-1']?.status))$('analyze').disabled=true;
   if(microphoneIssue)$('analyze').disabled=true;
   if(rangeIssue)for(const id of ['analyze','sync','plan','apply-sync','apply'])$(id).disabled=true;
@@ -458,7 +460,7 @@ function syncResultMatches(){return !!syncJob&&!!syncResult&&typeof syncResultIn
 function invalidateSyncResult(){clearSyncResult();syncInvalidated=true;say(messages.SYNC_INPUT_CHANGED);scheduleSettings();}
 function rejectStaleSync(){invalidateSyncResult();throw Object.assign(new Error(messages.SYNC_INPUT_CHANGED),{code:'SYNC_INPUT_CHANGED'});}
 function workButton(text,fn){const button=element('button',text,'full');button.setAttribute('data-work','true');button.onclick=()=>runAction(fn);return button;}
-async function runAction(fn){if(initializing||initializationIncomplete||pending||applying||job)return;pending=true;toggle();try{await fn();}catch(e){error(e);}finally{pending=false;toggle();}}
+async function runAction(fn){if(updateRecoveryRequest||initializing||initializationIncomplete||pending||applying||job)return;pending=true;toggle();try{await fn();}catch(e){error(e);}finally{pending=false;toggle();}}
 function activeCorrections(){const active=[];for(const item of analysisState?.history||[]){if(item.operation.type==='undo')active.pop();else active.push(item);}return active;}
 function addExamples(parent,id,candidate=false){
   const examples=(analysisState?.examples||[]).filter(e=>(candidate?e.candidateSpeakerId:e.speakerId)===id);
@@ -831,7 +833,7 @@ async function refresh(current=()=>true,accepted=()=>{},guidanceCurrent=()=>true
   $('update-banner').className=!updateIntent&&candidate&&['AVAILABLE','CHECKING'].includes(update.checkState)&&candidate.candidateId!==dismissedCandidate?'':'hidden';
   $('update-banner-text').textContent=candidate?'Contentrium CUT '+candidate.appVersion+' 업데이트':'';
   $('update-info').textContent=updateGuidance(update);
-  $('release-notes').textContent=candidate?.releaseNotes||'';$('recover-update').disabled=!['RECOVERY_REQUIRED','FAILED'].includes(update.updateState);
+  $('release-notes').textContent=candidate?.releaseNotes||'';
   const recovery=state.applyRecovery;
   $('apply-recovery').className=localEditPending||recovery?.blocked?'notice recovery-notice':'hidden';
   $('apply-recovery-text').textContent=localIntentError?messages[localIntentError]:localEditPending||recovery?.blocked?'이전 편집이 중단되었습니다. 기록을 확인한 뒤 새 작업을 시작할 수 있습니다.':'';
@@ -1118,7 +1120,7 @@ async function pollJob(){
 }
 function handler(id,fn){
   const serial=!['refresh','check-update','update','cancel','recover-update'].includes(id);
-  $(id).onclick=async()=>{if(serial&&(pending||initializing||initializationIncomplete))return;if(serial){pending=true;toggle();}try{await fn();}catch(e){error(e);}finally{if(serial)pending=false;toggle();}};
+  $(id).onclick=async()=>{if(serial&&(updateRecoveryRequest||pending||initializing||initializationIncomplete))return;if(serial){pending=true;toggle();}try{await fn();}catch(e){error(e);}finally{if(serial)pending=false;toggle();}};
 }
 async function performNative(kind,body,native,receipt,beginPath='/apply/begin'){
   if(updateIntent||stopped||!state?.gateOpen)throw Object.assign(new Error('Update stop is active.'),{code:'UPDATE_IN_PROGRESS'});
@@ -1255,7 +1257,7 @@ function updateCheckScope(){
   return [credentials,state?.epoch,state?.gateOpen,state?.stopEpoch,state?.compatible,state?.appVersion,state?.bundleId,state?.protocolVersion,JSON.stringify([state?.models,state?.update?.updateState,state?.update?.updateEpoch,state?.applyRecovery,state?.maintenance]),stopRevision,stopped,updateIntent,JSON.stringify(updateIntent),panelContextConflict,mode,connected,connected?.snapshot.snapshotHash,connected?.snapshot.hostSnapshotHash,analysisState,analysisState?.revision,plan,planInputHash,job,applying,batchRunning,previewPlaying,previewBusy,localEditPending,localIntentError,binding,projectRead,projectSelection,inputCapability,validationRevision,validationCount];
 }
 async function checkUpdate(){
-  if(!credentials||initializing||initializationIncomplete||updateCheckRequest||updateIntent||state?.update?.checkState==='CHECKING')return;
+  if(!credentials||initializing||initializationIncomplete||updateRecoveryRequest||updateCheckRequest||updateIntent||state?.update?.checkState==='CHECKING')return;
   const token={credential:credentials,scope:updateCheckScope(),guidanceRevision:statusRevision};updateCheckRequest=token;toggle();
   const current=()=>{if(updateCheckRequest!==token||credentials!==token.credential)return false;const scope=updateCheckScope();return token.scope.every((value,index)=>value===scope[index]);};
   try{
@@ -1286,7 +1288,25 @@ handler('update',async()=>{
   catch(e){if(e.code==='UPDATE_CANDIDATE')updateIntent=null;throw e;}
   finally{intent.inFlight=false;toggle();}
 });
-handler('recover-update',async()=>{await api('/updates/recover',{});await refresh();});
+function updateRecoveryReady(){return !!credentials&&!initializing&&!initializationIncomplete&&!updateRecoveryRequest&&!pending&&!applying&&!batchRunning&&!job&&!validationCount&&!previewPlaying&&!previewBusy&&!updateIntent?.inFlight&&['RECOVERY_REQUIRED','FAILED'].includes(state?.update?.updateState);}
+async function recoverUpdate(){
+  if(!updateRecoveryReady())return;
+  const token={credential:credentials,scope:null,guidanceRevision:statusRevision};updateRecoveryRequest=token;toggle();
+  token.scope=updateCheckScope();say('설치 복구 상태를 확인하고 있습니다.');token.guidanceRevision=statusRevision;
+  const current=()=>{if(updateRecoveryRequest!==token||credentials!==token.credential)return false;const scope=updateCheckScope();return token.scope.every((value,index)=>value===scope[index]);};
+  const guide=()=>statusRevision===token.guidanceRevision;
+  try{
+    await api('/updates/recover',{});if(!current())return;
+    if(!await refresh(current,()=>{token.scope=updateCheckScope();},guide)||!current())return;
+    if(guide())say(['RECOVERY_REQUIRED','FAILED'].includes(state.update.updateState)?'설치 복구가 더 필요합니다. 업데이트 상태와 설치 프로그램의 안내를 확인하세요.':'설치 복구 상태를 확인했습니다. 현재 버전과 연결 상태를 확인하세요.');
+  }catch(e){
+    if(!current())return;
+    if(e?.code==='PANEL_CONTEXT_CONFLICT'){contextConflict(guide());return;}
+    if(['AUTH_REQUIRED','SESSION_EXPIRED'].includes(e?.code)){credentials=null;stopped=true;connection.reset();retryAt=Date.now()+1000;setConnection(false,'편집 연결 복구 중');}
+    if(guide())say(['AUTH_REQUIRED','SESSION_EXPIRED'].includes(e?.code)?'편집 연결을 복구하고 있습니다. 새로고침으로 상태를 확인하세요.':'설치 복구를 확인하지 못했습니다. 설치 상태를 다시 확인한 뒤 재시도하세요.');
+  }finally{if(updateRecoveryRequest===token){updateRecoveryRequest=null;toggle();}}
+}
+handler('recover-update',recoverUpdate);
 handler('open-model-provider',()=>uxp.shell.openExternal('https://huggingface.co/pyannote/speaker-diarization-community-1','화자 모델 제공자의 이용 조건과 접근 권한을 확인합니다.'));
 function modelValidation(count,descriptors){
   const token=modelRequest;if(!token)return false;

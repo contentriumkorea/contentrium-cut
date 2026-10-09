@@ -1094,3 +1094,12 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 다음 후보 actual 수동 check-update 대기 후 두 모드×update/cancel4/4에서 late 오류가 새 안내를 덮음을 재현했다(cycle42-next-inspect.js/.log). stopped는true 유지·실제 Adobe/provider/install0이므로 실제 편집 성공으로 확대하지 않는다. 다음 회차는 수동 업데이트 확인·후속 refresh의 owner/credential/중단/안내 수명 설계다. implicit initialize 업데이트 조회 승인만으로 해당 수동 handler 또는 connection physicalRequest 전체 수명 해결을 주장하지 않는다.
 
 - 엔진/CCX·Setup 빌드 exit0. 고정52개 physical 입력 해시를 빌드 후 유지했고 공개659개 비공개 패턴·신뢰 키 보존 확인. [0.1.43 패키지 증거](package-0.1.43-proof.json): ZIP/CCX CRC·경로·크기·비공개 자료 제외·CCX raw 최종 소스·Silero 해시·frozen runtime29/Setup26모듈·진입점2개 소스 일치. 추출 engine runtimeReady=true/0.1.43·Setup help exit0,72.891초. optional 모듈/torchcodec 경고를 보존하고 실제 Community-1 품질로 확대하지 않는다. 독립 최종 final-review-report.md의 C/I/M0/0/0·175시나리오·패널404 및 exact SHA를 확인했다. 현재 단계: 기획·설계·구현·회귀·독립 리뷰·패키지 실행 완료.0.1.43 공개 및 익명 업데이트 발견·서명·실제 다운로드/CURRENT/고정v0.1.1 검증을 이어간다. 사용자 설치/활성화 없음.
+
+### 공개 결과
+
+- [v0.1.43](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.43): release `407537446`, 제목 `Contentrium CUT`, draft/prerelease 아님. 공개 시각 2026-10-09 14:17:59 KST (`2026-10-09T05:17:59Z`), target/tag commit `c60454108647d7a18cea88f7ebf56e60664d5fe5` 확인.
+- [공개 실제 재다운로드](release-0.1.43-proof.json): 익명 제품 경로0.1.42 →0.1.43 AVAILABLE·서명·실제 ZIP/CCX/Setup3개 크기/SHA-256 일치.
+- [현재 버전](release-0.1.43-current-proof.json): 빈 상태0.1.43 CURRENT/후보 없음. 공개 자산5개 ID·크기·digest 및 서명 문서 실제 바이트 일치.
+- [고정 복구 조회](migration-pinned-0.1.1-after-0.1.43-proof.json): latest0.1.43에서도 정확한 서명 v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+- 현재 단계: 기획 → 설계 → 구현 → 검증 →0.1.43 공개 및 공개 재검증 완료. 다음 회차는 수동 업데이트 확인·후속 refresh의 owner/credential/중단/안내 수명. actual check-update 대기 후 두 모드×update/cancel4/4에서 late 오류가 새 안내를 덮는 증거(cycle42-next-inspect.js/.log)를 이어간다. stopped=true 유지·실제 Adobe/provider/install0; 실제 편집 성공으로 확대하지 않는다. connection 물리 전송 전체 수명과 이미 발행된 native/API 취소·rollback도 별도 미검증이다.
+- 활성0.1.0 active/journal/first-install 해시 동일·서명 키 존재·ACTIVE15분·기존 공개 파일/사용자 자료/실패 증거 보존. 컴퓨터유즈·브라우저·Premiere 조작·재설치·provider 없음. 실제 UXP/Premiere 편집·설치 전환·Community-1 품질 미검증. original connect 중단2/4와 baseline7RED/6GREEN을 수정했다. 잘못된 refresh callback 인자와 새 안내 뒤 invalid 설치 retry 제한 결함은 최종 수정·검증했다. 초기 every-state hold/캡처 후 설정 기대 오류는 시험 구성 문제로 구별해 원본 증거를 보존했다. 최종 Node513/Python496/독립12top-level·175시나리오/패널404 통과, scoped C/I/M0/0/0. 기존 간헐 실패는 이번 전체 회귀에서 재현되지 않았고 원인은 미확정이다.

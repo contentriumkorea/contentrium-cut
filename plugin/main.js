@@ -15,7 +15,7 @@ let microphoneSelectionCustomized=false;
 let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;let projectRead=null,nativePreparation=null,editingSubmission=null,correctionRequest=null,settingsRestore=null,settingsSave=null;
 let settingsWriteTail=Promise.resolve();
 let modelRequest=null,modelInputRevision=0,modelPoll=null;
-let cacheRequest=null,syncPoll=null,examplePoll=null,refreshRequest=null;
+let cacheRequest=null,syncPoll=null,examplePoll=null,refreshRequest=null,updateCheckRequest=null;
 let previewBusy=0,previewGeneration=0;
 let resourceRequest=null,resourceInputRevision=0,resourceViewRevision=0,resourceInputDirty=false,stopRevision=0;
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
@@ -271,7 +271,7 @@ function toggle(){
   $('review-previous').disabled=locked||!plan||!reviewWindow?.previous;
   $('review-next').disabled=locked||!plan||!reviewWindow?.next;
   $('review-clear').disabled=locked||!plan;
-  $('check-update').disabled=!!updateIntent||update?.checkState==='CHECKING';
+  $('check-update').disabled=!credentials||initializing||initializationIncomplete||!!updateCheckRequest||!!updateIntent||update?.checkState==='CHECKING';
   if(!['ready','installed'].includes(state?.models?.[mode==='separate'?'silero':'community-1']?.status))$('analyze').disabled=true;
   if(microphoneIssue)$('analyze').disabled=true;
   if(rangeIssue)for(const id of ['analyze','sync','plan','apply-sync','apply'])$(id).disabled=true;
@@ -797,7 +797,7 @@ function validStateReceipt(receipt,prior){
   if(!record(update)||!text(update.updateState)||!text(update.checkState)||update.updateEpoch!==undefined&&!integer(update.updateEpoch)||!(update.candidate==null||record(update.candidate)&&text(update.candidate.candidateId)&&text(update.candidate.appVersion))||update.candidate?.releaseNotes!==undefined&&typeof update.candidate.releaseNotes!=='string')return false;
   return record(recovery)&&typeof recovery.blocked==='boolean'&&(recovery.records===undefined||Array.isArray(recovery.records))&&(receipt.maintenance==null||record(receipt.maintenance));
 }
-async function refresh(current=()=>true,accepted=()=>{}){
+async function refresh(current=()=>true,accepted=()=>{},guidanceCurrent=()=>true){
   if(!credentials||!current())return false;
   const token={credential:credentials,prior:state,scope:refreshScope(),guidanceRevision:statusRevision};refreshRequest=token;
   const owned=()=>refreshRequest===token&&credentials===token.credential;
@@ -805,7 +805,7 @@ async function refresh(current=()=>true,accepted=()=>{}){
   const ready=receipt=>scopeCurrent()&&current(receipt);
   const failed=e=>{
     if(!ready())return;
-    const guide=statusRevision===token.guidanceRevision;
+    const guide=statusRevision===token.guidanceRevision&&guidanceCurrent();
     if(e?.code==='PANEL_CONTEXT_CONFLICT'){contextConflict(guide);return;}
     stopped=true;setConnection(false,'편집 상태 확인 필요');
     if(['AUTH_REQUIRED','SESSION_EXPIRED'].includes(e?.code)){credentials=null;connection.reset();retryAt=Date.now()+1000;setConnection(false,'편집 연결 복구 중');}
@@ -838,7 +838,7 @@ async function refresh(current=()=>true,accepted=()=>{}){
   $('cache-maintenance').className=state.maintenance?'':'hidden';
   $('cache-maintenance-text').textContent=state.maintenance?.canRelease?'정리 작업이 종료됐습니다. 편집을 계속할 수 있습니다.':'캐시 정리 작업이 종료되는 것을 기다리고 있습니다.';
 
-    toggle();token.scope=refreshScope();
+    toggle();token.scope=refreshScope();accepted();
     if(!ready())return false;
     if(!state.gateOpen&&!state.maintenance&&!applying&&!batchRunning&&!previewPlaying&&!previewBusy){
       const epoch=receipt.epoch;
@@ -1251,7 +1251,25 @@ handler('cancel',async()=>{
   say('중단 요청 · 진행 중인 트랜잭션 뒤 추가 편집을 멈춥니다.');
 });
 handler('recover-apply',async()=>{await workflow.recover();localEditPending=false;localIntentError=null;if(!await refresh())return;say('중단 작업 기록을 확인했습니다. 결과 시퀀스를 검토한 뒤 새 작업을 시작하세요.');});
-handler('check-update',async()=>{await api('/updates/check',{});await refresh();});
+function updateCheckScope(){
+  return [credentials,state?.epoch,state?.gateOpen,state?.stopEpoch,state?.compatible,state?.appVersion,state?.bundleId,state?.protocolVersion,JSON.stringify([state?.models,state?.update?.updateState,state?.update?.updateEpoch,state?.applyRecovery,state?.maintenance]),stopRevision,stopped,updateIntent,JSON.stringify(updateIntent),panelContextConflict,mode,connected,connected?.snapshot.snapshotHash,connected?.snapshot.hostSnapshotHash,analysisState,analysisState?.revision,plan,planInputHash,job,applying,batchRunning,previewPlaying,previewBusy,localEditPending,localIntentError,binding,projectRead,projectSelection,inputCapability,validationRevision,validationCount];
+}
+async function checkUpdate(){
+  if(!credentials||initializing||initializationIncomplete||updateCheckRequest||updateIntent||state?.update?.checkState==='CHECKING')return;
+  const token={credential:credentials,scope:updateCheckScope(),guidanceRevision:statusRevision};updateCheckRequest=token;toggle();
+  const current=()=>{if(updateCheckRequest!==token||credentials!==token.credential)return false;const scope=updateCheckScope();return token.scope.every((value,index)=>value===scope[index]);};
+  try{
+    await api('/updates/check',{});if(!current())return;
+    await refresh(current,()=>{token.scope=updateCheckScope();},()=>statusRevision===token.guidanceRevision);
+  }catch(e){
+    if(!current())return;
+    const guide=statusRevision===token.guidanceRevision;
+    if(e?.code==='PANEL_CONTEXT_CONFLICT'){contextConflict(guide);return;}
+    if(['AUTH_REQUIRED','SESSION_EXPIRED'].includes(e?.code)){credentials=null;stopped=true;connection.reset();retryAt=Date.now()+1000;setConnection(false,'편집 연결 복구 중');}
+    if(guide)say(['AUTH_REQUIRED','SESSION_EXPIRED'].includes(e?.code)?'편집 연결을 복구하고 있습니다. 새로고침으로 상태를 확인하세요.':'업데이트를 확인하지 못했습니다. 잠시 후 다시 확인하세요.');
+  }finally{if(updateCheckRequest===token){updateCheckRequest=null;toggle();}}
+}
+handler('check-update',checkUpdate);
 handler('update',async()=>{
   if(updateIntent?.inFlight||updateIntent?.accepted)return;
   const candidate=state?.update?.candidate;if(!candidate&&!updateIntent)throw new Error('업데이트를 다시 확인하세요.');

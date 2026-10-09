@@ -73,6 +73,95 @@ async function updatePanel(extra={}){
   await f.tick();return f;
 }
 
+async function heldManualUpdate(stage='/updates/check',mode='separate'){
+  let armed=false,resume,reject;
+  const f=await updatePanel({request:path=>armed&&!resume&&path===stage?new Promise((a,b)=>{resume=a;reject=b;}):undefined});
+  if(mode==='mixed')await f.click('mode-mixed');armed=true;
+  const run=f.click('check-update');for(let i=0;i<100&&!resume;i++)await Promise.resolve();
+  assert.equal(typeof resume,'function','manual update stage was reached');
+  return {f,run,resume:value=>resume(value===undefined?(stage==='/state'?structuredClone(f.state):{}):value),reject:code=>reject(Object.assign(new Error('private old update detail'),{code}))};
+}
+
+test('manual update check preserves stop and update guidance at check and state waits',async()=>{
+  for(const mode of ['separate','mixed'])for(const stage of ['/updates/check','/state'])for(const action of ['cancel','update'])for(const outcome of ['success','AUTH_REQUIRED','PANEL_CONTEXT_CONFLICT','OLD_UPDATE_FAILURE']){
+    const {f,run,resume,reject}=await heldManualUpdate(stage,mode);await f.click(action);
+    const status=f.get('status').textContent,credential=f.evaluate('credentials'),connection=f.get('connection').textContent,states=f.calls.filter(c=>c.path==='/state').length,resets=f.resetCalls;
+    if(outcome==='success')resume();else reject(outcome);await run;
+    assert.equal(f.get('status').textContent,status,[mode,stage,action,outcome].join('/'));assert.equal(f.evaluate('stopped'),true);
+    assert.equal(f.evaluate('credentials'),credential);assert.equal(f.get('connection').textContent,connection);assert.equal(f.resetCalls,resets);
+    assert.equal(f.calls.filter(c=>c.path==='/state').length,states);assert.equal(f.get('analyze').disabled,true);
+  }
+});
+
+test('manual update check rejects obsolete semantic and connection scopes without follow-up',async()=>{
+  const changes=['credentials={...credentials}','state.epoch++','state.gateOpen=false','state.stopEpoch=0','state.compatible=false','state.update.updateEpoch=2','state.update.updateState="DOWNLOADING"','mode="mixed"','connected={...connected}','connected.snapshot.snapshotHash="new"','analysisState={revision:5}','job={jobId:"new",kind:"analysis"}','localEditPending=true','validationRevision++','panelContextConflict=true'];
+  for(const stage of ['/updates/check','/state'])for(const change of changes)for(const outcome of ['success','AUTH_REQUIRED']){
+    const {f,run,resume,reject}=await heldManualUpdate(stage);f.evaluate(change+';say("New scoped guidance")');
+    const credential=f.evaluate('credentials'),connection=f.get('connection').textContent,resets=f.resetCalls,states=f.calls.filter(c=>c.path==='/state').length;
+    if(outcome==='success')resume();else reject(outcome);await run;
+    assert.equal(f.get('status').textContent,'New scoped guidance',stage+change);assert.equal(f.evaluate('credentials'),credential);assert.equal(f.resetCalls,resets);assert.equal(f.get('connection').textContent,connection);assert.equal(f.calls.filter(c=>c.path==='/state').length,states);
+  }
+});
+
+test('manual update check keeps editing and periodic state discovery available and blocks duplicate checks',async()=>{
+  for(const mode of ['separate','mixed']){
+    const {f,run,resume}=await heldManualUpdate('/updates/check',mode);assert.equal(f.get('check-update').disabled,true);assert.equal(f.get('analyze').disabled,false);
+    const checks=f.calls.filter(c=>c.path==='/updates/check').length;await f.click('check-update');assert.equal(f.calls.filter(c=>c.path==='/updates/check').length,checks);
+    f.state.update.checkState='CHECKING';await f.tick();await f.tick();f.state.update.checkState='AVAILABLE';f.state.update.candidate.appVersion='0.1.2';await f.tick();
+    const states=f.calls.filter(c=>c.path==='/state').length;resume();await run;assert.equal(f.calls.filter(c=>c.path==='/state').length,states+1);assert.equal(f.get('check-update').disabled,false);assert.equal(f.get('update').disabled,false);assert.match(f.get('update-banner-text').textContent,/0\.1\.2/);
+  }
+});
+
+test('manual update current errors preserve newer guidance and retain auth and context safety',async()=>{
+  for(const stage of ['/updates/check','/state'])for(const code of ['AUTH_REQUIRED','SESSION_EXPIRED','PANEL_CONTEXT_CONFLICT','CURRENT_UPDATE_FAILURE'])for(const newGuide of [false,true]){
+    const {f,run,reject}=await heldManualUpdate(stage);if(newGuide)f.evaluate('say("Owned newer guide")');const resets=f.resetCalls;
+    reject(code);await run;if(newGuide)assert.equal(f.get('status').textContent,'Owned newer guide');else assert.doesNotMatch(f.get('status').textContent,/private old update detail/);
+    if(['AUTH_REQUIRED','SESSION_EXPIRED'].includes(code)){assert.equal(f.evaluate('credentials'),null);assert.equal(f.evaluate('stopped'),true);assert.equal(f.resetCalls,resets+1);}
+    else if(code==='PANEL_CONTEXT_CONFLICT'){assert.equal(f.evaluate('panelContextConflict'),true);assert.equal(f.evaluate('credentials'),null);}
+    else assert.notEqual(f.evaluate('credentials'),null);
+    assert.equal(f.get('check-update').disabled,['AUTH_REQUIRED','SESSION_EXPIRED','PANEL_CONTEXT_CONFLICT'].includes(code));
+  }
+});
+
+test('manual update cleanup preserves a replacement request owner',async()=>{
+  for(const stage of ['/updates/check','/state'])for(const outcome of ['success','AUTH_REQUIRED']){
+    const {f,run,resume,reject}=await heldManualUpdate(stage);const replacement=f.evaluate('updateCheckRequest={};say("New request guidance");updateCheckRequest');
+    const states=f.calls.filter(c=>c.path==='/state').length;if(outcome==='success')resume();else reject(outcome);await run;
+    assert.equal(f.evaluate('updateCheckRequest'),replacement);assert.equal(f.get('status').textContent,'New request guidance');assert.equal(f.calls.filter(c=>c.path==='/state').length,states);assert.equal(f.get('check-update').disabled,true);
+  }
+});
+
+test('manual update check refuses unavailable connection and initialization states',async()=>{
+  for(const change of ['credentials=null','initializing=true','initializationIncomplete=true','updateIntent={accepted:true}','state.update.checkState="CHECKING"']){
+    const f=await updatePanel();f.evaluate(change+';toggle()');const checks=f.calls.filter(c=>c.path==='/updates/check').length;
+    assert.equal(f.get('check-update').disabled,true);await f.click('check-update');assert.equal(f.calls.filter(c=>c.path==='/updates/check').length,checks);
+  }
+});
+
+test('manual update follow-up state errors retain guidance written before the refresh began',async()=>{
+  for(const code of ['AUTH_REQUIRED','CURRENT_STATE_FAILURE']){
+    let armed=false,resumeCheck,rejectState;
+    const f=await updatePanel({request:path=>{
+      if(armed&&path==='/updates/check')return new Promise(resolve=>{resumeCheck=resolve;});
+      if(armed&&path==='/state')return new Promise((_,reject)=>{rejectState=reject;});
+    }});
+    armed=true;const run=f.click('check-update');for(let i=0;i<100&&!resumeCheck;i++)await Promise.resolve();assert.equal(typeof resumeCheck,'function');
+    f.evaluate('say("New guide before refresh")');resumeCheck({});for(let i=0;i<100&&!rejectState;i++)await Promise.resolve();assert.equal(typeof rejectState,'function');
+    rejectState(Object.assign(new Error('private follow-up state detail'),{code}));await run;
+    assert.equal(f.get('status').textContent,'New guide before refresh');assert.equal(f.evaluate('stopped'),true);
+    if(code==='AUTH_REQUIRED')assert.equal(f.evaluate('credentials'),null);
+  }
+});
+
+test('manual update discovered stop state acknowledges idle after applying its own stop changes',async()=>{
+  for(const mode of ['separate','mixed']){
+    const {f,run,resume}=await heldManualUpdate('/state',mode);
+    const receipt=structuredClone(f.state);receipt.epoch=1;receipt.gateOpen=false;receipt.stopEpoch=1;receipt.update.updateEpoch=1;receipt.update.updateState='QUIESCING';
+    resume(receipt);await run;assert.equal(f.evaluate('stopped'),true);assert.equal(f.evaluate('plan'),null);assert.equal(f.get('analyze').disabled,true);
+    const acks=f.calls.filter(c=>c.path==='/updates/ack');assert.equal(acks.length,1);assert.deepEqual(JSON.parse(JSON.stringify(acks[0].body)),{epoch:1,quiescent:true,batchRunning:false});
+  }
+});
+
 function mic(f,index=0){return f.evaluate('microphoneRows['+index+']');}
 function readinessDiagnostic(f){return f.evaluate('JSON.stringify({pending,applying,job,validationCount,stopped,credentials,state,localEditPending,updateIntent,microphoneIssue,rangeIssue,syncIssue,initializing,connected:!!connected})');}
 function micError(f,index=0){return f.get('microphones').children[index]?.children.find(n=>n.className.includes('input-error'))?.textContent||'';}

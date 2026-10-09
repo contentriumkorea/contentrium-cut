@@ -3395,3 +3395,49 @@ test('sync review guidance preserves accepted offset validation status fallback 
   f.state.update={updateState:'IDLE',checkState:'AVAILABLE',candidate:{candidateId:'release:hash',manifestDigest:'a'.repeat(64),appVersion:'0.1.1'}};await f.tick();await f.click('update');assert.ok(f.calls.some(v=>v.path==='/updates/start'));assert.equal(f.get('sync').disabled,true);
  }
 });
+
+function namedSyncNative(paths,sequence='named-sync'){
+ const native=nativeSnapshot(sequence);for(const [index,path] of paths.entries())native.snapshot.sources[index].canonicalPath=path;delete native.snapshot.snapshotHash;native.snapshot.snapshotHash=hash(native.snapshot);return native;
+}
+async function namedSyncPanel(mode='separate',paths=['D:/owned/camera/session.mov','D:/owned/mic/session.mov']){
+ const result={sources:{camera:{status:'accepted'},mic:{status:'review'}},offsets:{camera:0},reviews:[{assetId:'mic',code:'SYNC_UNRESOLVED'}]},f=await panel({native:namedSyncNative(paths),request:async path=>path==='/jobs/job-1'?syncReviewReceipt(structuredClone(result)):undefined});
+ if(mode==='mixed')await f.click('mode-mixed');return f;
+}
+test('sync source names disambiguate duplicate basenames consistently in rows references errors and results',async()=>{
+ for(const mode of ['separate','mixed']){
+  const f=await namedSyncPanel(mode),names=['session.mov [camera]','session.mov [mic]'];assert.deepEqual(f.get('sync-sources').children.map(row=>row.children[0].textContent),names);assert.deepEqual(f.get('sync-reference').children.map(row=>row.textContent),names);assert.deepEqual(f.get('sync-reference').children.map(row=>row.value),['camera','mic']);
+  const before=f.evaluate('JSON.stringify(connected.snapshot)'),input=f.evaluate('syncInputHash()');syncRow(f,1).stream.value='0';syncRow(f,1).stream.oninput();assert.match(syncRow(f,1).issue.textContent,/^session\.mov \[mic\] · /);syncRow(f,1).stream.value='1';syncRow(f,1).stream.oninput();assert.equal(f.evaluate('syncInputHash()'),input);
+  await f.click('sync');await f.tick();assert.equal(f.get('sync-result').textContent,names[0]+' · 0.000초\n'+names[1]+' · 확인 필요 · '+syncReviewGuides.SYNC_UNRESOLVED);assert.equal(f.evaluate('JSON.stringify(connected.snapshot)'),before);assert.equal(f.evaluate('syncResultMatches()'),true);
+ }
+});
+test('sync source names keep shortest folder suffixes unique filenames unknown text and identical path identities',async()=>{
+ const f=await namedSyncPanel();assert.equal(f.evaluate('stagedSyncDisplay({sources:{camera:{status:"accepted"}},offsets:{camera:0}},["camera"],connected)'), 'session.mov [camera] · 0.000초');const cases=[
+  [['D:/root/cam/take/a.mov','D:/root/mic/take/a.mov'],['a.mov [cam/take]','a.mov [mic/take]']],
+  [['D:/a.mov','E:/a.mov'],['a.mov [D:]','a.mov [E:]']],
+  [['\\\\server1\\share\\a.mov','\\\\server2\\share\\a.mov'],['a.mov [server1/share]','a.mov [server2/share]']],
+  [['D:/same/a.mov','D:/same/a.mov'],['a.mov · 소스 1','a.mov · 소스 2']],
+  [['D:/카메라/A.MOV','D:/마이크/a.mov'],['A.MOV [카메라]','a.mov [마이크]']],
+  [['a.mov','root/a.mov'],['a.mov · 소스 1','a.mov [root]']],
+  [['D:/cam/<b>.mov','D:/mic/<b>.mov'],['<b>.mov [cam]','<b>.mov [mic]']],
+  [['D:/cam/a.mov','D:/mic/a.mov','D:/keep/a.mov [cam]'],['a.mov [cam] · 소스 1','a.mov [mic]','a.mov [cam]']],
+  [['D:/cam/unique.mov','D:/mic/other.wav'],['unique.mov','other.wav']]
+ ];
+ for(const [paths,expected] of cases){const sources=paths.map((canonicalPath,index)=>({assetId:'source-'+index,canonicalPath})),raw=JSON.stringify(sources),actual=f.evaluate('Array.from(syncSourceLabels('+raw+').values())');assert.deepEqual(Array.from(actual),expected);assert.equal(JSON.stringify(sources),raw);assert.equal(new Set(actual.map(v=>v.toLowerCase())).size,paths.length);}
+});
+test('sync source names preserve raw settings results work locks stale rows and immediate update',async()=>{
+ for(const mode of ['separate','mixed']){
+  const f=await namedSyncPanel(mode);await f.click('sync');await f.tick();const result=f.evaluate('JSON.stringify(syncResult)'),input=f.evaluate('syncInputHash()'),shown=f.get('sync-result').textContent;
+  for(const lock of trackLocks){const locked=await namedSyncPanel(mode);await locked.click('sync');await locked.tick();const before=syncState(locked),display=locked.get('sync-result').textContent;locked.evaluate(lock+';toggle()');for(const field of syncControls(locked)){field.oninput?.();field.onchange?.();}assert.equal(syncState(locked),before);assert.equal(locked.get('sync-result').textContent,display);}
+  const subset=f.evaluate('stagedSyncDisplay({sources:{mic:{status:"accepted"}},offsets:{mic:2.5}},["mic"],connected)');assert.equal(subset,'session.mov [mic] · 2.500초');assert.equal(f.evaluate('JSON.stringify(syncResult)'),result);assert.equal(f.evaluate('syncInputHash()'),input);assert.equal(f.get('sync-result').textContent,shown);
+  const old=syncRow(f,1);f.native=namedSyncNative(['D:/owned/cam/new.mov','D:/owned/mic/new.mov'],'named-next');await f.click('read-project');const raw=f.evaluate('JSON.stringify(captureSettings())');old.stream.oninput();assert.equal(f.evaluate('JSON.stringify(captureSettings())'),raw);assert.deepEqual(f.get('sync-reference').children.map(v=>v.textContent),['new.mov [cam]','new.mov [mic]']);
+  f.state.update={updateState:'IDLE',checkState:'AVAILABLE',candidate:{candidateId:'release:hash',manifestDigest:'a'.repeat(64),appVersion:'0.1.1'}};await f.tick();await f.click('update');assert.ok(f.calls.some(v=>v.path==='/updates/start'));assert.equal(f.get('sync').disabled,true);
+ }
+});
+
+test('sync source names keep invalid retained rows safe while reading a replacement input sequence',async()=>{
+ for(const mode of ['separate','mixed'])for(const field of ['stream','channel']){
+  const f=await namedSyncPanel(mode),row=syncRow(f,1);row[field].value='0';row[field].oninput();assert.match(row.issue.textContent,/^session\.mov \[mic\] · /);
+  f.evaluate('connected=null');assert.doesNotThrow(()=>f.evaluate('toggle()'));assert.match(row.issue.textContent,/^session\.mov \[mic\] · /);
+  f.native=namedSyncNative(['D:/owned/cam/new.mov','D:/owned/mic/new.mov'],'replacement-input');await f.evaluate('readProject()');assert.equal(f.evaluate('binding'),false);assert.equal(f.evaluate('projectRead'),null);assert.equal(f.evaluate('connected.snapshot.sequenceRef'),'replacement-input');assert.deepEqual(f.get('sync-reference').children.map(v=>v.textContent),['new.mov [cam]','new.mov [mic]']);
+ }
+});

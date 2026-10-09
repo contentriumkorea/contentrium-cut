@@ -420,13 +420,14 @@ function microphoneFeedback(){
 function renderSources(){
   for(const id of ['microphones','cameras','calibration','speaker-mapping','sync-sources'])$(id).innerHTML='';
   microphoneRows.length=cameraRows.length=calibrationRows.length=speakerRows.length=syncRows.length=0;microphoneSelectionCustomized=false;
-  const s=connected.snapshot,assets=new Map(s.sources.map(a=>[a.assetId,a]));
+  const s=connected.snapshot;
+  const microphoneNames=syncSourceLabels(s.sources.filter(a=>s.clips.some(c=>c.mediaType==='audio'&&c.assetId===a.assetId)));
   const audioTracks=s.tracks.filter(t=>t.mediaType==='audio'&&s.clips.some(c=>c.trackRef===t.trackRef));
   for(const clip of s.clips.filter(c=>c.mediaType==='audio')){
     const track=audioTracks.find(t=>t.trackRef===clip.trackRef),order=audioTracks.indexOf(track);
     const row=element('div',undefined,'source-row'),check=checkbox(order<(mode==='mixed'?1:2));
     const title=trackTitle('A'+(track.index+1),track.name,undefined,true);title.appendChild(check);row.appendChild(title);
-    row.appendChild(element('p',basename(assets.get(clip.assetId).canonicalPath),'hint'));
+    row.appendChild(element('p',microphoneNames.get(clip.assetId),'hint'));
     const fields=element('div',undefined,'row'),speaker=element('input'),channel=number(1),stream=number(1);speaker.value=String.fromCharCode(65+order);
     channel.min=stream.min='1';channel.max='64';stream.max='256';
     fields.appendChild(label('화자 ID',speaker));fields.appendChild(label('채널',channel));row.appendChild(fields);row.appendChild(label('오디오 스트림',stream));
@@ -438,7 +439,7 @@ function renderSources(){
     for(const field of [check,speaker,channel,stream]){field.disabled=workLocked()||!connected;field.onchange=()=>{if(workLocked()||!connected)return;if(field!==check&&!check.checked){scheduleSettings();toggle();return;}if(field===check)microphoneSelectionCustomized=true;invalidateAnalysis();renderSpeakers(mode==='mixed'?[]:[...new Set(microphoneRows.filter(r=>r.check.checked).map(r=>r.speaker.value.trim()))]);};}
     for(const field of [speaker,channel,stream])field.oninput=field.onchange;
     const calibration=element('div',undefined,'source-row'),bounds=element('div',undefined,'row'),first=number(0),last=number(0);
-    calibration.appendChild(element('div','A'+(track.index+1)+' · '+basename(assets.get(clip.assetId).canonicalPath),'source-title'));
+    calibration.appendChild(element('div','A'+(track.index+1)+' · '+microphoneNames.get(clip.assetId),'source-title'));
     bounds.appendChild(label('단독 발화 시작 · 프레임',first));bounds.appendChild(label('종료 · 프레임',last));calibration.appendChild(bounds);
     const calibrationHint=element('p','','hint'),calibrationIssue=element('p','','hint input-error hidden');calibrationHint.id='calibration-guide-'+calibrationRows.length;calibrationIssue.id='calibration-error-'+calibrationRows.length;calibrationIssue.setAttribute('aria-live','polite');calibration.appendChild(calibrationHint);calibration.appendChild(calibrationIssue);$('calibration').appendChild(calibration);
     const calibrationRow={instanceKey:clip.instanceKey,clip,check,speaker,first,last,stream,channel,hint:calibrationHint,issue:calibrationIssue,title:'A'+(track.index+1)+' · '+track.name};calibrationRows.push(calibrationRow);

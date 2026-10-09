@@ -2055,6 +2055,52 @@ async function heldResourceSettings(mode,stage='post',kind='save'){
  assert.equal(f.get(kind==='save'?'save-resources':'open-settings').disabled,false,'resource button admitted');const run=f.click(kind==='save'?'save-resources':'open-settings');for(let i=0;i<100&&!entered;i++)await Promise.resolve();assert.equal(entered,true);return {f,run,resume,reject};
 }
 function resourceState(f){return JSON.stringify({result:JSON.parse(resultState(f)),device:f.get('analysis-device').value,budget:f.get('cache-budget').value,cache:f.get('cache-info').textContent,loaded:f.evaluate('resourceLoaded'),status:f.get('status').textContent,timer:f.evaluate('settingsTimer')});}
+async function heldResourceDiscard(mode='separate',raw='2.25',device='cuda'){
+ let hold=false,resume,reject;
+ const f=await updatePanel({request:async(p,b)=>hold&&p==='/resources'&&!b?new Promise((a,z)=>{resume=a;reject=z;}):undefined});
+ if(mode==='mixed')await f.click('mode-mixed');await f.click('analyze');await f.tick();await f.click('open-settings');assert.ok(f.get('discard-resources'),'explicit resource discard action exists');
+ assert.equal(f.get('discard-resources').disabled,true);const clean=f.calls.length;await f.click('discard-resources');assert.equal(f.calls.length,clean);
+ f.get('cache-budget').value=raw;f.get('cache-budget').oninput();f.get('analysis-device').value=device;f.get('analysis-device').onchange();hold=true;
+ assert.equal(f.get('discard-resources').disabled,false,'actual discard admission');const before=f.calls.length,run=f.click('discard-resources');for(let i=0;i<60&&!resume;i++)await Promise.resolve();assert.equal(typeof resume,'function');
+ return {f,run,reject,before,resume:()=>resume({settings:{device:'auto',cacheBudgetBytes:3*1073741824},status:{cacheBytes:1073741824,freeDiskBytes:10*1073741824}})};
+}
+test('resource discard restores only current stored settings with GET and retains editing results',async()=>{
+ for(const mode of ['separate','mixed'])for(const raw of ['2.25','','-1']){
+  const h=await heldResourceDiscard(mode,raw),f=h.f,before=resultState(f);
+  assert.equal(f.get('discard-resources').attrs['aria-busy'],'true');assert.match(f.get('discard-resources').textContent,/확인 중/);assert.match(f.get('status').textContent,/저장된.*다시 확인/);assert.equal(f.get('cache-budget').disabled,true);assert.equal(f.get('save-resources').disabled,true);assert.equal(f.get('prune-cache').disabled,true);assert.equal(f.get('resource-save-info').textContent,'');
+  const count=f.calls.length;await f.click('discard-resources');assert.equal(f.calls.length,count);h.resume();await h.run;
+  assert.equal(f.get('analysis-device').value,'auto');assert.equal(f.get('cache-budget').value,'3');assert.equal(f.evaluate('resourceInputDirty'),false);assert.equal(f.get('discard-resources').disabled,true);assert.equal(f.get('discard-resources').attrs['aria-busy'],'false');assert.equal(f.get('discard-resources').textContent,'저장된 설정으로 되돌리기');assert.equal(f.get('cache-budget').attrs['aria-invalid'],'false');assert.equal(f.get('prune-cache').disabled,false);assert.equal(f.get('resource-save-info').textContent,'');assert.match(f.get('status').textContent,/설정으로 되돌렸습니다/);assert.equal(resultState(f),before);
+  const sent=f.calls.slice(h.before);assert.equal(sent.length,1);assert.equal(sent[0].path,'/resources');assert.equal(sent[0].body,undefined);
+ }
+});
+test('resource discard failure keeps unsaved input and permits retry without POST',async()=>{
+ for(const mode of ['separate','mixed']){
+  const h=await heldResourceDiscard(mode,'-1'),f=h.f,cache=f.get('cache-info').textContent;h.reject(new Error('Owned discard read failure'));await h.run;
+  assert.equal(f.get('cache-budget').value,'-1');assert.equal(f.get('analysis-device').value,'cuda');assert.equal(f.get('cache-info').textContent,cache);assert.equal(f.evaluate('resourceInputDirty'),true);assert.equal(f.get('discard-resources').disabled,false);assert.equal(f.get('discard-resources').attrs['aria-busy'],'false');assert.equal(f.get('prune-cache').disabled,true);assert.match(f.get('resource-save-info').textContent,/먼저 저장/);assert.match(f.get('status').textContent,/Owned discard read failure/);assert.equal(f.calls.slice(h.before).filter(c=>c.body).length,0);
+ }
+});
+test('resource discard stale replies and newer guidance cannot overwrite current inputs or status',async()=>{
+ for(const mode of ['separate','mixed'])for(const change of ['resourceInputRevision+=2','resourceViewRevision+=2','credentials={...credentials}','resourceRequest={replacement:true}','stopRevision++','state.epoch++','analysisState.revision++','$("cache-budget").value="4"'])for(const outcome of ['success','error']){
+  const h=await heldResourceDiscard(mode),f=h.f;f.evaluate(change+';say("Owned current discard scope")');const before=resourceState(f);
+  if(outcome==='success')h.resume();else h.reject(new Error('Owned late discard error'));await h.run;assert.equal(resourceState(f),before);assert.equal(f.evaluate('resourceInputDirty'),true);
+ }
+ for(const mode of ['separate','mixed'])for(const outcome of ['success','error']){
+  const h=await heldResourceDiscard(mode),f=h.f;f.evaluate('say("Owned newer discard guidance")');if(outcome==='success')h.resume();else h.reject(new Error('Owned old discard error'));await h.run;assert.equal(f.get('status').textContent,'Owned newer discard guidance');assert.equal(f.evaluate('resourceInputDirty'),outcome==='error');
+ }
+});
+test('resource discard stays blocked during initial read and preserves immediate update',async()=>{
+ for(const mode of ['separate','mixed']){
+  const h=await heldResourceSettings(mode,'get','open'),f=h.f;assert.ok(f.get('discard-resources'),'explicit resource discard action exists');f.get('cache-budget').value='2.25';f.get('cache-budget').oninput();assert.equal(f.evaluate('resourceInputDirty'),true);assert.equal(f.get('discard-resources').disabled,true);const before=f.calls.length;await f.click('discard-resources');assert.equal(f.calls.length,before);h.resume();await h.run;assert.equal(f.get('cache-budget').value,'2.25');assert.equal(f.get('discard-resources').disabled,false);
+ }
+ for(const mode of ['separate','mixed'])for(const outcome of ['success','error']){
+  const h=await heldResourceDiscard(mode),f=h.f;assert.equal(f.get('update').disabled,false);await f.click('update');assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.equal(f.evaluate('stopped'),true);const before=resourceState(f);if(outcome==='success')h.resume();else h.reject(new Error('Owned stopped discard error'));await h.run;assert.equal(resourceState(f),before);assert.equal(f.evaluate('resourceInputDirty'),true);assert.equal(f.get('discard-resources').disabled,true);
+ }
+});
+test('resource discard projection and direct admission retain all editing work locks',async()=>{
+ for(const mode of ['separate','mixed'])for(const change of ['previewBusy=1','state.stopEpoch=0','projectRead={owned:true}','batchRunning=true','panelContextConflict=true']){
+  const f=await updatePanel();if(mode==='mixed')await f.click('mode-mixed');await f.click('analyze');await f.tick();await f.click('open-settings');f.get('cache-budget').value='2.25';f.get('cache-budget').oninput();assert.equal(f.get('discard-resources').disabled,false,'eligible dirty discard before lock');f.evaluate(change+';toggle()');assert.equal(f.get('discard-resources').disabled,true,change);const count=f.calls.length;await f.click('discard-resources');assert.equal(f.calls.length,count,change);assert.equal(f.get('cache-budget').value,'2.25');assert.equal(f.evaluate('resourceInputDirty'),true);
+ }
+});
 test('resource progress identifies save and result query waits and resets on completion or failure',async()=>{
  for(const mode of ['separate','mixed'])for(const stage of ['post','get'])for(const outcome of ['success','error']){
   const h=await heldResourceSettings(mode,stage),f=h.f;assert.equal(f.get('save-resources').disabled,true);assert.equal(f.get('save-resources').getAttribute('aria-busy'),'true');assert.match(f.get('save-resources').textContent,stage==='post'?/저장 중/:/결과 확인 중/);assert.match(f.get('status').textContent,stage==='post'?/자원 설정을 저장하고/:/자원 설정과 캐시 상태를 확인하고/);assert.equal(f.get('progress').className,'running');const calls=f.calls.length;await f.click('save-resources');assert.equal(f.calls.length,calls);

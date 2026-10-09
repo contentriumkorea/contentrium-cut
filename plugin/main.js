@@ -268,7 +268,8 @@ function toggle(){
   $('undo-correction').disabled=locked||!analysisState||activeCorrections().length===0;
   $('recover-apply').disabled=!applyRecoveryReady();$('recover-apply').textContent=applyRecoveryRequest?'기록 확인 중…':'중단 작업 확인';$('recover-apply').setAttribute('aria-busy',applyRecoveryRequest?'true':'false');
   $('release-cache').disabled=busy||!cacheReady(true);
-  $('progress').className=cancelRequest||applyRecoveryRequest||updateRecoveryRequest||initializing||job||applying||pending||validationCount?'running':'';
+  const updateBusy=renderUpdateUI();
+  $('progress').className=cancelRequest||applyRecoveryRequest||updateRecoveryRequest||initializing||job||applying||pending||validationCount||updateBusy?'running':'';
   const update=state?.update,available=update?.candidate&&['AVAILABLE','CHECKING'].includes(update.checkState);
   $('update').disabled=!credentials||!!updateIntent?.inFlight||!!updateIntent?.accepted||(!updateIntent&&!available)||!!update&& !['IDLE','COMPLETE','CANCELED','FAILED_BEFORE_REPLACE','ROLLED_BACK'].includes(update.updateState);
   $('update-banner-button').disabled=$('update').disabled;
@@ -762,12 +763,28 @@ function addOverride(defer=false){
   const remove=element('button','삭제');remove.setAttribute('data-work','true');remove.disabled=workLocked()||!connected;row.appendChild(remove);const value={first,last,camera,error,title,row,remove};for(const field of [first,last,camera]){field.disabled=workLocked()||!connected;field.setAttribute('aria-describedby',errorId);field.oninput=field.onchange=()=>editOverrides(invalidatePlan);}
   overrideRows.push(value);remove.onclick=()=>editOverrides(()=>{const index=overrideRows.indexOf(value);if(index<0)return;overrideRows.splice(index,1);overrideVisibleRows.delete(value);row.remove();invalidatePlan();});$('overrides').appendChild(row);if(!defer)invalidatePlan();
 }
+function localUpdatePhase(phase){return ['IDLE','COMPLETE','CANCELED','FAILED_BEFORE_REPLACE','ROLLED_BACK','UNAVAILABLE'].includes(phase);}
+function localUpdateGuidance(){
+  if(!credentials)return (updateIntent?.accepted?'업데이트 시작이 접수되었습니다.':'업데이트 시작 결과를 확인하지 못했습니다.')+' 새로고침으로 연결과 업데이트 상태를 확인하세요.';
+  if(updateIntent?.inFlight)return '작업 중단을 요청하고 업데이트 시작 요청을 확인하고 있습니다.';
+  if(updateIntent?.accepted)return '업데이트 시작이 접수되었습니다. 진행 상태를 확인하고 있습니다.';
+  return credentials?'업데이트 시작 결과를 확인하지 못했습니다. 업데이트 시작 재확인을 누르면 같은 요청을 다시 확인합니다. 작업은 중단된 상태로 유지됩니다.':'업데이트 시작 결과를 확인하지 못했습니다. 새로고침으로 연결과 업데이트 상태를 확인하세요.';
+}
+function renderUpdateUI(){
+  const update=state?.update,local=localUpdatePhase(update?.updateState);
+  const active=['STOP_REQUESTED','QUIESCING','DOWNLOADING','VERIFYING_PACKAGE','WAITING_HOST_EXIT','INSTALLING','PENDING_ACTIVATION','VERIFYING_INSTALL','ROLLING_BACK'].includes(update?.updateState);
+  const busy=!!updateIntent?.inFlight||active||local&&!!updateIntent?.accepted;
+  const label=local&&updateIntent?.inFlight?'시작 요청 중…':busy?'업데이트 진행 중':local&&updateIntent&&!updateIntent.accepted?'업데이트 시작 재확인':null;
+  for(const id of ['update','update-banner-button']){const button=$(id);button.textContent=label||(id==='update'?'업데이트':'지금 업데이트');button.setAttribute('aria-busy',busy?'true':'false');}
+  if(update)$('update-info').textContent=updateGuidance(update)+(!credentials&&!local&&(updateIntent||active)?' 새로고침으로 연결과 업데이트 상태를 확인하세요.':'');
+  return busy;
+}
 function updateGuidance(update){
   const phase=update.updateState,code=update.error?.code;
   const suffix=typeof code==='string'&&/^[A-Z][A-Z0-9_]{0,63}$/.test(code)?' ('+code+')':'';
   const remaining=Number.isFinite(update.retryAt)?Math.max(0,Math.ceil(update.retryAt-Date.now()/1000)):0;
   const retry=remaining?'최소 '+remaining+'초 후 업데이트 확인을 다시 누르세요.':'업데이트 확인을 다시 누르세요.';
-  if(updateIntent&&['IDLE','COMPLETE','CANCELED','FAILED_BEFORE_REPLACE','ROLLED_BACK','UNAVAILABLE'].includes(phase))return '업데이트 시작 요청을 확인하고 있습니다.';
+  if(updateIntent&&localUpdatePhase(phase))return localUpdateGuidance();
   const phases={STOP_REQUESTED:'작업 중단을 요청했습니다.',
     QUIESCING:previewPlaying||previewBusy?'미리보기 종료를 기다리고 있습니다. 지연되면 프로젝트를 저장하고 Premiere를 정상 종료하세요.':'진행 중인 작업을 안전하게 종료하고 있습니다.',
     DOWNLOADING:'업데이트 파일을 다운로드하고 있습니다.',VERIFYING_PACKAGE:'다운로드한 파일을 검증하고 있습니다.',
@@ -779,7 +796,7 @@ function updateGuidance(update){
     FAILED_BEFORE_REPLACE:'파일 교체 전에 업데이트가 실패했습니다. '+retry+suffix,
     ROLLED_BACK:'이전 버전으로 복구했습니다. '+retry};
   if(!['IDLE','COMPLETE','UNAVAILABLE'].includes(phase))return phases[phase]||'업데이트 상태를 확인하지 못했습니다. 설정에서 설치 상태를 확인하세요.';
-  if(updateIntent)return '업데이트 시작 요청을 확인하고 있습니다.';
+  if(updateIntent)return localUpdateGuidance();
   if(phase==='UNAVAILABLE'||update.checkState==='UNAVAILABLE')return '자동 업데이트 연결을 사용할 수 없습니다. Contentrium CUT Setup으로 설치를 복구하세요.';
   if(update.checkState==='INCOMPATIBLE')return '새 버전 '+(update.candidate?.appVersion||'')+'은 현재 설치 환경과 호환되지 않습니다. Premiere 버전과 설치 환경을 확인하세요.';
   if(update.candidate&&['AVAILABLE','CHECKING'].includes(update.checkState))return '새 버전 '+update.candidate.appVersion;
@@ -835,7 +852,6 @@ async function refresh(current=()=>true,accepted=()=>{},guidanceCurrent=()=>true
   const update=state.update,candidate=update.candidate;
   $('update-banner').className=!updateIntent&&candidate&&['AVAILABLE','CHECKING'].includes(update.checkState)&&candidate.candidateId!==dismissedCandidate?'':'hidden';
   $('update-banner-text').textContent=candidate?'Contentrium CUT '+candidate.appVersion+' 업데이트':'';
-  $('update-info').textContent=updateGuidance(update);
   $('release-notes').textContent=candidate?.releaseNotes||'';
   const recovery=state.applyRecovery;
   $('apply-recovery').className=localEditPending||recovery?.blocked?'notice recovery-notice':'hidden';

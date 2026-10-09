@@ -3373,14 +3373,14 @@ test('sync review guidance translates direct timecode manual and audio reasons i
  for(const mode of ['separate','mixed'])for(const [code,guide] of Object.entries(syncReviewGuides))for(const field of ['reason','code']){
   const result={sources:{camera:{status:'accepted',reason:code},mic:{status:'review',[field]:code}},offsets:{camera:'1.23456'},reviews:[]},raw=JSON.stringify(result);
   const f=await completedSync({mode,request:async path=>path==='/jobs/job-1'?syncReviewReceipt(result):undefined});
-  assert.equal(f.get('sync-result').textContent,'camera.mov · 1.235초\nmic.wav · 확인 필요 · '+guide,mode+' '+code+' '+field);assert.equal(f.evaluate('JSON.stringify(syncResult)'),raw);assert.equal(f.evaluate('syncResultMatches()'),true);assert.equal(f.evaluate('job'),null);
+  assert.equal(f.get('sync-result').textContent,'camera.mov · 기준 대비 +1.235초\nmic.wav · 확인 필요 · '+guide,mode+' '+code+' '+field);assert.equal(f.evaluate('JSON.stringify(syncResult)'),raw);assert.equal(f.evaluate('syncResultMatches()'),true);assert.equal(f.evaluate('job'),null);
  }
 });
 test('sync review guidance scopes engine reviews deduplicates in order and keeps unknown codes as text',async()=>{
  for(const mode of ['separate','mixed']){
   const result={sources:{camera:{status:'accepted'},mic:{status:'review',reason:'TIMECODE_FPS_MISMATCH',code:'IGNORED_CODE'}},offsets:{camera:0},reviews:[{assetId:'other',code:'TIMECODE_RESET'},{code:'GLOBAL_CODE'},{assetIds:['mic','camera'],code:'SYNC_DRIFT'},{assetId:'mic',code:'TIMECODE_FPS_MISMATCH'},{assetId:'mic',code:'<b>UNKNOWN</b>'},{assetId:'mic',code:'toString'},{assetId:'mic',code:'SYNC_DRIFT'},null,{assetId:'mic',code:42}]},raw=JSON.stringify(result);
   const f=await completedSync({mode,request:async path=>path==='/jobs/job-1'?syncReviewReceipt(result):undefined});
-  assert.equal(f.get('sync-result').textContent,'camera.mov · 0.000초\nmic.wav · 확인 필요 · '+syncReviewGuides.TIMECODE_FPS_MISMATCH+' · '+syncReviewGuides.SYNC_DRIFT+' · <b>UNKNOWN</b> · toString');assert.equal(f.evaluate('JSON.stringify(syncResult)'),raw);assert.equal(f.get('sync-result').children.length,0);
+  assert.equal(f.get('sync-result').textContent,'camera.mov · 기준 대비 0.000초\nmic.wav · 확인 필요 · '+syncReviewGuides.TIMECODE_FPS_MISMATCH+' · '+syncReviewGuides.SYNC_DRIFT+' · <b>UNKNOWN</b> · toString');assert.equal(f.evaluate('JSON.stringify(syncResult)'),raw);assert.equal(f.get('sync-result').children.length,0);
   for(const reviews of [undefined,null,{},'bad']){const plain={sources:{camera:{status:'accepted'},mic:{status:'review'}},offsets:{camera:0},reviews};assert.equal(f.evaluate('stagedSyncDisplay('+JSON.stringify(plain)+',["camera","mic"],connected)').split('\n')[1],'mic.wav · 확인 필요 · 싱크 연결을 확인하고 수동 싱크로 보정하세요.');}
   const engine={sources:{camera:{status:'accepted'},mic:{status:'review'}},offsets:{camera:0},reviews:[{assetId:'mic',code:'TIMECODE_DATE_REQUIRED'}]};assert.equal(f.evaluate('stagedSyncDisplay('+JSON.stringify(engine)+',["camera","mic"],connected)').split('\n')[1],'mic.wav · 확인 필요 · '+syncReviewGuides.TIMECODE_DATE_REQUIRED);
  }
@@ -3407,11 +3407,11 @@ test('sync source names disambiguate duplicate basenames consistently in rows re
  for(const mode of ['separate','mixed']){
   const f=await namedSyncPanel(mode),names=['session.mov [camera]','session.mov [mic]'];assert.deepEqual(f.get('sync-sources').children.map(row=>row.children[0].textContent),names);assert.deepEqual(f.get('sync-reference').children.map(row=>row.textContent),names);assert.deepEqual(f.get('sync-reference').children.map(row=>row.value),['camera','mic']);
   const before=f.evaluate('JSON.stringify(connected.snapshot)'),input=f.evaluate('syncInputHash()');syncRow(f,1).stream.value='0';syncRow(f,1).stream.oninput();assert.match(syncRow(f,1).issue.textContent,/^session\.mov \[mic\] · /);syncRow(f,1).stream.value='1';syncRow(f,1).stream.oninput();assert.equal(f.evaluate('syncInputHash()'),input);
-  await f.click('sync');await f.tick();assert.equal(f.get('sync-result').textContent,names[0]+' · 0.000초\n'+names[1]+' · 확인 필요 · '+syncReviewGuides.SYNC_UNRESOLVED);assert.equal(f.evaluate('JSON.stringify(connected.snapshot)'),before);assert.equal(f.evaluate('syncResultMatches()'),true);
+  await f.click('sync');await f.tick();assert.equal(f.get('sync-result').textContent,names[0]+' · 기준 대비 0.000초\n'+names[1]+' · 확인 필요 · '+syncReviewGuides.SYNC_UNRESOLVED);assert.equal(f.evaluate('JSON.stringify(connected.snapshot)'),before);assert.equal(f.evaluate('syncResultMatches()'),true);
  }
 });
 test('sync source names keep shortest folder suffixes unique filenames unknown text and identical path identities',async()=>{
- const f=await namedSyncPanel();assert.equal(f.evaluate('stagedSyncDisplay({sources:{camera:{status:"accepted"}},offsets:{camera:0}},["camera"],connected)'), 'session.mov [camera] · 0.000초');const cases=[
+ const f=await namedSyncPanel();assert.equal(f.evaluate('stagedSyncDisplay({sources:{camera:{status:"accepted"}},offsets:{camera:0}},["camera"],connected)'), 'session.mov [camera] · 기준 대비 0.000초');const cases=[
   [['D:/root/cam/take/a.mov','D:/root/mic/take/a.mov'],['a.mov [cam/take]','a.mov [mic/take]']],
   [['D:/a.mov','E:/a.mov'],['a.mov [D:]','a.mov [E:]']],
   [['\\\\server1\\share\\a.mov','\\\\server2\\share\\a.mov'],['a.mov [server1/share]','a.mov [server2/share]']],
@@ -3428,7 +3428,7 @@ test('sync source names preserve raw settings results work locks stale rows and 
  for(const mode of ['separate','mixed']){
   const f=await namedSyncPanel(mode);await f.click('sync');await f.tick();const result=f.evaluate('JSON.stringify(syncResult)'),input=f.evaluate('syncInputHash()'),shown=f.get('sync-result').textContent;
   for(const lock of trackLocks){const locked=await namedSyncPanel(mode);await locked.click('sync');await locked.tick();const before=syncState(locked),display=locked.get('sync-result').textContent;locked.evaluate(lock+';toggle()');for(const field of syncControls(locked)){field.oninput?.();field.onchange?.();}assert.equal(syncState(locked),before);assert.equal(locked.get('sync-result').textContent,display);}
-  const subset=f.evaluate('stagedSyncDisplay({sources:{mic:{status:"accepted"}},offsets:{mic:2.5}},["mic"],connected)');assert.equal(subset,'session.mov [mic] · 2.500초');assert.equal(f.evaluate('JSON.stringify(syncResult)'),result);assert.equal(f.evaluate('syncInputHash()'),input);assert.equal(f.get('sync-result').textContent,shown);
+  const subset=f.evaluate('stagedSyncDisplay({sources:{mic:{status:"accepted"}},offsets:{mic:2.5}},["mic"],connected)');assert.equal(subset,'session.mov [mic] · 기준 대비 +2.500초');assert.equal(f.evaluate('JSON.stringify(syncResult)'),result);assert.equal(f.evaluate('syncInputHash()'),input);assert.equal(f.get('sync-result').textContent,shown);
   const old=syncRow(f,1);f.native=namedSyncNative(['D:/owned/cam/new.mov','D:/owned/mic/new.mov'],'named-next');await f.click('read-project');const raw=f.evaluate('JSON.stringify(captureSettings())');old.stream.oninput();assert.equal(f.evaluate('JSON.stringify(captureSettings())'),raw);assert.deepEqual(f.get('sync-reference').children.map(v=>v.textContent),['new.mov [cam]','new.mov [mic]']);
   f.state.update={updateState:'IDLE',checkState:'AVAILABLE',candidate:{candidateId:'release:hash',manifestDigest:'a'.repeat(64),appVersion:'0.1.1'}};await f.tick();await f.click('update');assert.ok(f.calls.some(v=>v.path==='/updates/start'));assert.equal(f.get('sync').disabled,true);
  }
@@ -3439,5 +3439,29 @@ test('sync source names keep invalid retained rows safe while reading a replacem
   const f=await namedSyncPanel(mode),row=syncRow(f,1);row[field].value='0';row[field].oninput();assert.match(row.issue.textContent,/^session\.mov \[mic\] · /);
   f.evaluate('connected=null');assert.doesNotThrow(()=>f.evaluate('toggle()'));assert.match(row.issue.textContent,/^session\.mov \[mic\] · /);
   f.native=namedSyncNative(['D:/owned/cam/new.mov','D:/owned/mic/new.mov'],'replacement-input');await f.evaluate('readProject()');assert.equal(f.evaluate('binding'),false);assert.equal(f.evaluate('projectRead'),null);assert.equal(f.evaluate('connected.snapshot.sequenceRef'),'replacement-input');assert.deepEqual(f.get('sync-reference').children.map(v=>v.textContent),['new.mov [cam]','new.mov [mic]']);
+ }
+});
+
+test('sync offset context shows signed reference-relative seconds in live results without changing raw offsets',async()=>{
+ for(const mode of ['separate','mixed'])for(const [offset,want] of [[-1.5,'-1.500'],[0,'0.000'],[1.5,'+1.500'],['1.23456','+1.235'],[' -2.3456 ','-2.346'],['0.000','0.000']]){
+  const result={sources:{camera:{status:'accepted'},mic:{status:'accepted'}},offsets:{camera:0,mic:offset},reviews:[]},raw=JSON.stringify(result),f=await completedSync({mode,request:async path=>path==='/jobs/job-1'?syncReviewReceipt(structuredClone(result)):undefined});
+  assert.equal(f.get('sync-result').textContent,'camera.mov · 기준 대비 0.000초\nmic.wav · 기준 대비 '+want+'초');assert.equal(f.evaluate('JSON.stringify(syncResult)'),raw);assert.equal(f.evaluate('syncResultMatches()'),true);assert.equal(f.evaluate('syncResult.offsets.mic'),offset);
+ }
+});
+
+test('sync offset context preserves duplicate source identity review text and accepted offset rejection',async()=>{
+ const f=await namedSyncPanel(),result={sources:{camera:{status:'accepted'},mic:{status:'review',reason:'<b>UNKNOWN</b>'}},offsets:{camera:1.5,mic:true},reviews:[]},raw=JSON.stringify(result);
+ assert.equal(f.evaluate('stagedSyncDisplay('+raw+',["camera","mic"],connected)'),'session.mov [camera] · 기준 대비 +1.500초\nsession.mov [mic] · 확인 필요 · <b>UNKNOWN</b>');assert.equal(JSON.stringify(result),raw);
+ for(const value of [null,'',' ',true,false,[],{},'bad']){const invalid=structuredClone(result);invalid.offsets.camera=value;assert.throws(()=>f.evaluate('stagedSyncDisplay('+JSON.stringify(invalid)+',["camera","mic"],connected)'),/싱크 시간/);}
+ const numeric={sources:{mic:{status:'accepted'}},offsets:{mic:'1e-3'}};assert.equal(f.evaluate('stagedSyncDisplay('+JSON.stringify(numeric)+',["mic"],connected)'),'session.mov [mic] · 기준 대비 +0.001초');assert.equal(f.evaluate('stagedSyncDisplay({sources:{mic:{status:"accepted"}},offsets:{mic:-0.0001}},["mic"],connected)'),'session.mov [mic] · 기준 대비 -0.000초');
+});
+
+test('sync offset context remains stable through raw settings restore work locks new sequences and immediate update',async()=>{
+ for(const mode of ['separate','mixed']){
+  const result={sources:{camera:{status:'accepted'},mic:{status:'accepted'}},offsets:{camera:0,mic:'2.5'},reviews:[]},make=()=>completedSync({mode,request:async path=>path==='/jobs/job-1'?syncReviewReceipt(structuredClone(result)):undefined}),f=await make(),raw=f.evaluate('JSON.stringify(syncResult)'),input=f.evaluate('syncInputHash()');assert.match(f.get('sync-result').textContent,/mic.wav · 기준 대비 \+2\.500초/);
+  await f.click('save-settings');await f.click('load-settings');assert.equal(f.evaluate('syncInputHash()'),input);assert.equal(f.evaluate('syncResult'),null);assert.equal(f.get('sync-result').textContent,'');await f.click('sync');await f.tick();assert.equal(f.evaluate('JSON.stringify(syncResult)'),raw);assert.match(f.get('sync-result').textContent,/mic.wav · 기준 대비 \+2\.500초/);
+  for(const lock of trackLocks){const locked=await make(),before=syncState(locked),display=locked.get('sync-result').textContent;locked.evaluate(lock+';toggle()');for(const field of syncControls(locked)){field.oninput?.();field.onchange?.();}assert.equal(syncState(locked),before);assert.equal(locked.get('sync-result').textContent,display);}
+  const old=syncRow(f,1);f.native=nativeSnapshot('offset-next');await f.click('read-project');const settings=f.evaluate('JSON.stringify(captureSettings())');old.offset.oninput();assert.equal(f.evaluate('JSON.stringify(captureSettings())'),settings);assert.equal(f.get('sync-result').textContent,'');
+  f.state.update={updateState:'IDLE',checkState:'AVAILABLE',candidate:{candidateId:'release:hash',manifestDigest:'a'.repeat(64),appVersion:'0.1.73'}};await f.tick();await f.click('update');assert.ok(f.calls.some(v=>v.path==='/updates/start'));assert.equal(f.get('sync').disabled,true);
  }
 });

@@ -1065,11 +1065,12 @@ function syncReviewReason(result,id,evidence){
   const reviews=Array.isArray(result.reviews)?result.reviews:[],codes=[...new Set([evidence.reason||evidence.code,...reviews.filter(review=>review&&typeof review==='object'&&(review.assetId===id||Array.isArray(review.assetIds)&&review.assetIds.includes(id))).map(review=>review.code)].filter(code=>typeof code==='string'&&code.trim()))];
   return codes.length?codes.map(code=>Object.prototype.hasOwnProperty.call(syncReviewReasons,code)?syncReviewReasons[code]:code).join(' · '):evidence.status==='review'?'싱크 연결을 확인하고 수동 싱크로 보정하세요.':evidence.status;
 }
+function syncOffsetLabel(offset){const value=Number(offset);return '기준 대비 '+(value>0?'+':'')+value.toFixed(3)+'초';}
 function stagedSyncDisplay(result,assets,connection){
   const record=value=>!!value&&typeof value==='object'&&!Array.isArray(value);
   if(!record(result)||!record(result.sources)||!record(result.offsets)||Object.keys(result.sources).length!==assets.length||assets.some(id=>!record(result.sources[id])||typeof result.sources[id].status!=='string'))throw Object.assign(new Error('싱크 결과를 확인하지 못했습니다. 싱크를 다시 분석하세요.'),{code:'SYNC_RESULT_INVALID'});
   const sources=syncSourceLabels(connection.snapshot.sources);
-  return assets.map(id=>{const evidence=result.sources[id],offset=result.offsets[id];if(evidence.status==='accepted'&&(!['number','string'].includes(typeof offset)||typeof offset==='string'&&!offset.trim()||!Number.isFinite(Number(offset))))throw Object.assign(new Error('싱크 시간 정보를 확인하지 못했습니다. 싱크를 다시 분석하세요.'),{code:'SYNC_RESULT_INVALID'});return sources.get(id)+' · '+(evidence.status==='accepted'?Number(offset).toFixed(3)+'초':'확인 필요 · '+syncReviewReason(result,id,evidence));}).join('\n');
+  return assets.map(id=>{const evidence=result.sources[id],offset=result.offsets[id];if(evidence.status==='accepted'&&(!['number','string'].includes(typeof offset)||typeof offset==='string'&&!offset.trim()||!Number.isFinite(Number(offset))))throw Object.assign(new Error('싱크 시간 정보를 확인하지 못했습니다. 싱크를 다시 분석하세요.'),{code:'SYNC_RESULT_INVALID'});return sources.get(id)+' · '+(evidence.status==='accepted'?syncOffsetLabel(offset):'확인 필요 · '+syncReviewReason(result,id,evidence));}).join('\n');
 }
 async function pollSyncJob(active){
   if(syncPoll)return;
@@ -1217,7 +1218,7 @@ async function pollJob(){
       if(active.inputHash!==syncInputHash()){invalidateSyncResult();return;}
       syncJob=value.jobId;syncResult=value.result;syncResultInputHash=active.inputHash;
       const sources=syncSourceLabels(connected.snapshot.sources);
-      $('sync-result').textContent=Object.entries(syncResult.sources).map(([id,evidence])=>sources.get(id)+' · '+(evidence.status==='accepted'?(Number(syncResult.offsets[id]).toFixed(3)+'초'):'확인 필요 · '+syncReviewReason(syncResult,id,evidence))).join('\n');
+      $('sync-result').textContent=Object.entries(syncResult.sources).map(([id,evidence])=>sources.get(id)+' · '+(evidence.status==='accepted'?syncOffsetLabel(syncResult.offsets[id]):'확인 필요 · '+syncReviewReason(syncResult,id,evidence))).join('\n');
       say('싱크 분석 완료 · 확인이 필요한 소스를 검토하세요.');
     }else if(active.kind==='input-probe'){
       try{

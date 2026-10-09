@@ -3082,3 +3082,50 @@ test('cache initialization lock preserves immediate update and late initializer 
   await f.click('release-cache');await f.evaluate('runCache(true)');assert.equal(f.calls.length,calls);
  }
 });
+
+async function heldAuthenticatedCacheCancel(mode='separate'){
+ const h=await heldExample(mode),f=h.f;h.resume(exampleReceipt(f));await h.run;await f.click('open-settings');
+ const peer=await require('./panel-continuation-peer.js').attachContinuationPeer(f);
+ const prune=f.click('prune-cache');await peer.drainUntil(()=>peer.activity.at(-1)===1&&[...peer.timers].some(t=>t.ms===50));
+ await f.evaluate('refresh()');assert.equal(f.evaluate('state.maintenance.drained'),true);assert.equal(f.evaluate('validationCount'),1);
+ const cancel=f.click('cancel');await peer.drainUntil(peer.cancelEntered);peer.poll();await prune;
+ await peer.drainUntil(()=>f.evaluate('previewBusy')===0);assert.equal(f.evaluate('validationCount'),0);assert.equal(f.evaluate('pending'),false);assert.notEqual(f.evaluate('cancelRequest'),null);
+ return {f,peer,cancel,settle:async(code)=>{if(code==='OWNED_TRANSPORT_LOSS')peer.reject();else peer.release(code);await cancel;peer.close();}};
+}
+
+test('cache cancellation real authenticated queue blocks UI and direct execution until receipt',async()=>{
+ for(const mode of ['separate','mixed']){
+  const h=await heldAuthenticatedCacheCancel(mode),{f,peer}=h;
+  try{
+   assert.equal(f.get('release-cache').disabled,true);assert.equal(f.get('prune-cache').disabled,true);assert.equal(f.evaluate('cacheReady(true)'),false);assert.equal(f.evaluate('cacheReady(false)'),false);
+   const before=cacheState(f),files=JSON.stringify([...peer.files]),calls=peer.calls.length;
+   await f.click('release-cache');await f.click('prune-cache');await f.evaluate('runCache(true)');await f.evaluate('runCache(false)');
+   assert.equal(peer.calls.length,calls);assert.equal(cacheState(f),before);assert.equal(JSON.stringify([...peer.files]),files);assert.equal(f.evaluate('cacheRequest'),null);
+  }finally{await h.settle();}
+  assert.equal(f.get('release-cache').disabled,false);const start=peer.calls.length;await f.click('release-cache');
+  assert.deepEqual(peer.calls.slice(start).map(c=>c.path),['/resources/prune','/state']);assert.deepEqual(JSON.parse(peer.calls[start].body),{epoch:0,action:'release'});
+  assert.match(f.get('status').textContent,/정리를 종료했습니다/);assert.deepEqual(peer.activity,[1,0]);assert.equal(peer.calls.some(c=>c.path.endsWith('/take')),false);peer.close();
+ }
+});
+
+test('cache cancellation real signed and transport failures restore only safe release conditions and preserve guidance',async()=>{
+ for(const mode of ['separate','mixed'])for(const code of ['AUTH_REQUIRED','SESSION_EXPIRED','PANEL_CONTEXT_CONFLICT','OWNED_CANCEL_FAILURE','OWNED_TRANSPORT_LOSS']){
+  const h=await heldAuthenticatedCacheCancel(mode),{f,peer}=h;f.evaluate('say("Owned newer cancel guide")');
+  try{assert.equal(f.get('release-cache').disabled,true);assert.equal(f.evaluate('cacheReady(true)'),false);}finally{await h.settle(code);}
+  assert.equal(f.get('status').textContent,'Owned newer cancel guide');assert.equal(f.evaluate('cancelRequest'),null);assert.equal(f.evaluate('validationCount'),0);assert.equal(f.evaluate('stopped'),true);
+  const auth=['AUTH_REQUIRED','SESSION_EXPIRED','PANEL_CONTEXT_CONFLICT'].includes(code);assert.equal(f.get('release-cache').disabled,auth);assert.equal(f.evaluate('credentials===null'),auth);
+  assert.equal(peer.calls.filter(c=>c.path.endsWith('/cancel')).length,1);assert.equal(peer.calls.some(c=>c.path.endsWith('/take')),false);
+ }
+});
+
+test('cache cancellation real queue leaves update click immediate while preserving serialized transport',async()=>{
+ for(const mode of ['separate','mixed']){
+  const h=await heldAuthenticatedCacheCancel(mode),{f,peer}=h;let update;
+  try{
+   assert.equal(f.get('update').disabled,false);update=f.click('update');await peer.drainUntil(()=>f.evaluate('updateIntent?.inFlight')===true);
+   assert.equal(f.evaluate('stopped'),true);assert.equal(f.get('update').disabled,true);assert.equal(f.get('analyze').disabled,true);assert.equal(f.get('release-cache').disabled,true);
+   assert.equal(peer.calls.filter(c=>c.path==='/updates/start').length,0,'physical authenticated queue still awaits cancellation receipt');
+  }finally{peer.release();await h.cancel;await update;peer.close();}
+  assert.equal(peer.calls.filter(c=>c.path==='/updates/start').length,1);assert.equal(f.evaluate('updateIntent.accepted'),true);assert.equal(f.get('release-cache').disabled,true);assert.equal(f.evaluate('stopped'),true);
+ }
+});

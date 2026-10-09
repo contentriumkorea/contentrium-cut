@@ -5,7 +5,7 @@ require('./sync.js').install(ContentriumHost);
 require('./selection.js').install(ContentriumHost);
 const $=id=>document.getElementById(id);
 const view=require('./view.js').install(document);
-const connection=require('./connection.js').create(uxp,bundle,{onValidation:count=>{validationRevision++;validationCount=count;if(count&&!stopped)say('원본 파일의 내용이 분석 결과와 같은지 확인하고 있습니다.');toggle();}});
+const connection=require('./connection.js').create(uxp,bundle,{onValidation:(count,descriptors)=>{validationRevision++;validationCount=count;const own=cacheValidation(count,descriptors);if(count&&!stopped){say(own?'완료된 캐시를 확인하고 정리하고 있습니다.':'원본 파일의 내용이 분석 결과와 같은지 확인하고 있습니다.');if(own)cacheRequest.guidanceRevision=statusRevision;}toggle();}});
 function requestId(){const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');}
 const workflow=require('./workflow.js').create({api:(...args)=>api(...args),storage:uxp.storage.secureStorage,randomId:requestId,
   stopped:()=>stopped,onBatch:value=>{batchRunning=value;},onResult:()=>say('결과 시퀀스에 편집을 적용하고 있습니다.')});
@@ -14,6 +14,7 @@ const microphoneRows=[],cameraRows=[],speakerRows=[],calibrationRows=[],override
 let microphoneSelectionCustomized=false;
 let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;let projectRead=null,nativePreparation=null,editingSubmission=null,correctionRequest=null,settingsRestore=null,settingsSave=null;
 let settingsWriteTail=Promise.resolve();
+let cacheRequest=null;
 let resourceRequest=null,resourceInputRevision=0,resourceViewRevision=0,resourceInputDirty=false,stopRevision=0;
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
 let analysisState=null;
@@ -254,7 +255,7 @@ function toggle(){
   $('create-input').disabled=locked||!projectSelection||!inputCapability;$('cancel').disabled=!job&&!applying&&!previewPlaying&&!validationCount;
   $('undo-correction').disabled=locked||!analysisState||activeCorrections().length===0;
   $('recover-apply').disabled=busy||!credentials||!(localEditPending||state?.applyRecovery?.blocked);
-  $('release-cache').disabled=busy||!credentials||state?.compatible===false||state?.maintenance?.canRelease!==true;
+  $('release-cache').disabled=busy||!cacheReady(true);
   $('progress').className=job||applying||pending||validationCount?'running':'';
   const update=state?.update,available=update?.candidate&&['AVAILABLE','CHECKING'].includes(update.checkState);
   $('update').disabled=!credentials||!!updateIntent?.inFlight||!!updateIntent?.accepted||(!updateIntent&&!available)||!!update&& !['IDLE','COMPLETE','CANCELED','FAILED_BEFORE_REPLACE','ROLLED_BACK'].includes(update.updateState);
@@ -771,8 +772,8 @@ function updateGuidance(update){
   }
   return {CURRENT:'최신 버전입니다.',NO_RELEASE:'게시된 업데이트가 없습니다.',CHECKING:'업데이트 확인 중'}[update.checkState]||'업데이트 상태를 확인하지 못했습니다. 업데이트 확인을 다시 누르세요.';
 }
-async function refresh(){
-  if(!credentials)return;state=await api('/state');
+async function refresh(current=()=>true,accepted=()=>{}){
+  if(!credentials||!current())return false;const receipt=await api('/state');if(!current(receipt))return false;state=receipt;accepted();
   if(updateIntent&&state.gateOpen&&state.update.updateEpoch>updateIntent.epoch&&['COMPLETE','CANCELED','FAILED_BEFORE_REPLACE','ROLLED_BACK'].includes(state.update.updateState))updateIntent=null;
   if(updateIntent||!state.gateOpen||state.stopEpoch!==null&&state.stopEpoch!==undefined){stopped=true;plan=null;}else if(!applying)stopped=false;
   $('boot-status').className='hidden';
@@ -793,7 +794,8 @@ async function refresh(){
   $('apply-recovery-text').textContent=localIntentError?messages[localIntentError]:localEditPending||recovery?.blocked?'이전 편집이 중단되었습니다. 기록을 확인한 뒤 새 작업을 시작할 수 있습니다.':'';
   $('cache-maintenance').className=state.maintenance?'':'hidden';
   $('cache-maintenance-text').textContent=state.maintenance?.canRelease?'정리 작업이 종료됐습니다. 편집을 계속할 수 있습니다.':'캐시 정리 작업이 종료되는 것을 기다리고 있습니다.';
-  toggle();if(!state.gateOpen&&!state.maintenance&&!applying&&!batchRunning&&!previewPlaying){await api('/updates/ack',{epoch:state.epoch,quiescent:true,batchRunning:false}).catch(()=>{});}
+  toggle();if(!state.gateOpen&&!state.maintenance&&!applying&&!batchRunning&&!previewPlaying){if(current())await api('/updates/ack',{epoch:state.epoch,quiescent:true,batchRunning:false}).catch(()=>{});}
+  return current();
 }
 async function heartbeat(current=()=>true){if(!credentials||!state)return;const receipt=await api('/heartbeat',{hostIdentity:null,epoch:state.epoch,batchRunning,quiescent:!applying&&!previewPlaying,panelVersion:bundle.appVersion,bundleId:bundle.bundleId,protocolVersion:bundle.protocolVersion});if(!current())return;if(!receipt.gateOpen||receipt.stopEpoch!==null&&receipt.stopEpoch!==undefined){stopped=true;plan=null;toggle();}}
 function periodicHeartbeat(){
@@ -1043,8 +1045,49 @@ async function runResourceSettings(save=false){
   finally{if(resourceRequest===token)resourceRequest=null;}
 }
 handler('save-resources',()=>runResourceSettings(true));
-handler('prune-cache',async()=>{const value=await api('/resources/prune',{epoch:state.epoch});await loadResources();say('완료된 캐시 '+value.removed.length+'개 정리'+(value.budgetMet?'':' · 보존해야 하는 데이터가 있어 예산을 초과합니다.'));});
-handler('release-cache',async()=>{await api('/resources/prune',{epoch:state.epoch,action:'release'});await refresh();say('정리를 종료했습니다. 편집을 계속할 수 있습니다.');});
+function cacheReady(release=false){
+  return !!credentials&&!!state&&!updateIntent&&!panelContextConflict&&state.compatible!==false&&state.stopEpoch==null&&!binding&&!projectRead&&!job&&!validationCount&&!applying&&!batchRunning&&!localEditPending&&!state.applyRecovery?.blocked&&(release?state.maintenance?.canRelease===true&&state.maintenance.drained===true&&!state.gateOpen:state.gateOpen&&!stopped&&!state.maintenance);
+}
+function cacheValidation(count,descriptors){
+  const token=cacheRequest;if(!token)return false;
+  const own=!token.release&&!token.invalid&&count===1&&Array.isArray(descriptors)&&descriptors.length===1&&descriptors[0].path==='/resources/prune'&&descriptors[0].epoch===token.epoch&&typeof descriptors[0].id==='string'&&/^[a-f0-9]{32}$/.test(descriptors[0].id)&&!token.validationFinished&&(!token.id||token.id===descriptors[0].id);
+  if(own){token.id=descriptors[0].id;token.validationActive=true;token.validationRevision=validationRevision;return true;}
+  if(!count&&token.validationActive&&!token.invalid){token.validationActive=false;token.validationFinished=true;token.validationRevision=validationRevision;return false;}
+  token.invalid=true;return false;
+}
+function cacheScope(){return [credentials,connected,connected?.snapshot.snapshotHash,connected?.snapshot.hostSnapshotHash,mode,analysisState,analysisState?.revision,state?.epoch,state?.compatible,state?.appVersion,state?.bundleId,state?.protocolVersion,localEditPending,state?.applyRecovery?.blocked,binding,projectRead,job,applying,batchRunning,projectSelection,inputCapability,syncResult,syncJob,syncResultInputHash,resourceInputRevision,resourceViewRevision,resourceInputDirty,stopRevision,resourceRequest,planInvalidated,JSON.stringify(state?.update),JSON.stringify(state?.models),JSON.stringify(state?.applyRecovery)];}
+function cacheResponseGuard(token){
+  const scope=cacheScope(),rows=selectedRows.slice(),raw=JSON.stringify([$('analysis-device').value,$('cache-budget').value]);
+  return receipt=>{
+    if(cacheRequest!==token||token.invalid||!credentials||!state||updateIntent||panelContextConflict||state.stopEpoch!=null||state.compatible===false||validationRevision!==token.validationRevision||validationCount!==(token.validationActive?1:0))return false;
+    const live=cacheScope();if(!scope.every((value,index)=>value===live[index])||rows.length!==selectedRows.length||!rows.every((row,index)=>row===selectedRows[index])||raw!==JSON.stringify([$('analysis-device').value,$('cache-budget').value]))return false;
+    if(plan!==token.plan&&!(token.id&&!token.release&&plan===null)||planInputHash!==token.planInputHash)return false;
+    const allowed=value=>!!value&&value.epoch===token.epoch&&value.stopEpoch==null&&value.compatible!==false&&value.appVersion===state.appVersion&&value.bundleId===state.bundleId&&value.protocolVersion===state.protocolVersion&&!value.applyRecovery?.blocked&&JSON.stringify(value.update)===JSON.stringify(state.update)&&JSON.stringify(value.models)===JSON.stringify(state.models)&&JSON.stringify(value.applyRecovery)===JSON.stringify(state.applyRecovery)&&(!value.maintenance?value.gateOpen:value.maintenance.id===token.id&&!value.gateOpen);
+    if(!allowed(state)||receipt&&!allowed(receipt))return false;
+    return token.release||!stopped||!!token.id;
+  };
+}
+async function runCache(release=false){
+  if(!cacheReady(release))return;
+  const token={release,epoch:state.epoch,id:release?state.maintenance.id:null,plan,planInputHash,validationRevision,guidanceRevision:statusRevision,validationActive:false,validationFinished:false,invalid:false};cacheRequest=token;let current=cacheResponseGuard(token);
+  try{
+    const value=await api('/resources/prune',release?{epoch:token.epoch,action:'release'}:{epoch:token.epoch});if(!current())return;
+    let message;
+    if(release){
+      if(value?.released!==true)throw new Error('캐시 정리 종료 응답을 확인하지 못했습니다.');
+      if(!await refresh(current,()=>{current=cacheResponseGuard(token);})||!current())return;
+      message='정리를 종료했습니다. 편집을 계속할 수 있습니다.';
+    }else{
+      if(!Array.isArray(value?.removed)||typeof value.budgetMet!=='boolean')throw new Error('캐시 정리 결과를 확인하지 못했습니다.');
+      message='완료된 캐시 '+value.removed.length+'개 정리'+(value.budgetMet?'':' · 보존해야 하는 데이터가 있어 예산을 초과합니다.');
+      if(!await loadResources(current,()=>{current=cacheResponseGuard(token);})||!current())return;
+    }
+    if(statusRevision===token.guidanceRevision)say(message);
+  }catch(e){if(current()&&statusRevision===token.guidanceRevision)error(e);}
+  finally{if(cacheRequest===token)cacheRequest=null;}
+}
+handler('prune-cache',()=>runCache());
+handler('release-cache',()=>runCache(true));
 const showSettings=$('open-settings').onclick;
 $('open-settings').onclick=()=>{showSettings();if(view.current()==='settings'&&!resourceLoaded&&!resourceInputDirty)return runResourceSettings();};
 for(const id of ['analysis-device','cache-budget'])$(id).oninput=$(id).onchange=()=>{if(workLocked())return;resourceInputRevision++;resourceInputDirty=true;};

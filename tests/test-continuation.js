@@ -5,7 +5,7 @@ const bundle={appVersion:'0.1.0',bundleId:'bundle-test',protocolVersion:1};
 const bootstrap={schemaVersion:1,productId:'com.contentrium.cut',installationId:'install-test',keyId:'key-test',authProtocol:1,endpoint:'http://127.0.0.1:41737',secret:Buffer.from(Array.from({length:32},(_,i)=>i)).toString('base64')};
 async function fixture(t,scenario='success',{loseTake=false}={}){
   const process=spawn(path.join(__dirname,'../.build-venv/Scripts/python.exe'),['-B',path.join(__dirname,'continuation_auth_bridge.py'),scenario],{cwd:path.join(__dirname,'..'),env:{...global.process.env,PYTHONPATH:'companion;tests'},windowsHide:true,stdio:['pipe','pipe','pipe']});
-  const queue=[],calls=[],activity=[];let exited=false,stderr='';const lines=createInterface({input:process.stdout});
+  const queue=[],calls=[],activity=[],descriptors=[];let exited=false,stderr='';const lines=createInterface({input:process.stdout});
   process.stderr.on('data',v=>{stderr=(stderr+v.toString()).slice(-2000);});
   lines.on('line',line=>{const next=queue.shift();if(next)next.resolve(JSON.parse(line));});
   process.on('error',e=>{while(queue.length)queue.shift().reject(e);});
@@ -20,13 +20,13 @@ async function fixture(t,scenario='success',{loseTake=false}={}){
   t.after(async()=>{global.fetch=oldFetch;if(oldCrypto)Object.defineProperty(globalThis,'crypto',oldCrypto);if(!exited){process.stdin.end();const timeout=setTimeout(()=>process.kill(),3000);await new Promise(resolve=>process.once('exit',resolve));clearTimeout(timeout);}lines.close();});
   const files=new Map([['contentrium-bootstrap.json',JSON.stringify(bootstrap)]]),entry=name=>({name,isFile:true,read:async()=>files.get(name),write:async value=>files.set(name,value)});
   const uxp={storage:{localFileSystem:{getDataFolder:async()=>({getEntries:async()=>[...files.keys()].map(entry),createFile:async name=>{files.set(name,'');return entry(name);}})}}};
-  const client=connection.create(uxp,bundle,{onValidation:count=>activity.push(count)});
+  const client=connection.create(uxp,bundle,{onValidation:(count,active)=>{activity.push(count);descriptors.push(active);}});
   const started=async()=>{for(let i=0;i<200&&!calls.some(c=>c.path==='/continuations/'+'c'.repeat(32));i++)await new Promise(resolve=>setTimeout(resolve,5));};
-  return {client,calls,activity,started};
+  return {client,calls,activity,descriptors,started};
 }
 test('signed validation continuation is consumed once with captured epoch and no original replay',async t=>{
   const f=await fixture(t);assert.deepEqual(await f.client.request('/fixture/work',{}),{execute:true,restored:true,count:1});
-  assert.equal(f.calls.filter(c=>c.path==='/fixture/work').length,1);const takes=f.calls.filter(c=>c.path.endsWith('/take'));assert.equal(takes.length,1);assert.equal(takes[0].method,'POST');assert.deepEqual(JSON.parse(takes[0].body),{epoch:7});assert.deepEqual(f.activity,[1,0]);
+  assert.equal(f.calls.filter(c=>c.path==='/fixture/work').length,1);const takes=f.calls.filter(c=>c.path.endsWith('/take'));assert.equal(takes.length,1);assert.equal(takes[0].method,'POST');assert.deepEqual(JSON.parse(takes[0].body),{epoch:7});assert.deepEqual(f.activity,[1,0]);assert.deepEqual(f.descriptors,[[{id:'c'.repeat(32),path:'/fixture/work',epoch:7}],[]]);assert.deepEqual(Object.keys(f.descriptors[0][0]).sort(),['epoch','id','path']);
 });
 test('waiting validation releases the transport queue for heartbeats and update controls',async t=>{
   const f=await fixture(t,'hold'),pending=f.client.request('/fixture/work',{});await f.started();

@@ -1068,3 +1068,12 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 자체 freeze 추가 진단에서 test-panel-main.js가 기존52개 빌드 입력에 있다고 가정하여 KeyError가 발생했다. 제품/빌드 실패가 아닌 진단 구성 오류다. 빌드52개와 독립 검수 test SHA를 분리해 모두 일치함을 확인했으며 원본 원인·수정 증거(cycle41-freeze-check-diagnostic.json)를 보존했다.
 
 - 엔진/CCX·Setup 빌드 exit0. 최초 고정52개 physical 해시를 빌드 후 그대로 유지했다. [0.1.42 패키지 증거](package-0.1.42-proof.json): ZIP/CCX CRC·경로·크기·비공개 자료 제외·CCX raw 소스·Silero 해시·frozen runtime29/Setup26모듈·진입점2개 소스 일치. 추출 engine runtimeReady=true/0.1.42·Setup help exit0,55.265초. optional 모듈/torchcodec 경고를 보존하고 실제 Community-1 품질 증거로 확대하지 않는다. 현재 단계: 기획·설계·구현·회귀·독립 리뷰·패키지 실행 완료.0.1.42 공개 및 익명 업데이트 발견·서명·실제 다운로드/CURRENT/고정v0.1.1 검증을 이어간다. 사용자 설치/활성화 없음.
+
+### 공개 결과
+
+- [v0.1.42](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.42): release `407519629`, 제목 `Contentrium CUT`, draft/prerelease 아님. 공개 시각 2026-10-09 13:51:15 KST (`2026-10-09T04:51:15Z`), target/tag commit `04c87cd82bfa5bd846941c10ee3fd69cc32615eb` 확인.
+- [공개 실제 재다운로드](release-0.1.42-proof.json): 익명 제품 경로0.1.41 →0.1.42 AVAILABLE·서명·실제 ZIP/CCX/Setup3개 크기/SHA-256 일치.
+- [현재 버전](release-0.1.42-current-proof.json): 빈 상태0.1.42 CURRENT/후보 없음. 공개 자산5개 ID·크기·digest 및 서명 문서 실제 바이트 일치.
+- [고정 복구 조회](migration-pinned-0.1.1-after-0.1.42-proof.json): latest0.1.42에서도 정확한 서명 v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+- 현재 단계: 기획 → 설계 → 구현 → 검증 →0.1.42 공개 및 공개 재검증 완료. 다음 회차는 초기 connect/pending/후속 처리 exact stop/credential/owner 수명. actual connect 대기 이후 cancel→늦은 성공이 두 모드2/4에서 stopped=true를 false로 바꾸고 /state·heartbeat·/project·updates/check 및 새 안내를 발행한 증거(cycle41-next-inspect.js/.log)를 이어간다. 오류2개는 해당 변화 없음. 실제 Adobe/provider/install0; 실제 편집 성공으로 확대하지 않는다.
+- 활성0.1.0 active/journal/first-install 해시 동일·서명 키 존재·ACTIVE15분·기존 공개 파일/사용자 자료/실패 증거 보존. 컴퓨터유즈·브라우저·Premiere 조작·재설치·provider 없음. 실제 UXP/Premiere 편집·설치 전환·Community-1 품질 미검증. 원본 선택 조회 late 오류4/4와 atomic 준비 실패를 수정했다. 독립 native items/project 누락 Important1건을 바로잡아 exact handle 회귀 및 재검수를 통과했다. 최종 Node496/Python496/독립731/패널387 통과, scoped C/I/M0/0/0. 기존 간헐 실패는 이번 전체 회귀에서 재현되지 않았고 원인은 미확정이다. 이미 발행한 native/API 호출 취소·rollback 또는 초기 연결 전체 수명 해결을 보장하지 않는다.

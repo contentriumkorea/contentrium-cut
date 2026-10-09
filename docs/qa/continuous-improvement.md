@@ -1565,3 +1565,13 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - root 검수 기록 helper 첫 실행은 실제 matrix JSON의 cases를 rows로 가정하여 KeyError(native1)로 중단했다. cycle60-review-record-first-error.json에 원본 오류·native 결과를 보존하고 실제 schema에 맞춘 helper만 수정했다. 최종 기록 helper native0·실제32행/unique/full488/현재raw해시 비교 통과·제품 수정/전체 시험 재실행 없음. 엔진/CCX native89477/exit0, Setup native35223/exit0; 추출 패키지 검사 진행 중.
 
 - [0.1.61 패키지 증거](package-0.1.61-proof.json): 실제native17566/exit0·51.687초. ZIP332267793/CCX79769/Setup93424331byte의 실제SHA 기록·CRC/경로/비공개 자료 제외·CCX raw source/metadata·Silero 해시·runtime29/Setup26모듈·진입점2개 일치. 추출 engine runtimeReady=true/0.1.61·Setup help0. 고정52 raw 입력 동일·신뢰 키/비공개 패턴·설치0.1.0 해시 동일·서명 키 존재·ACTIVE15분 확인. 사용자 설치/활성화/Premiere 조작 없음. 기획·설계·구현·전체 회귀·독립 검수·패키지 실행 완료,0.1.61 공개와 익명 서명/실제3다운로드/CURRENT/고정v0.1.1 검증을 이어간다.
+
+
+### 공개 결과
+
+- [v0.1.61](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.61): release `407858605`, 제목 `Contentrium CUT`, 공개 시각 `2026-10-09T11:43:39Z`, target/tag commit `6f25514a11d9aec357e4314c26f4b7faf1af9df0` 확인. draft/prerelease 아님.
+- [공개 실제 재다운로드](release-0.1.61-proof.json): 익명0.1.60 →0.1.61 AVAILABLE·서명·실제 ZIP/CCX/Setup3개 크기/SHA-256 일치. [현재 버전](release-0.1.61-current-proof.json):0.1.61 CURRENT/후보 없음·공개 자산5개 ID/크기/digest/서명 문서 바이트 일치. [고정 복구 조회](migration-pinned-0.1.1-after-0.1.61-proof.json): latest0.1.61에서도 정확한 서명 v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+- 기획→설계→구현→검증→0.1.61 공개 및 공개 재검증 완료. Node611/Python496/독립32/전체 패널488·각native exit0. 다음 회차는 cycle60-next-inspect.js/.log(native0) 중단 응답 대기 UI와 callback 불일치를 기획한다. 실제 완료 예제·cancel handler·mock continuation cancel receipt hold에서 previewBusy/validationCount0/cancelRequest active이나 release UI enabled·serialcallback 요청0. actual connection validation drain/cancel 응답 경로에서 도달 가능한지 먼저 재현하고, 필요하면 공통 admission을 보완한다. mock stage를 물리 네트워크 중첩/취소 완료 증거로 확대하지 않는다.
+- 신규 RED2 assertion 실패·RED nativeexit 별도 저장 누락·독립 원본 TEMP fixture 실패/로그/native/hash·optional/torchcodec 경고 보존. 현재 신규 초기화 guard 범위 미해결 C/I/M0/0/0. 실제 UXP/Premiere 편집·설치 전환·Community-1 품질 미검증. 기존 공개 파일·사용자 자료/설정/실패 증거와 설치0.1.0 보존·컴퓨터유즈·브라우저·Premiere 조작·재설치·provider/미디어 업로드 없음.
+
+- 최종 공개 실제 다운로드 native15669/exit0·CURRENT/자산5개/고정v0.1.1 native exit0. 공개750파일 비공개 패턴·신뢰 키·고정52 raw 입력 유지, 설치0.1.0 해시 동일·서명 키 존재·자동 개선 ACTIVE15분·검증 종료 후 순차 자체 CLI 작업0/native0을 확인했다. root 검수 기록 helper KeyError도 원본 증거를 보존하고 실제 schema 비교로 해결했다. 다음 회차는 실제 continuation cancellation 응답/validation drain 경로의 UI 표시 일치 여부부터 재현한다. 사용자 설치/활성화·Premiere 조작 없음.

@@ -2390,3 +2390,13 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - [0.1.90 패키지 검증](package-0.1.90-proof.json): runtime/CCX native66205/exit0·Setup native89560/exit0·추출 proof native95933/exit0·53.078초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.90·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.
 
 - root 리뷰 수집 helper 실패 2건 보존: 첫 native1 packaging_count 필드 불일치, 둘째 native1 per-case id/pass 필드 불일치. 실제 sealed schema packaging 배열 길이·packaging_expected_mismatches 및 name/status를 사용하도록 reader만 교정, 최종 native0·55 seal hash/size·11 freeze·86 최종/87raw·실패1개만 retry 및 새2개 ledger 직접검증. 제품/시험 수정이나 통과 시험 반복없음; 첫/둘째 script/log/native는 owned scratch에 보존.
+
+
+### 공개 결과
+
+- [v0.1.90](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.90): release408357049·제목 Contentrium CUT·공개2026-10-09T21:21:43Z·target/tag 1ce8004333e2ab7633bf97115369ae79b8305bef·draft/prerelease 아님. [실제 재다운로드](release-0.1.90-proof.json): 익명0.1.89→0.1.90 AVAILABLE·서명·ZIP/CCX/Setup3개 실제 size/SHA 일치. [현재 조회](release-0.1.90-current-proof.json): CURRENT/후보 없음·5자산 ID/size/digest/서명 바이트 일치. [고정 복구](migration-pinned-0.1.1-after-0.1.90-proof.json): latest0.1.90에도 서명v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+- 기획→설계→구현→검증→0.1.90 공개/재검증 완료. 정식 Node711/Python496·독립 검수는 별도 evidence와 집계를 따른다. 신규4 RED/native1→GREEN4/native0·관련16/16 native0. 실제 Premiere/UXP 화면·편집·기존0.1.0 설치 업데이트 전환·Community-1 품질 미검증. 사용자 설치/활성화·컴퓨터유즈/브라우저/Premiere 조작·provider 동의/토큰/미디어 업로드 없음.
+
+- 종료근거: 업로드 native71803/exit0·실제3다운로드 native86573/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native66205/exit0·Setup native89560/exit0·추출패키지 native95933/exit0/53.078초. 공개867파일 비공개패턴검사·신뢰키불변·최종52raw일치·설치0.1.0 hash동일·서명키존재만확인·자동화ACTIVE15분·자체CLI0. Node711/native29137/exit0/70798.6524ms·Python496고유/native62344/exit0/90.172초. 독립 native588 정확히1회·추가86고유/87raw·미해결0·source52/peer10/hash seal 확인.
+- 실패원인보존: 신규4 RED/native1은복원버튼부재4fail. GREEN4/4/native0/258.6719ms·관련16/16/native0/956.9136ms·기존시험기대변경없음. 최종formal시험/독립제품수정 여부는별도검수기록과동결증거를따름. optional/torchcodec/Silero-SAPI는Community-1품질근거아님. helper실패가있으면각원본로그/native/seal과교정내용보존·통과시험반복없음.
+- 이어갈 단계: actual-main7–19입력초기화뒤복원버튼사용가능하지만복원전의시작/종료입력값이현재UI에없음·raw/hash불변·probe native0. 다음회차복원대상입력값표시를기획→설계·raw빈값/무효표기·유효성오해방지·현재backup맥락/행수명·중복live쓰기·설정/분석/plan불변·즉시update보존수용조건→실패재현부터진행. 이번동결뒤추가제품변경없음·probe/독립matrix는정식집계가산없음. 실제Premiere/UXP 화면·편집·스크린리더·기존0.1.0 업데이트설치전환·Community-1품질미검증. CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/결제/token/media외부업로드없음.

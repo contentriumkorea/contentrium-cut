@@ -1689,3 +1689,86 @@ test('current correction operations retain payload and current response error be
 test('old correction completion cannot clear new request token or overwrite newer accepted analysis',async()=>{
  for(const mode of ['separate','mixed'])for(const outcome of ['success','error']){const {f,run,resume,reject,next,resumeLatest}=await heldCorrection(mode);const firstResume=resume,firstReject=reject;const second=f.evaluate('correct({type:"name",speakerId:"A",name:"Owned replacement"})');for(let i=0;i<100;i++)await Promise.resolve();const owner=f.evaluate('correctionRequest'),replacement={...next,revision:2,names:{A:'Owned replacement'}};if(outcome==='success')firstResume(next);else firstReject(new Error('Owned older correction'));await run;assert.equal(f.evaluate('correctionRequest'),owner);assert.equal(f.evaluate('analysisState.revision'),0);resumeLatest(replacement);await second;assert.equal(f.evaluate('analysisState.revision'),2);assert.equal(f.evaluate('analysisState.names.A'),'Owned replacement');assert.equal(f.evaluate('correctionRequest'),null);}
 });
+
+async function heldSettingsRestore(mode,stage='storage'){
+ const f=await updatePanel();if(mode==='mixed')await f.click('mode-mixed');await f.click('analyze');await f.tick();
+ const settings=JSON.parse(f.evaluate('JSON.stringify(captureSettings())'));settings.policy.minShot=4.25;settings.policyInput.minShot='4.25';
+ let resume,reject,entered=false;const hold=()=>new Promise((a,b)=>{entered=true;resume=a;reject=b;});
+ const get=f.saved.getItem;f.saved.rows.set(f.evaluate('settingsKey()'),JSON.stringify(settings));
+ f.saved.getItem=key=>stage==='storage'?hold():get(key);
+ const conn=f.evaluate('connection'),request=conn.request;let snapshots=0;const snapshot=f.host.snapshot;
+ conn.request=(...args)=>((stage==='job'&&args[0]==='/jobs/job-1')||(stage==='analysis'&&args[0]==='/analyses/'+f.analysisId))?hold():request(...args);
+ f.host.snapshot=()=>{snapshots++;return (stage==='current'&&snapshots===1)||(stage==='final-current'&&snapshots===2)?hold():snapshot();};
+ const run=f.click('load-settings');for(let i=0;i<150&&!entered;i++)await Promise.resolve();assert.equal(entered,true,stage);
+ const restored={analysisId:f.analysisId,revision:1,snapshotHash:f.bound.snapshotHash,names:{A:'Owned saved name'},history:[],examples:[],analysis:{sessionSpeakerIds:['A'],intervals:[],unresolvedSpeakerIds:[]}};
+ const result=()=>stage==='storage'?JSON.stringify(settings):stage==='job'?{jobId:'job-1',kind:'analysis',status:'completed',result:{}}:stage==='analysis'?restored:snapshot();
+ return {f,run,resume,reject,result,settings,restored,snapshot};
+}
+function savedRestoreState(f){return JSON.stringify({result:JSON.parse(resultState(f)),settings:f.evaluate('connected')?JSON.parse(f.evaluate('JSON.stringify(captureSettings())')):null,status:f.get('status').textContent,timer:f.evaluate('settingsTimer')});}
+test('settings storage response after update preserves settings analysis and update guidance in both modes',async()=>{
+ for(const mode of ['separate','mixed'])for(const outcome of ['success','error']){const {f,run,resume,reject,result}=await heldSettingsRestore(mode);await f.click('update');const before=savedRestoreState(f),calls=f.calls.length;assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);if(outcome==='success')resume(await result());else reject(new Error('Owned obsolete settings failure'));await run;assert.equal(savedRestoreState(f),before);assert.equal(f.calls.length,calls);}
+});
+
+test('saved analysis responses after update cancel and failed update preserve current state at every wait',async()=>{
+ for(const mode of ['separate','mixed'])for(const stage of ['current','job','analysis','final-current'])for(const stop of ['update','cancel','failed-update'])for(const outcome of ['success','error']){
+  const {f,run,resume,reject,result}=await heldSettingsRestore(mode,stage);
+  if(stop==='failed-update'){const conn=f.evaluate('connection'),request=conn.request;conn.request=(...args)=>args[0]==='/updates/start'?Promise.reject(Object.assign(new Error('Owned update failure'),{code:'OWNED_UPDATE_FAILURE'})):request(...args);await f.click('update');}else await f.click(stop);
+  const before=savedRestoreState(f),calls=f.calls.length;if(outcome==='success')resume(await result());else reject(Object.assign(new Error('Owned obsolete restoration error'),{code:'OWNED_OLD_RESTORE'}));await run;
+  assert.equal(savedRestoreState(f),before,mode+stage+stop+outcome);assert.equal(f.calls.length,calls);assert.equal(f.evaluate('settingsRestore'),null);assert.equal(f.evaluate('binding'),false);
+ }
+});
+test('late settings and saved analysis responses preserve newer scope results raw inputs and binding ownership',async()=>{
+ const changes=['state.epoch++','connected={...connected}','connected.snapshot={...connected.snapshot,snapshotHash:"owned-new-bound"}','connected.snapshot={...connected.snapshot,hostSnapshotHash:"owned-new-host"}','mode=mode==="mixed"?"separate":"mixed"','analysisState={analysisId:"owned-new-analysis",revision:2,analysis:{sessionSpeakerIds:[],intervals:[]},history:[]}','credentials={...credentials}','credentials=null','state.compatible=false','state.gateOpen=false','state.stopEpoch=0','panelContextConflict=true','localEditPending=true','state.applyRecovery.blocked=true','validationCount=1','applying=true','batchRunning=true','binding=true','projectRead={ownedNew:true}','projectSelection={ownedNew:true}','inputCapability={ownedNew:true}','selectedRows.push({source:{assetId:"owned-new"},role:{value:"exclude"},audio:{checked:false},selectionHint:{textContent:"",className:""}})','planInputHash="owned-new-plan-input"','syncResult={ownedNew:true}','syncJob="owned-new-sync"','settingsRestore={ownedNew:true}',"$('min-shot').value='9'","$('range-start').value='5'","microphoneRows[0].speaker.value='Owned changed raw'"];
+ for(const mode of ['separate','mixed'])for(const stage of ['storage','current','job','analysis','final-current'])for(const change of changes)for(const outcome of ['success','error']){
+  const {f,run,resume,reject,result}=await heldSettingsRestore(mode,stage);f.evaluate(change+';say("Owned new restoration scope")');const before=savedRestoreState(f),owner=f.evaluate('settingsRestore'),binding=f.evaluate('binding'),calls=f.calls.length;
+  if(outcome==='success')resume(await result());else reject(Object.assign(new Error('Owned old scope restoration failure'),{code:'OWNED_OLD_RESTORE'}));await run;
+  assert.equal(savedRestoreState(f),before,mode+stage+change+outcome);assert.equal(f.calls.length,calls);assert.equal(f.evaluate('binding'),binding);if(change.startsWith('settingsRestore='))assert.equal(f.evaluate('settingsRestore'),owner);else assert.equal(f.evaluate('settingsRestore'),null);
+ }
+});
+test('normal settings restore preserves saved analysis raw policy mode and range rebind',async()=>{
+ for(const mode of ['separate','mixed']){
+  const f=await updatePanel();if(mode==='mixed')await f.click('mode-mixed');await f.click('analyze');await f.tick();if(mode==='mixed')f.evaluate('cameraRows[0].covered.value="A";speakerRows[0].select.value="video:0"');await f.click('save-settings');
+  f.get('range-end').value='100';f.get('range-end').oninput();await f.evaluate('requireCurrent()');assert.equal(f.evaluate('connected.snapshot.range.endFrame'),100);
+  await f.click('load-settings');assert.equal(f.evaluate('connected.snapshot.range.endFrame'),300);assert.equal(f.evaluate('analysisState?.analysisId'),f.analysisId);assert.match(f.get('status').textContent,/저장한 분석/);assert.equal(f.evaluate('binding'),false);assert.equal(f.evaluate('settingsRestore'),null);
+ }
+});
+test('old settings restore completion cannot clear new request token binding or newer settings',async()=>{
+ for(const outcome of ['success','error']){const {f,run,resume,reject,result,settings}=await heldSettingsRestore('separate');const oldResume=resume,oldReject=reject;let finish;f.saved.getItem=()=>new Promise(a=>{finish=a;});const second=f.evaluate('loadSavedSettings()');for(let i=0;i<100&&!finish;i++)await Promise.resolve();assert.ok(finish);const owner=f.evaluate('settingsRestore');if(outcome==='success')oldResume(await result());else oldReject(new Error('Owned old restore'));await run;assert.equal(f.evaluate('settingsRestore'),owner);assert.equal(f.evaluate('binding'),false);settings.analysisReference=null;settings.policyInput.minShot='7';settings.policy.minShot=7;finish(JSON.stringify(settings));await second;assert.equal(f.get('min-shot').value,'7');assert.match(f.get('status').textContent,/저장한 설정/);assert.equal(f.evaluate('settingsRestore'),null);}
+});
+
+test('settings restore error and completion publication preserve real update guidance across continuation boundaries',async()=>{
+ for(const mode of ['separate','mixed'])for(const stage of ['storage','current','job','analysis','final-current'])for(const outcome of ['success','error','invalid'])for(let depth=0;depth<11;depth++){
+  const {f,run,resume,reject,result}=await heldSettingsRestore(mode,stage);
+  if(outcome==='error')reject(Object.assign(new Error('Owned late publish failure'),{code:'OWNED_LATE_PUBLISH'}));else if(outcome==='invalid')resume(stage==='storage'?'not-json':stage==='job'?{kind:'sync',status:'completed'}:stage==='analysis'?{analysisId:'wrong',snapshotHash:'wrong'}:await result());else resume(await result());
+  for(let i=0;i<depth;i++)await Promise.resolve();await f.click('update');const before=savedRestoreState(f),calls=f.calls.length;await run;
+  assert.equal(savedRestoreState(f),before,mode+stage+outcome+depth);assert.equal(f.calls.length,calls);assert.equal(f.evaluate('settingsRestore'),null);
+ }
+});
+test('current settings and saved analysis failures remain visible and stored presets stay untouched',async()=>{
+ for(const mode of ['separate','mixed'])for(const stage of ['storage','current','job','analysis','final-current'])for(const outcome of ['error','invalid']){
+  const {f,run,resume,reject,result}=await heldSettingsRestore(mode,stage),stored=JSON.stringify([...f.saved.rows]);
+  if(outcome==='error')reject(Object.assign(new Error('Owned current restore failure'),{code:'OWNED_CURRENT_RESTORE'}));else resume(stage==='storage'?'not-json':stage==='job'?{kind:'sync',status:'completed'}:stage==='analysis'?{analysisId:'wrong',snapshotHash:'wrong',revision:0}:await result());await run;
+  assert.equal(f.evaluate('settingsRestore'),null);assert.equal(f.evaluate('binding'),false);assert.equal(JSON.stringify([...f.saved.rows]),stored);
+  if(outcome==='error')assert.match(f.get('status').textContent,stage==='storage'?/설정을 불러오지 못했습니다/:/OWNED_CURRENT_RESTORE/);else assert.match(f.get('status').textContent,stage==='storage'?/설정을 불러오지 못했습니다/:stage==='job'?/이전 분석 작업/:stage==='analysis'?/범위가 현재 시퀀스/:/저장한 분석/);
+ }
+ for(const mode of ['separate','mixed']){const {f,run,resume,settings}=await heldSettingsRestore(mode);settings.analysisReference=null;resume(JSON.stringify(settings));await run;assert.equal(f.get('min-shot').value,'4.25');assert.equal(f.evaluate('analysisState'),null);assert.match(f.get('status').textContent,/저장한 설정/);}
+});
+
+async function heldSavedRangeRebind(mode,stage){
+ const f=await updatePanel();if(mode==='mixed')await f.click('mode-mixed');await f.click('analyze');await f.tick();await f.click('save-settings');
+ f.get('range-end').value='100';f.get('range-end').oninput();await f.evaluate('requireCurrent()');
+ let resume,reject,entered=false,body;const conn=f.evaluate('connection'),request=conn.request;
+ conn.request=(...args)=>{if(args[0]===stage){f.calls.push({path:args[0],body:args[1]});body=args[1];return new Promise((a,b)=>{entered=true;resume=a;reject=b;}).then(result=>{if(stage==='/project')f.bound=structuredClone(body.snapshot);return result;});}return request(...args);};
+ const run=f.click('load-settings');for(let i=0;i<150&&!entered;i++)await Promise.resolve();assert.equal(entered,true,stage);
+ return {f,run,resume,reject,result:()=>stage==='/heartbeat'?{gateOpen:true,stopEpoch:null}:{snapshotHash:body.snapshot.snapshotHash}};
+}
+test('saved range rebind checks inner heartbeat and project waits and preserves current failure guidance',async()=>{
+ for(const mode of ['separate','mixed'])for(const stage of ['/heartbeat','/project'])for(const change of ['current','update','cancel','epoch','raw','owner','binding'])for(const outcome of ['success','error']){
+  const {f,run,resume,reject,result}=await heldSavedRangeRebind(mode,stage);
+  if(change==='update'||change==='cancel')await f.click(change);else if(change==='epoch')f.evaluate('state.epoch++;say("Owned newer rebind scope")');else if(change==='raw')f.evaluate('$("min-shot").value="9";say("Owned newer rebind scope")');else if(change==='owner')f.evaluate('settingsRestore={ownedNew:true};say("Owned newer rebind scope")');else if(change==='binding')f.evaluate('projectRead={ownedNew:true};binding=true;say("Owned newer rebind scope")');
+  const before=savedRestoreState(f),owner=f.evaluate('settingsRestore'),binding=f.evaluate('binding'),calls=f.calls.length;
+  if(outcome==='error')reject(Object.assign(new Error('Owned current rebind failure'),{code:'OWNED_CURRENT_REBIND'}));else resume(result());await run;
+  if(change==='current'){if(outcome==='error'){assert.match(f.get('status').textContent,/OWNED_CURRENT_REBIND/);assert.equal(f.evaluate('connected'),null);}else{assert.equal(f.evaluate('analysisState.analysisId'),f.analysisId);assert.match(f.get('status').textContent,/저장한 분석/);}}else{assert.equal(savedRestoreState(f),before,mode+stage+change+outcome);assert.equal(f.calls.length,calls);}
+  if(change==='owner')assert.equal(f.evaluate('settingsRestore'),owner);else assert.equal(f.evaluate('settingsRestore'),null);if(change==='binding')assert.equal(f.evaluate('binding'),binding);else assert.equal(f.evaluate('binding'),false);
+ }
+});

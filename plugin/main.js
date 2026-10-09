@@ -12,7 +12,7 @@ const workflow=require('./workflow.js').create({api:(...args)=>api(...args),stor
 let credentials=null,state=null,connected=null,mode='separate',job=null,analysisJob=null,analysis=null,plan=null,syncResult=null,syncJob=null,planCameraRefs=[],applying=false,batchRunning=false,stopped=false,applyId=null,polling=false,pending=false;
 const microphoneRows=[],cameraRows=[],speakerRows=[],calibrationRows=[],overrideRows=[],syncRows=[];
 let microphoneSelectionCustomized=false;
-let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;let projectRead=null,nativePreparation=null,editingSubmission=null,correctionRequest=null;
+let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;let projectRead=null,nativePreparation=null,editingSubmission=null,correctionRequest=null,settingsRestore=null;
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
 let analysisState=null;
 let planInputHash=null,planInvalidated=false;
@@ -124,23 +124,46 @@ function restoreSettings(settings){
   for(const v of restoredOverrides){if(v&&typeof v.first==='string'&&typeof v.last==='string'&&typeof v.camera==='string'){addOverride(true);const r=overrideRows[overrideRows.length-1];r.first.value=v.first;r.last.value=v.last;overrideCameraOptions(r.camera,cameraValues(),v.camera);}}
   clearPolicyPlan();overrideFeedback();
 }
-async function restoreSavedSettings(optional=false){
-  try{const raw=await uxp.storage.secureStorage.getItem(settingsKey()),settings=JSON.parse(typeof raw==='string'?raw:new TextDecoder().decode(raw));restoreSettings(settings);return settings;}
-  catch(e){if(!optional)throw new Error('현재 시퀀스에 저장된 설정을 불러오지 못했습니다.');}
+async function readSavedSettings(current){
+  try{
+    const raw=await uxp.storage.secureStorage.getItem(settingsKey());if(!current())throw currentCheckDiscarded;
+    return JSON.parse(typeof raw==='string'?raw:new TextDecoder().decode(raw));
+  }catch(e){if(!current()||e===currentCheckDiscarded)throw currentCheckDiscarded;throw new Error('현재 시퀀스에 저장된 설정을 불러오지 못했습니다.');}
 }
-async function restoreSavedAnalysis(settings){
+function settingsResponseGuard(allowBinding=false){
+  const scoped=editingResponseGuard(allowBinding),input=connected?ContentriumHost.hash(captureSettings()):null;
+  return ()=>scoped()&&(input===null?!connected:!!connected&&ContentriumHost.hash(captureSettings())===input);
+}
+async function restoreSavedAnalysis(settings,owned=()=>true,accepted=()=>{}){
   const ref=settings.analysisReference;if(!ref)return false;
+  let scoped=settingsResponseGuard();const current=()=>owned()&&scoped();
+  const checkOptions={responseCurrent:current,guardFactory:()=>{const guard=settingsResponseGuard(true);return ()=>owned()&&guard();},onSettledRead:()=>{scoped=settingsResponseGuard();accepted();}};
   const matches=()=>ref.schemaVersion===1&&/^[a-f0-9]{64}$/.test(ref.analysisId)&&/^[a-zA-Z0-9_-]{1,128}$/.test(ref.jobId)&&
     Number.isSafeInteger(ref.revision)&&ref.revision>=0&&ref.snapshotHash===connected?.snapshot.snapshotHash&&ref.mode===mode&&!microphoneFeedback()&&analysisReferenceMatches(ref.inputHash);
-  await requireCurrent();if(!matches())throw new Error('이전 분석의 타임라인 또는 음성 입력이 달라졌습니다. 새로 분석해 주세요.');
-  const completed=await api('/jobs/'+ref.jobId);
-  if(completed.kind!=='analysis'||completed.status!=='completed')throw new Error('이전 분석 작업을 확인할 수 없습니다. 새로 분석해 주세요.');
-  const restored=await api('/analyses/'+ref.analysisId);
-  await requireCurrent();if(!matches()||restored.analysisId!==ref.analysisId||restored.snapshotHash!==ref.snapshotHash)throw new Error('이전 분석의 범위가 현재 시퀀스와 다릅니다.');
-  if(!Number.isSafeInteger(restored.revision)||restored.revision<ref.revision)throw new Error('저장한 교정 이력을 확인할 수 없습니다.');
-  analysisJob=ref.jobId;acceptAnalysis(restored);
-  binding=true;try{restoreSettings(settings);}finally{binding=false;}
-  scheduleSettings();return true;
+  let restored;
+  try{
+    if(!current())throw currentCheckDiscarded;
+    await requireCurrent(checkOptions);if(!current())throw currentCheckDiscarded;
+    if(!matches())throw new Error('이전 분석의 타임라인 또는 음성 입력이 달라졌습니다. 새로 분석해 주세요.');
+    const completed=await api('/jobs/'+ref.jobId);if(!current())throw currentCheckDiscarded;
+    if(completed.kind!=='analysis'||completed.status!=='completed')throw new Error('이전 분석 작업을 확인할 수 없습니다. 새로 분석해 주세요.');
+    restored=await api('/analyses/'+ref.analysisId);if(!current())throw currentCheckDiscarded;
+    await requireCurrent(checkOptions);if(!current())throw currentCheckDiscarded;
+    if(!matches()||restored.analysisId!==ref.analysisId||restored.snapshotHash!==ref.snapshotHash)throw new Error('이전 분석의 범위가 현재 시퀀스와 다릅니다.');
+    if(!Number.isSafeInteger(restored.revision)||restored.revision<ref.revision)throw new Error('저장한 교정 이력을 확인할 수 없습니다.');
+  }catch(e){if(!current())throw currentCheckDiscarded;throw e;}
+  try{analysisJob=ref.jobId;acceptAnalysis(restored);binding=true;try{restoreSettings(settings);}finally{binding=false;}scheduleSettings();}finally{accepted();}
+  return true;
+}
+async function loadSavedSettings(){
+  const token={};settingsRestore=token;let scopeCurrent=settingsResponseGuard();const current=()=>settingsRestore===token&&scopeCurrent();
+  try{
+    if(settingsTimer){clearTimeout(settingsTimer);settingsTimer=null;}
+    const settings=await readSavedSettings(current);if(!current())throw currentCheckDiscarded;
+    binding=true;try{restoreSettings(settings);clearAnalysis();renderSpeakers(mode==='mixed'?[]:[...new Set(microphoneRows.filter(r=>r.check.checked).map(r=>r.speaker.value))]);}finally{binding=false;scopeCurrent=settingsResponseGuard();}
+    let restored;try{restored=await restoreSavedAnalysis(settings,()=>settingsRestore===token,()=>{scopeCurrent=settingsResponseGuard();});}catch(e){if(!current())throw currentCheckDiscarded;throw e;}if(!current())throw currentCheckDiscarded;
+    say(restored?'저장한 분석과 화자 교정을 불러왔습니다. 편집안을 다시 만들어 주세요.':'저장한 설정을 불러왔습니다. 음성 입력을 다시 분석하세요.');
+  }catch(e){if(current())error(e);}finally{if(settingsRestore===token)settingsRestore=null;}
 }
 async function api(path,body,method){return connection.request(path,body,method);}
 function admitted(){if(!credentials||!connected)throw new Error('Premiere에서 편집할 시퀀스를 열어 주세요.');if(!state?.gateOpen||stopped)throw new Error('현재 작업 상태를 확인한 뒤 다시 실행하세요.');if(localEditPending||state?.applyRecovery?.blocked)throw Object.assign(new Error('APPLY_RECOVERY_REQUIRED'),{code:'APPLY_RECOVERY_REQUIRED'});}
@@ -516,9 +539,9 @@ async function afterEditingPreview(next,nativeToken=null){
   await stopPreview(current);if(!current())throw currentCheckDiscarded;
   return next();
 }
-function editingResponseGuard(){
+function editingResponseGuard(allowBinding=false){
   const scope=projectScope(),read=projectRead,selection=projectSelection,capability=inputCapability,rows=selectedRows.slice(),reviewed=plan,reviewedHash=planInputHash,sync=syncResult,syncId=syncJob,syncHash=syncResultInputHash;
-  return ()=>!binding&&!batchRunning&&projectRead===read&&projectScopeCurrent(scope)&&projectSelection===selection&&inputCapability===capability&&selectedRows.length===rows.length&&rows.every((row,index)=>selectedRows[index]===row)&&plan===reviewed&&planInputHash===reviewedHash&&syncResult===sync&&syncJob===syncId&&syncResultInputHash===syncHash;
+  return ()=>(allowBinding||!binding)&&!batchRunning&&projectRead===read&&projectScopeCurrent(scope)&&projectSelection===selection&&inputCapability===capability&&selectedRows.length===rows.length&&rows.every((row,index)=>selectedRows[index]===row)&&plan===reviewed&&planInputHash===reviewedHash&&syncResult===sync&&syncJob===syncId&&syncResultInputHash===syncHash;
 }
 async function submitEditingJob(path,body,identity,message,inputsCurrent=()=>true){
   const token={},scopeCurrent=editingResponseGuard();
@@ -592,12 +615,13 @@ function rejectStalePlan(){clearPolicyPlan();planInvalidated=true;throw Object.a
 function requireReviewedPlan(reviewed,inputHash){if(plan!==reviewed||planInputHash!==inputHash||!planMatches())rejectStalePlan();}
 function projectScope(){return {connection:connected,snapshotHash:connected?.snapshot.snapshotHash,hostSnapshotHash:connected?.snapshot.hostSnapshotHash,mode,analysisState,revision:analysisState?.revision,epoch:state?.epoch,credentials};}
 function projectScopeCurrent(scope,allowApplying=false){return !!credentials&&credentials===scope.credentials&&!!state?.gateOpen&&!stopped&&!updateIntent&&state?.compatible!==false&&!panelContextConflict&&(!applying||allowApplying)&&!job&&!validationCount&&!localEditPending&&!state?.applyRecovery?.blocked&&(state?.stopEpoch===null||state?.stopEpoch===undefined)&&state?.epoch===scope.epoch&&connected===scope.connection&&connected?.snapshot.snapshotHash===scope.snapshotHash&&connected?.snapshot.hostSnapshotHash===scope.hostSnapshotHash&&mode===scope.mode&&analysisState===scope.analysisState&&analysisState?.revision===scope.revision;}
-async function readProject({fresh=null,automatic=false}={}){
+async function readProject({fresh=null,automatic=false,guardFactory=null,onSettledRead=null}={}){
   if(applying||job)throw new Error('현재 작업을 마친 뒤 시퀀스를 변경하세요.');
   const scope=projectScope();if(!projectScopeCurrent(scope))return false;
   const token={};projectRead=token;binding=true;toggle();
-  const settingsQueued=!!settingsTimer,prior=connected,settings=prior?captureSettings():null;let preserveSettings=false,committed=false;
-  const current=()=>projectRead===token&&projectScopeCurrent(scope);
+  const settingsQueued=!!settingsTimer,prior=connected,settings=prior?captureSettings():null;let preserveSettings=false,committed=false,receipt=null,failed=false;
+  const responseCurrent=guardFactory?guardFactory():()=>true;
+  const current=()=>projectRead===token&&projectScopeCurrent(scope)&&responseCurrent();
   try{
     const next=fresh||await ContentriumHost.snapshot();if(!current())return false;const s=next.snapshot;
     next.fullRangeEnd=s.range.endFrame;
@@ -627,9 +651,9 @@ async function readProject({fresh=null,automatic=false}={}){
     $('range-start').value=String(start);$('range-end').value=String(end);
     clearAnalysis();clearSyncResult();savedSpeakerMappings={};overrideRows.length=0;overrideErrorsOnly=false;overrideVisibleRows.clear();$('overrides').innerHTML='';
     renderSources();if(same&&settings)restoreSettings(settings);else if(saved){try{restoreSettings(saved);}catch(_){/* An invalid optional saved preset must not prevent connecting. */}}
-    toggle();say('트랙을 확인하고 분석할 마이크와 카메라를 지정하세요.');return projectScope();
-  }catch(e){if(!committed&&!current())return false;if(e.code==='RANGE_INPUT_INVALID')preserveSettings=true;else resetSequence();throw e;}
-  finally{if(projectRead===token){projectRead=null;binding=false;toggle();if(preserveSettings||committed&&settingsQueued&&connected&&prior&&connected.snapshot.projectRef===prior.snapshot.projectRef&&connected.snapshot.sequenceRef===prior.snapshot.sequenceRef)scheduleSettings();}}
+    toggle();say('트랙을 확인하고 분석할 마이크와 카메라를 지정하세요.');receipt=projectScope();return receipt;
+  }catch(e){if(!committed&&!current())return false;failed=true;if(e.code==='RANGE_INPUT_INVALID')preserveSettings=true;else resetSequence();throw e;}
+  finally{if(projectRead===token){projectRead=null;binding=false;toggle();if(preserveSettings||committed&&settingsQueued&&connected&&prior&&connected.snapshot.projectRef===prior.snapshot.projectRef&&connected.snapshot.sequenceRef===prior.snapshot.sequenceRef)scheduleSettings();if((receipt||failed)&&onSettledRead)onSettledRead(receipt);}}
 }
 function frameLabel(frame){const rate=connected?connected.snapshot.fps.num/connected.snapshot.fps.den:30,seconds=Math.max(0,Math.floor(frame/rate));return [Math.floor(seconds/3600),Math.floor(seconds/60)%60,seconds%60].map(n=>String(n).padStart(2,'0')).join(':');}
 function segmentTiming(segment){const fps=connected?.snapshot.fps||{num:30,den:1},frames=segment.endFrame-segment.startFrame;return segment.startFrame+'–'+segment.endFrame+' 프레임 · '+frames+'프레임 / '+(frames*fps.den/fps.num).toFixed(3)+'초';}
@@ -646,23 +670,23 @@ async function followSequence(){
     else throw e;
   }
 }
-async function requireCurrent(){
+async function requireCurrent({responseCurrent=()=>true,guardFactory=null,onSettledRead=null}={}){
   admitted();const scope=projectScope(),read=projectRead;
-  const current=()=>!binding&&projectRead===read&&projectScopeCurrent(scope);
+  const current=()=>!binding&&projectRead===read&&projectScopeCurrent(scope)&&responseCurrent();
   if(!current())throw currentCheckDiscarded;
   let fresh;
   try{fresh=await ContentriumHost.snapshot();}catch(e){if(!current())throw currentCheckDiscarded;throw e;}
   if(!current())throw currentCheckDiscarded;
   const changed=fresh.snapshot.snapshotHash!==scope.hostSnapshotHash;
   if(changed){
-    const receipt=await readProject({fresh,automatic:true});
-    if(!receipt||binding||projectRead||!projectScopeCurrent(receipt))throw currentCheckDiscarded;
+    const receipt=await readProject({fresh,automatic:true,guardFactory,onSettledRead});
+    if(!receipt||binding||projectRead||!projectScopeCurrent(receipt)||!responseCurrent())throw currentCheckDiscarded;
     throw new Error('타임라인이 변경됐습니다. 갱신된 트랙 설정을 확인하세요.');
   }
   const issue=rangeFeedback();if(issue)throw Object.assign(new Error(issue),{code:'RANGE_INPUT_INVALID'});
   if(rangeDirty){
-    const receipt=await readProject({fresh});
-    if(!receipt||binding||projectRead||!projectScopeCurrent(receipt))throw currentCheckDiscarded;
+    const receipt=await readProject({fresh,guardFactory,onSettledRead});
+    if(!receipt||binding||projectRead||!projectScopeCurrent(receipt)||!responseCurrent())throw currentCheckDiscarded;
   }
 }
 async function seekFrame(frame){await requireCurrent();return afterEditingPreview(()=>connected.sequence.setPlayerPosition(ContentriumHost.time(String(BigInt(frame)*BigInt(connected.perFrame)))));}
@@ -929,7 +953,7 @@ handler('create-input',async()=>{
   projectSelection=inputCapability=null;selectedRows.length=0;$('selected-sources').innerHTML='';connected=null;await readProject();say('입력 시퀀스를 만들었습니다. 트랙 설정에서 싱크와 화자 분석을 시작하세요.');
 });
 handler('save-settings',async()=>{admitted();await uxp.storage.secureStorage.setItem(settingsKey(),JSON.stringify(captureSettings()));say('현재 시퀀스의 설정을 저장했습니다.');});
-handler('load-settings',async()=>{admitted();return afterEditingPreview(async()=>{if(settingsTimer){clearTimeout(settingsTimer);settingsTimer=null;}let settings;binding=true;try{settings=await restoreSavedSettings();clearAnalysis();renderSpeakers(mode==='mixed'?[]:[...new Set(microphoneRows.filter(r=>r.check.checked).map(r=>r.speaker.value))]);}finally{binding=false;}const restored=await restoreSavedAnalysis(settings);say(restored?'저장한 분석과 화자 교정을 불러왔습니다. 편집안을 다시 만들어 주세요.':'저장한 설정을 불러왔습니다. 음성 입력을 다시 분석하세요.');});});
+handler('load-settings',async()=>{admitted();return afterEditingPreview(loadSavedSettings);});
 $('add-override').onclick=()=>editOverrides(()=>addOverride());
 $('override-filter').onclick=()=>{if($('override-filter').disabled||!overrideRows.some(r=>r.error.textContent))return;overrideErrorsOnly=!overrideErrorsOnly;overrideVisibleRows.clear();view.show('cut');view.openDisclosure('disclosure-6');overrideFeedback();};
 handler('undo-correction',()=>correct({type:'undo'}));

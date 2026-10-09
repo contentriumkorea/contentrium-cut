@@ -176,6 +176,23 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(status, 409)
         self.assertNotIn('secret', json.dumps(body))
 
+    def test_model_public_receipt_distinguishes_terminal_message_from_owned_process_drain(self):
+        for status in ['running', 'canceling', 'completed', 'canceled', 'failed', 'interrupted']:
+            value = dict(jobId='owned-model-job', kind='model-setup', status=status, epoch=0,
+                         result={'private': 'provider'}, error={'code': 'MODEL_NOT_READY', 'message': 'private URL'})
+            with self.service.jobs.lock:
+                self.service.jobs.processes[value['jobId']] = {'owned': True}
+            try:
+                receipt = self.service._public_job(value)
+                self.assertIs(receipt['drained'], False)
+                self.assertNotIn('private', json.dumps(receipt))
+                self.assertEqual(receipt['status'], status)
+            finally:
+                with self.service.jobs.lock:
+                    self.service.jobs.processes.pop(value['jobId'])
+            self.assertIs(self.service._public_job(value)['drained'], True)
+        self.assertNotIn('drained', self.service._public_job(dict(jobId='other', kind='analysis', status='completed')))
+
     def test_job_read_cancel_and_plan_are_owned_by_authenticated_session(self):
         args = self.bind()
         job = self.completed_analysis(args)

@@ -960,7 +960,8 @@ async function modelPanel(extra={}){
   return panel({request:async(path,body,f)=>{
     if(extra.request){const value=await extra.request(path,body,f);if(value!==undefined)return value;}
     if(path==='/models/community-1/revision')return {revision:'b'.repeat(40)};
-    if(path==='/models/community-1/install')return {jobId:'job-1',kind:'model-setup',status:'running'};
+    if(path==='/models/community-1/install'){f.jobKind='model-setup';return {jobId:'job-1',kind:'model-setup',status:'running'};}
+    if(path==='/jobs/job-1')return {jobId:'job-1',kind:'model-setup',status:f.jobStatus,epoch:0,drained:!['running','canceling'].includes(f.jobStatus)};
   }});
 }
 async function installModel(f){f.get('model-token').value='owned-fixture-access';f.get('model-terms').checked=true;await f.click('install-model');}
@@ -975,7 +976,7 @@ test('model setup request failures clear busy guidance without exposing provider
 
 test('model worker failure and cancellation show distinct terminal guidance and allow retry',async()=>{
   for(const status of ['failed','canceled']){
-    const f=await modelPanel({request:(path,body,f)=>{if(path==='/jobs/job-1')return {jobId:'job-1',status:f.jobStatus,error:{code:'MODEL_NOT_READY',message:'private provider URL'}};}});await installModel(f);f.jobStatus=status;await f.tick();
+    const f=await modelPanel({request:(path,body,f)=>{if(path==='/jobs/job-1')return {jobId:'job-1',kind:'model-setup',epoch:0,drained:true,status:f.jobStatus,error:{code:'MODEL_NOT_READY',message:'private provider URL'}};}});await installModel(f);f.jobStatus=status;await f.tick();
     assert.match(f.get('model-install-status').textContent,status==='failed'?/실패.*다시/:/중단.*토큰.*다시/);
     assert.doesNotMatch(f.get('model-install-status').textContent,/private provider/);assert.doesNotMatch(f.get('status').textContent,/private provider/);
     assert.equal(f.get('install-model').disabled,false);assert.doesNotMatch(f.get('model-install-status').textContent,/설치 중/);
@@ -2090,4 +2091,37 @@ test('model direct await boundary honors stop before success and before sanitize
   const setup='const ownedModelApi=api;api=async(...args)=>{try{const value=await ownedModelApi(...args);if(args[0]==="/models/community-1/'+stage+'"){stopRevision++;stopped=true;say("New boundary stop");}return value;}catch(e){if(args[0]==="/models/community-1/'+stage+'"){stopRevision++;stopped=true;say("New boundary stop");}throw e;}}';
   const h=await heldModel('mixed',stage,setup);if(outcome==='success')h.resume(h.value);else h.reject(Object.assign(new Error('private provider URL'),{code:'MODEL_NOT_READY'}));await h.run;assert.equal(h.f.get('status').textContent,'New boundary stop');assert.equal(h.f.evaluate('job'),null);assert.doesNotMatch(h.f.get('status').textContent,/private/);
  }
+});
+
+async function heldModelPoll(mode='separate'){
+ let hold=false,resume,reject;const f=await modelPanel({request:p=>{if(hold&&!resume&&p==='/jobs/job-1')return new Promise((a,z)=>{resume=a;reject=z;});}});
+ if(mode==='mixed')await f.click('mode-mixed');f.state.update={updateState:'IDLE',updateEpoch:0,checkState:'AVAILABLE',candidate:{candidateId:'release:hash',manifestDigest:'a'.repeat(64),appVersion:'0.1.1'}};await f.tick();await installModel(f);hold=true;const run=f.evaluate('pollJob()');for(let i=0;i<50&&!resume;i++)await Promise.resolve();assert.ok(resume);return {f,run,resume,reject,active:f.evaluate('job')};
+}
+function modelReceipt(status='completed',extra={}){return {jobId:'job-1',kind:'model-setup',epoch:0,status,drained:!['running','canceling'].includes(status),...extra};}
+test('model poll preserves immediate update and cancel guidance while confirmed drain alone releases job',async()=>{
+ for(const mode of ['separate','mixed'])for(const action of ['update','cancel'])for(const outcome of ['running','canceling','completed','failed','canceled','error']){const h=await heldModelPoll(mode);assert.equal(h.f.get(action).disabled,false);await h.f.click(action);const status=h.f.get('status').textContent,model=h.f.get('model-install-status').textContent;assert.equal(h.f.get('install-model').disabled,true);if(action==='update')assert.equal(h.f.calls.filter(c=>c.path==='/updates/start').length,1);
+ if(outcome==='error')h.reject(Object.assign(new Error('private URL'),{code:'AUTH_REQUIRED'}));else h.resume(modelReceipt(outcome));await h.run;assert.equal(h.f.get('status').textContent,status);assert.doesNotMatch(h.f.get('model-install-status').textContent,/마쳤|private/);assert.equal(h.f.evaluate('job'),['running','canceling','error'].includes(outcome)?h.active:null);if(['running','canceling','error'].includes(outcome))assert.equal(h.f.get('model-install-status').textContent,model);}
+});
+test('model poll never treats transport failure or malformed response as worker drain',async()=>{
+ for(const bad of [null,{},modelReceipt('unknown'),modelReceipt('completed',{drained:false}),modelReceipt('completed',{drained:'true'}),modelReceipt('completed',{drained:undefined}),modelReceipt('completed',{jobId:'other'}),modelReceipt('completed',{kind:'analysis'}),modelReceipt('completed',{epoch:1})]){const h=await heldModelPoll();h.resume(bad);await h.run;assert.equal(h.f.evaluate('job'),h.active);assert.equal(h.f.get('install-model').disabled,true);assert.doesNotMatch(h.f.get('model-install-status').textContent,/마쳤/);}
+ for(const code of ['WORKER_FAILED','CANCELED','AUTH_REQUIRED','VALIDATION_BUSY']){const h=await heldModelPoll();h.reject(Object.assign(new Error('private provider URL'),{code}));await h.run;assert.equal(h.f.evaluate('job'),h.active);assert.equal(h.f.get('install-model').disabled,true);assert.doesNotMatch(h.f.get('status').textContent+h.f.get('model-install-status').textContent,/private provider/);}
+});
+test('model poll ignores old admission credentials owner validation and newer guidance',async()=>{
+ const changes=['state.epoch++','credentials={...credentials}','credentials=null','stopRevision++','state.stopEpoch=0','state.gateOpen=false','state.compatible=false','state.maintenance={id:"new"}','state.applyRecovery.blocked=true','panelContextConflict=true','validationRevision++','modelPoll={newOwner:true}','job={...job}','job={jobId:"new-job",kind:"model-setup"};canceledJobs.add(job.jobId)'];
+ for(const mode of ['separate','mixed'])for(const change of changes)for(const outcome of ['running','completed','error']){const h=await heldModelPoll(mode);h.f.evaluate(change+';say("New guidance");document.getElementById("model-install-status").textContent="New model guidance";toggle()');const active=h.f.evaluate('job'),owner=h.f.evaluate('modelPoll'),marker=active&&h.f.evaluate('canceledJobs.has(job.jobId)');if(outcome==='error')h.reject(Object.assign(new Error('private old failure'),{code:'WORKER_FAILED'}));else h.resume(modelReceipt(outcome));await h.run;assert.equal(h.f.get('status').textContent,'New guidance');assert.equal(h.f.get('model-install-status').textContent,'New model guidance');assert.equal(h.f.evaluate('job'),active);if(change==='modelPoll={newOwner:true}')assert.equal(h.f.evaluate('modelPoll'),owner);if(active)assert.equal(h.f.evaluate('canceledJobs.has(job.jobId)'),marker);}
+});
+test('model status can be rechecked after transient failure and terminal status waits for actual drain',async()=>{
+ const h=await heldModelPoll();h.reject(Object.assign(new Error('private transient'),{code:'WORKER_FAILED'}));await h.run;assert.equal(h.f.evaluate('job'),h.active);assert.match(h.f.get('model-install-status').textContent,/상태.*확인.*다시/);assert.equal(h.f.evaluate('modelPoll'),null);h.f.jobStatus='completed';await h.f.evaluate('pollJob()');assert.equal(h.f.evaluate('job'),null);assert.match(h.f.get('model-install-status').textContent,/마쳤/);
+ const stopped=await heldModelPoll();await stopped.f.click('cancel');stopped.resume(modelReceipt('completed',{drained:false}));await stopped.run;assert.equal(stopped.f.evaluate('job'),stopped.active);assert.equal(stopped.f.get('install-model').disabled,true);stopped.f.jobStatus='completed';await stopped.f.evaluate('pollJob()');assert.equal(stopped.f.evaluate('job'),null);assert.match(stopped.f.get('model-install-status').textContent,/중단.*토큰.*다시/);
+});
+test('model poll coalesces duplicate reads and preserves newer main or model guidance',async()=>{
+ for(const target of ['main','model']){const h=await heldModelPoll();const calls=h.f.calls.length;await h.f.evaluate('pollJob()');assert.equal(h.f.calls.length,calls);if(target==='main')h.f.evaluate('say("New main guidance")');else h.f.get('model-install-status').textContent='New model guidance';h.resume(modelReceipt());await h.run;assert.equal(h.f.evaluate('job'),null);assert.equal(h.f.get(target==='main'?'status':'model-install-status').textContent,target==='main'?'New main guidance':'New model guidance');}
+});
+
+test('current model poll auth failure reconnects without exposing details or treating it as drain',async()=>{
+ for(const code of ['AUTH_REQUIRED','SESSION_EXPIRED']){const h=await heldModelPoll();const resets=h.f.resetCalls;h.reject(Object.assign(new Error('private authenticated URL'),{code}));await h.run;assert.equal(h.f.evaluate('credentials'),null);assert.equal(h.f.resetCalls,resets+1);assert.equal(h.f.evaluate('job'),h.active);assert.equal(h.f.get('install-model').disabled,true);assert.doesNotMatch(h.f.get('status').textContent+h.f.get('model-install-status').textContent,/private authenticated/);}
+});
+
+test('reconnected model job interrupted by engine restart releases only after confirmed drain',async()=>{
+ for(const drained of [false,true]){const h=await heldModelPoll('mixed');h.resume(modelReceipt('interrupted',{drained,error:{code:'INTERRUPTED',message:'private old process'}}));await h.run;assert.equal(h.f.evaluate('job'),drained?null:h.active);if(drained){assert.match(h.f.get('model-install-status').textContent,/이전 연결.*중단.*토큰.*다시/);assert.equal(h.f.get('install-model').disabled,false);}else assert.equal(h.f.get('install-model').disabled,true);assert.doesNotMatch(h.f.get('status').textContent+h.f.get('model-install-status').textContent,/private old/);}
 });

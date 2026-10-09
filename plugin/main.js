@@ -14,7 +14,7 @@ const microphoneRows=[],cameraRows=[],speakerRows=[],calibrationRows=[],override
 let microphoneSelectionCustomized=false;
 let projectSelection=null,inputCapability=null,dismissedCandidate=null,localEditPending=false,resourceLoaded=false,settingsTimer=null,previewPlaying=false,rangeDirty=false,binding=false;let projectRead=null,nativePreparation=null,editingSubmission=null,correctionRequest=null,settingsRestore=null,settingsSave=null;
 let settingsWriteTail=Promise.resolve();
-let modelRequest=null,modelInputRevision=0;
+let modelRequest=null,modelInputRevision=0,modelPoll=null;
 let cacheRequest=null;
 let resourceRequest=null,resourceInputRevision=0,resourceViewRevision=0,resourceInputDirty=false,stopRevision=0;
 let savedSpeakerMappings={},savedSpeakerMappingScope=null,speakerRowsScope=null,localIntentError=null,panelContextConflict=false;
@@ -189,11 +189,14 @@ function missingModelGuidance(){
   if(state?.models?.[mode==='separate'?'silero':'community-1']?.status==='error')return mode==='separate'?'발화 모델 정보를 확인하지 못했습니다. Contentrium CUT Setup으로 설치를 복구하세요.':'혼합 녹음 모델 정보를 확인하지 못했습니다. 설정에서 모델을 다시 설치하세요.';
   return mode==='separate'?'발화 모델을 찾지 못했습니다. Contentrium CUT Setup으로 설치를 복구하세요.':'설정에서 혼합 녹음 모델을 준비하세요.';
 }
-function modelInstallResult(status,code){
-  const text=status==='completed'?'화자 모델 설치를 마쳤습니다. 다음 분석에서 모델 무결성을 확인합니다.':status==='canceling'?'모델 설치 중단을 요청했습니다. 실제 작업 종료를 기다리고 있습니다.':status==='canceled'?'모델 설치를 중단했습니다. 다시 설치하려면 접근 토큰을 다시 입력하세요.':
+function modelInstallMessage(status,code){
+  const text=status==='completed'?'화자 모델 설치를 마쳤습니다. 다음 분석에서 모델 무결성을 확인합니다.':status==='canceling'?'모델 설치 중단을 요청했습니다. 실제 작업 종료를 기다리고 있습니다.':status==='interrupted'?'모델 설치 작업이 이전 연결에서 중단됐습니다. 다시 설치하려면 접근 토큰을 다시 입력하세요.':status==='canceled'?'모델 설치를 중단했습니다. 다시 설치하려면 접근 토큰을 다시 입력하세요.':
     ['AUTH_REQUIRED','SESSION_EXPIRED'].includes(code)?'편집 연결을 확인하지 못했습니다. 연결이 복구되면 접근 토큰을 다시 입력하고 모델 설치를 재시도하세요.':'모델 설치에 실패했습니다. 제공자 접근 권한과 네트워크를 확인하고 접근 토큰을 다시 입력해 재시도하세요.';
   const suffix=status==='failed'&&typeof code==='string'&&/^[A-Z][A-Z0-9_]{0,63}$/.test(code)?' ('+code+')':'';
-  $('model-install-status').textContent=text+suffix;return text+suffix;
+  return text+suffix;
+}
+function modelInstallResult(status,code){
+  const text=modelInstallMessage(status,code);$('model-install-status').textContent=text;return text;
 }
 function actionGuidance(){
   const update=state?.update?.updateState;
@@ -826,8 +829,51 @@ function finishPolledJob(active){
   if(!job||job.jobId!==active.jobId)canceledJobs.delete(active.jobId);
   toggle();
 }
+function modelPollAdmission(){
+  return [stopRevision,validationRevision,validationCount,state?.gateOpen,state?.stopEpoch,state?.compatible,state?.appVersion,state?.bundleId,state?.protocolVersion,state?.maintenance,stopped,updateIntent,panelContextConflict,localEditPending,state?.applyRecovery?.blocked,applying];
+}
+async function pollModelJob(active){
+  if(modelPoll)return;
+  const token={active,credential:credentials,epoch:state?.epoch,jobEpoch:active.epoch??state?.epoch,admission:modelPollAdmission(),guidanceRevision:statusRevision,modelStatus:$('model-install-status').textContent};modelPoll=token;
+  const owned=()=>modelPoll===token&&job===active&&credentials===token.credential&&state?.epoch===token.epoch;
+  const current=()=>owned()&&modelPollAdmission().every((value,index)=>value===token.admission[index]);
+  const canGuide=()=>current()&&!stopped&&!updateIntent&&!canceledJobs.has(active.jobId)&&!!credentials&&!!state?.gateOpen&&state.stopEpoch==null&&state.compatible!==false&&!validationCount&&!state.maintenance&&!panelContextConflict&&!localEditPending&&!state.applyRecovery?.blocked&&!applying;
+  const queryFailure=()=>{
+    if(!canGuide())return;
+    const text='모델 설치 상태를 확인하지 못했습니다. 실제 작업 종료를 확인할 때까지 다시 조회합니다.';
+    if($('model-install-status').textContent===token.modelStatus)$('model-install-status').textContent=text;
+    if(statusRevision===token.guidanceRevision)say(text);
+  };
+  try{
+    let value;
+    try{value=await api('/jobs/'+active.jobId);}catch(e){
+      if(canGuide()){
+        queryFailure();
+        if(['AUTH_REQUIRED','SESSION_EXPIRED'].includes(e.code)){setConnection(false,'편집 연결 복구 중');credentials=null;connection.reset();retryAt=Date.now()+1000;toggle();}
+      }
+      return;
+    }
+    if(!owned())return;
+    if(!value||value.jobId!==active.jobId||value.kind!=='model-setup'||value.epoch!==token.jobEpoch||typeof value.drained!=='boolean'||!['running','canceling','completed','canceled','failed','interrupted'].includes(value.status)){queryFailure();return;}
+    if(['running','canceling'].includes(value.status)||!value.drained){
+      if(!canGuide())return;
+      if(value.status==='canceling'&&$('model-install-status').textContent===token.modelStatus)modelInstallResult('canceling');
+      if(statusRevision===token.guidanceRevision)say(value.status==='canceling'?'작업을 중단하고 있습니다.':'화자 모델을 설치하고 있습니다.');
+      return;
+    }
+    const canceled=canceledJobs.has(active.jobId);
+    if(!current()&&!canceled)return;
+    if(canGuide()){
+      const outcome=value.status==='completed'?'completed':value.status==='canceled'?'canceled':value.status==='interrupted'?'interrupted':'failed',text=modelInstallMessage(outcome,value.error?.code);
+      if($('model-install-status').textContent===token.modelStatus)$('model-install-status').textContent=text;
+      if(statusRevision===token.guidanceRevision)say(text);
+    }else if(canceled&&$('model-install-status').textContent===modelInstallMessage('canceling'))modelInstallResult('canceled');
+    finishPolledJob(active);
+  }finally{if(modelPoll===token)modelPoll=null;}
+}
 async function pollJob(){
   if(!job)return;
+  if(job.kind==='model-setup'){await pollModelJob(job);return;}
   const active=job,inputScope=active.kind==='input-probe'?{selection:projectSelection,rows:selectedRows.slice(),epoch:state?.epoch}:null,analysisScope=active.kind==='analysis'?{connection:connected,snapshotHash:connected?.snapshot.snapshotHash,hostSnapshotHash:connected?.snapshot.hostSnapshotHash,epoch:state?.epoch,mode,analysisState,revision:analysisState?.revision}:null;let value;
   try{value=await api('/jobs/'+active.jobId);}catch(e){
     if(inputScope&&!inputProbeCurrent(active,inputScope)||analysisScope&&!analysisResultCurrent(active,analysisScope)){finishPolledJob(active);return;}
@@ -1034,7 +1080,7 @@ async function runModelInstall(){
     if(typeof revision?.revision!=='string'||!/^[a-fA-F0-9]{40}$/.test(revision.revision))throw Object.assign(new Error('MODEL_NOT_READY'),{code:'MODEL_NOT_READY'});
     token.phase='install';const next=await api('/models/community-1/install',{token:access,termsAccepted,revision:revision.revision,epoch:token.epoch});if(!current())return;
     if(typeof next?.jobId!=='string'||!/^[a-zA-Z0-9_-]{1,128}$/.test(next.jobId)||next.kind!=='model-setup'||next.status!=='running'||Object.prototype.hasOwnProperty.call(next,'epoch')&&next.epoch!==token.epoch)throw Object.assign(new Error('MODEL_NOT_READY'),{code:'MODEL_NOT_READY'});
-    job=next;$('model-install-status').textContent='로컬 모델 설치 중';
+    job={...next,epoch:token.epoch};$('model-install-status').textContent='로컬 모델 설치 중';
   }catch(e){if(current()){const canceled=['CANCELED','UPDATE_IN_PROGRESS'].includes(e.code),text=modelInstallResult(canceled?'canceled':'failed',e.code);if(statusRevision===token.guidanceRevision)say(text);}}
   finally{if(modelRequest===token)modelRequest=null;}
 }

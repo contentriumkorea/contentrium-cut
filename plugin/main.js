@@ -263,6 +263,9 @@ function toggle(){
   for(const [id,active,idle,label] of [['save-settings',settingsSave&&!settingsSave.automatic,'저장','저장 중…'],['load-settings',settingsRestore,'불러오기','불러오는 중…']]){$(id).textContent=active?label:idle;$(id).setAttribute('aria-busy',active?'true':'false');}
   for(const id of ['read-project','read-selection','install-model','save-resources','prune-cache'])$(id).disabled=locked;
   const budgetIssue=cacheBudgetFeedback();$('save-resources').disabled=locked||!!budgetIssue;
+  $('prune-cache').disabled=locked||resourceInputDirty;
+  const saveInfo=resourceInputDirty&&!resourceRequest?.save?'변경한 분석 자원 설정을 먼저 저장하세요. 캐시 정리는 저장된 예산을 사용합니다.':'';
+  if($('resource-save-info').textContent!==saveInfo)$('resource-save-info').textContent=saveInfo;$('resource-save-info').className='hint'+(saveInfo?'':' hidden');
   const savingResources=!!resourceRequest?.save;$('save-resources').textContent=savingResources?(resourceRequest.phase==='checking'?'저장 결과 확인 중…':'자원 설정 저장 중…'):'자원 설정 저장';$('save-resources').setAttribute('aria-busy',savingResources?'true':'false');
   for(const [id,release,idle] of [['prune-cache',false,'완료된 분석 캐시 정리'],['release-cache',true,'정리 종료 후 편집 계속']]){
     const active=!!cacheRequest&&cacheRequest.release===release;$(id).textContent=active?(cacheRequest.phase==='checking'?(release?'편집 상태 확인 중…':'정리 결과 확인 중…'):(release?'정리 종료 요청 중…':'분석 캐시 정리 중…')):idle;$(id).setAttribute('aria-busy',active?'true':'false');
@@ -1472,7 +1475,7 @@ async function runResourceSettings(save=false){
 }
 handler('save-resources',()=>runResourceSettings(true));
 function cacheReady(release=false){
-  return !!credentials&&!!state&&!updateIntent&&!panelContextConflict&&state.compatible!==false&&state.stopEpoch==null&&!binding&&!projectRead&&!job&&!validationCount&&!applying&&!batchRunning&&!localEditPending&&!state.applyRecovery?.blocked&&(release?state.maintenance?.canRelease===true&&state.maintenance.drained===true&&!state.gateOpen:state.gateOpen&&!stopped&&!state.maintenance);
+  return !!credentials&&!!state&&!updateIntent&&!panelContextConflict&&state.compatible!==false&&state.stopEpoch==null&&!binding&&!projectRead&&!job&&!validationCount&&!applying&&!batchRunning&&!localEditPending&&!state.applyRecovery?.blocked&&(release?state.maintenance?.canRelease===true&&state.maintenance.drained===true&&!state.gateOpen:state.gateOpen&&!stopped&&!state.maintenance&&!resourceInputDirty);
 }
 function cacheValidation(count,descriptors){
   const token=cacheRequest;if(!token)return false;

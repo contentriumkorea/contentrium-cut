@@ -1915,3 +1915,29 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 기획→설계→구현→검증→0.1.74 공개/재검증 완료. 정식 Node654/Python496·독립 검수는 별도 evidence와 집계를 따른다. RED3/native1·신규DOMdouble 및 disconnected 기대작성오류2 정정 및 optional/torchcodec 경고 보존. 실제 Premiere/UXP 화면·편집·기존0.1.0 설치 업데이트 전환·Community-1 품질 미검증. 사용자 설치/활성화·컴퓨터유즈/브라우저/Premiere 조작·provider 동의/토큰/미디어 업로드 없음.
 
 - 최종 업로드 native66088/exit0·실제3다운로드 native9222/exit0·CURRENT/5자산/고정v0.1.1 closeout 즉시완료 exit0/session없음. 추출package native34209/exit0·51.906초. 공개803파일 비공개패턴·신뢰키·52raw 입력불변·설치0.1.0 hash동일·서명키 존재만 확인·자동화 ACTIVE15분·helper종료 후 순차자체CLI0. 정식654/496·독립panel531+추가고유218(actual-main216/static2)·engine6 별도·미해결0. RED3/native1·root신규DOMdouble/연결없음 기대2·다음후보 우선순위1/helper없는3번째source1 및 record예약어SyntaxError1(제품0사례)·readonly잘못된경로/glob 원본보존. 독립fixture 실패0·supplement wrapper rg무매치 exit1과childnative0 구분·passed재실행0. optional/torchcodec 경고보존. 이어갈 단계: actual-main 양모드2행에서 확인한 선택1개/최소2개 경고의 선택수 부재를 기획→설계하고 raw설정/hash/기준선택/경고우선순위/locks/update를 유지하는 count안내 수용조건부터 진행. 제품소스 추가변경없음. 실제Premiere/UXP 편집·설치업데이트전환·Community-1품질 미검증. CUA/브라우저/Premiere조작·사용자재설치/활성화·동의/결제/token/media외부업로드 없음.
+
+
+## 74회차: 싱크 소스 선택 개수 안내 — 0.1.75
+
+- 시작: clean HEAD7397a91596dc28d9913c5b16e2b737da6175d296·공개v0.1.74/release408106055/제목Contentrium CUT/targeta0f5bb6723935694db359808e9a607bee686b863·자체진행CLI0 확인. 지난actual-main 양모드2행에서 선택1개/최소2개 경고에 현재선택수 부재 확인. 이전2소스 경고우선순위/3소스helper 작성오류 증거 보존.
+- 기획/설계: 싱크 설정 내부 sync-sources 위에 별도 status p sync-selection-count를 추가. 연결되고 syncRows가있으면 `싱크 소스 N/T개 선택 · 최소 2개` 표시. 모든audio/manual/timecode·separate/mixed 방식에 동일. 제외소스도분모포함·분자는check선택행수, 원본 snapshot/정밀값/reference/기존minimum/reference/stream/channel 경고우선순위 불변. 연결없음/행없음은text빈값+hidden으로 이전시퀀스개수 숨김. workLocked에서보이는연결된기존행은현재개수읽기유지·입력잠금은기존대로. role=status/aria-live=polite·aria-atomic=true, 반복toggle동일text면쓰기없음. checkbox aria-describedby에 globalcount를추가하지않아개별hint읽기를유지. syncFeedback의display만추가·설정/options/hash/result/admission/request/update 변경없음.
+- 수용: 실제index/main 양모드 모든method 2/1/0선택·error동시노출/기존priority·snapshot/settings/hash/result 보존·save/load/newsequence/stale callback·실제workLocked18원인+connected=null준비조건1·연결없음/emptyRows·statusaria/idempotence·즉시update/held late응답. 기존test기대변경없이 신규3 RED→관련→정식 Node/Python 각1회→독립검수→package실행→공개AVAILABLE/CURRENT/서명/3download/고정v0.1.1. 자율동일범위승인으로설계대기없음. CUA/browser/Premiere/사용자설치/활성화·terms/결제/token/media외부업로드없음. 실제Premiere/UXP 편집·설치전환·Community-1품질 미검증.
+
+- 신규3 RED/native1·161.147ms 모두실제index의count안내부재 assertion으로 재현. p/status와syncFeedback count표시만구현. 관련10 최초9pass/1fail/native1·717.674ms은 신규emptyRows fixture가const syncRows를재할당한 TypeError. 실제선언const와기존clear length방식을확인해 신규실패1의array length만0으로정정·제품변경없음/기존test기대변경없음·최초test/log/native보존. 통과9재반복없이실패1만검증후정식시험으로이어간다.
+
+- 이어갈 개선 후보 actual-main 양모드2행 native0: source3/track3/clip3 유효metadata fixture를직접구성·중복basename의3source label disambiguation 확인. 기준소스를제외하면count2/3과기존기준선택경고가맞게나타나지만제외된기준소스이름이경고에없음. raw설정/toggle불변·제품소스추가변경없음·정식집계가산없음. 다음회차 기존minimum/stream/channel 우선순위와동일파일명표시를유지하는구체적기준안내 기획/설계부터진행. 실제host/media아닌metadata/HTTP/Adobe/timer doubles 범위.
+
+- 최종정식 Node657/657/native3902/exit0·141481.6527ms·fail/cancel/skip/todo0; Python496/496/native96451/exit0·106.469초·fail/error/skip/excluded0. 신규3 RED/native1·관련10 최초9pass/1신규emptyRows fixture const재할당오류/native1·해당failed1정정native0 보존. 정식시험각1회·추가matrix/관련재검증/중복import를합산하지않음. optional/torchcodec경고보존·Community-1품질근거아님.
+
+- 런타임압축중 native완료marker를읽은 readonly진행조회(tool09627c)는 아직파일없어exit1/제품0사례. 실제buildsession57410은계속실행중이며재시작하지않음·원본tool결과보존. 완료여부는실제session nativeexit로판단한다.
+
+- [0.1.75 패키지 검증](package-0.1.75-proof.json): runtime/CCX native57410/exit0·Setup native87798/exit0·추출 proof native49551/exit0·51.610초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.75·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.
+
+- root 독립근거record 최초 reader가report의 uniqueNames 파일경로문자열을array로해석해assertion/native1(tool4591f6,제품0사례). 실제raw212/union193와별도193name파일을확인해reader만filepath역참조하도록정정·원본record script/tool보존·제품/native테스트재실행없음. 자체proof에는원본uniqueNamesFile경로와실제배열을함께보존한다.
+
+- 같은reader filepath역참조후193항목이name/type/pass 객체라는두번째schema차이를확인(TypeError/unhashable dict native1/tool67add2,제품0사례). 원본intermediate reader보존·객체name배열을정규화하고모든최종pass를별도검증하며원본객체도자체proof에보존. failedreader만정정·native fixture/정식테스트재실행없음.
+
+- record reader 세번째assertion/native1(tool89d295,제품0사례)은after근거에만정상추가된unchanged=true 필드때문이며freeze/raw의실제10파일·HEAD/index/scopedstatus·52raw는전부동일함을비교확인. 비교대상을freeze/raw로명시하고after unchanged도별도true검증·원본intermediate reader보존·제품/native시험재실행없음.
+
+- 독립최종 C/I/M/차단0. panel534/534 정확히1회 PID147052/native0/wall83699ms/TAP83626.5995ms. 추가193고유=actual-main190+static3/raw212. 최초185 PID171244/native1/166pass/19TEMPfail·TAP1450.0895ms, failed19+진짜신규3source6 PID140176/native0/25pass·TAP289.4913ms, disclosure진짜신규2 PID172300/native0/TAP112.1214ms. 최초passed166/native재실행0, 초기실패19와helper outer ReferenceError/없는panel.js조회는제품0사례·원본보존. root657/496과합산하지않음.
+- 독립TEMP실패19 원인: separate rawrestore3는기존speaker A→A,B 재구성을fullcapture와혼동해sync/syncInput exact raw·effective hash/snapshot/result복원과별도검증; disconnected4는기존captureSettings가연결필요해retained row raw 직접검증; heldcancel12는inactive cancel에실제허용된fake playback상태를주어기존cancelhandler와late응답검증. 제품/기존test기대수정없음·원본script/raw/실패배열보존·실패/신규만정정. 실제workLocked18원인+connected준비1×both modes×accepted-invalid76 별도IDs, held60고유/실제72settle(실패12retry분리), actualview.js disclosure/page 전환2는VM근거·브라우저시각검증주장아님. 10raw/HEAD/index digest/scopedstatus beforeafter동일·52/52·metadata5versiononly. VM209/fake timer209/timeout636 정리·held/timer/request잔여0. 실제Premiere/install/Community/package/public은독립범위밖.

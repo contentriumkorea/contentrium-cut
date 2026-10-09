@@ -82,15 +82,16 @@ function scheduleSettings(){
 async function saveSettings(automatic=false){
   if(!settingsWriteReady())return;
   if(!automatic&&settingsTimer){clearTimeout(settingsTimer);settingsTimer=null;}
-  const token={},guidanceRevision=statusRevision,key=settingsKey(),payload=JSON.stringify(captureSettings()),scope=[credentials,connected,mode,analysisState,analysisState?.revision,state.epoch,connected.snapshot.snapshotHash,connected.snapshot.hostSnapshotHash,projectSelection,inputCapability,plan,planInputHash,syncResult,syncJob,syncResultInputHash,job,validationCount,validationRevision,settingsRestore,correctionRequest,editingSubmission,nativePreparation],rows=selectedRows.slice();
+  const token={automatic},key=settingsKey(),payload=JSON.stringify(captureSettings()),scope=[credentials,connected,mode,analysisState,analysisState?.revision,state.epoch,connected.snapshot.snapshotHash,connected.snapshot.hostSnapshotHash,projectSelection,inputCapability,plan,planInputHash,syncResult,syncJob,syncResultInputHash,job,validationCount,validationRevision,settingsRestore,correctionRequest,editingSubmission,nativePreparation],rows=selectedRows.slice();
   const current=()=>settingsSave===token&&settingsWriteReady()&&scope.every((value,index)=>value===[credentials,connected,mode,analysisState,analysisState?.revision,state.epoch,connected.snapshot.snapshotHash,connected.snapshot.hostSnapshotHash,projectSelection,inputCapability,plan,planInputHash,syncResult,syncJob,syncResultInputHash,job,validationCount,validationRevision,settingsRestore,correctionRequest,editingSubmission,nativePreparation][index])&&selectedRows.length===rows.length&&rows.every((row,index)=>selectedRows[index]===row)&&settingsKey()===key&&JSON.stringify(captureSettings())===payload;
   const prior=settingsWriteTail;let release;settingsWriteTail=new Promise(resolve=>{release=resolve;});settingsSave=token;
+  if(!automatic)say('현재 시퀀스의 설정을 저장하고 있습니다.');const guidanceRevision=statusRevision;toggle();
   try{
     await prior;if(!current())return;
     await uxp.storage.secureStorage.setItem(key,payload);if(!current())return;
     if(!automatic&&statusRevision===guidanceRevision)say('현재 시퀀스의 설정을 저장했습니다.');
   }catch(e){if(current()&&statusRevision===guidanceRevision){if(automatic)say('설정을 자동 저장하지 못했습니다. 설정에서 다시 저장해 주세요.');else error(e);}}
-  finally{release();if(settingsSave===token)settingsSave=null;}
+  finally{release();if(settingsSave===token){settingsSave=null;toggle();}}
 }
 function captureSettings(){
   return {schemaVersion:2,projectRef:connected.snapshot.projectRef,sequenceRef:connected.snapshot.sequenceRef,mode,policy:policy(),policyInput:{minShot:$('min-shot').value,shortTurn:$('short-turn').value,overlap:$('overlap').value},
@@ -156,7 +157,7 @@ function settingsResponseGuard(allowBinding=false){
 async function restoreSavedAnalysis(settings,owned=()=>true,accepted=()=>{}){
   const ref=settings.analysisReference;if(!ref)return false;
   let scoped=settingsResponseGuard();const current=()=>owned()&&scoped();
-  const checkOptions={responseCurrent:current,guardFactory:()=>{const guard=settingsResponseGuard(true);return ()=>owned()&&guard();},onSettledRead:()=>{scoped=settingsResponseGuard();accepted();}};
+  const checkOptions={responseCurrent:current,guardFactory:()=>{const guard=settingsResponseGuard(true);return ()=>owned()&&guard();},onSettledRead:()=>{scoped=settingsResponseGuard();accepted();},guidanceCurrent:()=>false};
   const matches=()=>ref.schemaVersion===1&&/^[a-f0-9]{64}$/.test(ref.analysisId)&&/^[a-zA-Z0-9_-]{1,128}$/.test(ref.jobId)&&
     Number.isSafeInteger(ref.revision)&&ref.revision>=0&&ref.snapshotHash===connected?.snapshot.snapshotHash&&ref.mode===mode&&!microphoneFeedback()&&analysisReferenceMatches(ref.inputHash);
   let restored;
@@ -176,13 +177,14 @@ async function restoreSavedAnalysis(settings,owned=()=>true,accepted=()=>{}){
 }
 async function loadSavedSettings(){
   const token={};settingsRestore=token;let scopeCurrent=settingsResponseGuard();const current=()=>settingsRestore===token&&scopeCurrent();
+  say('현재 시퀀스의 설정을 불러오고 있습니다.');const guidanceRevision=statusRevision;toggle();
   try{
     if(settingsTimer){clearTimeout(settingsTimer);settingsTimer=null;}
     const settings=await readSavedSettings(current);if(!current())throw currentCheckDiscarded;
     binding=true;try{restoreSettings(settings);clearAnalysis();renderSpeakers(mode==='mixed'?[]:[...new Set(microphoneRows.filter(r=>r.check.checked).map(r=>r.speaker.value))]);}finally{binding=false;scopeCurrent=settingsResponseGuard();}
     let restored;try{restored=await restoreSavedAnalysis(settings,()=>settingsRestore===token,()=>{scopeCurrent=settingsResponseGuard();});}catch(e){if(!current())throw currentCheckDiscarded;throw e;}if(!current())throw currentCheckDiscarded;
-    say(restored?'저장한 분석과 화자 교정을 불러왔습니다. 편집안을 다시 만들어 주세요.':'저장한 설정을 불러왔습니다. 음성 입력을 다시 분석하세요.');
-  }catch(e){if(current())error(e);}finally{if(settingsRestore===token)settingsRestore=null;}
+    if(statusRevision===guidanceRevision)say(restored?'저장한 분석과 화자 교정을 불러왔습니다. 편집안을 다시 만들어 주세요.':'저장한 설정을 불러왔습니다. 음성 입력을 다시 분석하세요.');
+  }catch(e){if(current()&&statusRevision===guidanceRevision)error(e);}finally{if(settingsRestore===token){settingsRestore=null;toggle();}}
 }
 async function api(path,body,method){return connection.request(path,body,method);}
 function admitted(){if(cancelRequest)throw new Error('중단 요청 상태를 확인한 뒤 다시 실행하세요.');if(applyRecoveryRequest)throw new Error('중단 작업 기록을 확인한 뒤 다시 실행하세요.');if(updateRecoveryRequest)throw new Error('설치 복구 상태를 확인한 뒤 다시 실행하세요.');if(initializing||initializationIncomplete)throw new Error('편집 연결 확인을 마친 뒤 다시 실행하세요.');if(!credentials||!connected)throw new Error('Premiere에서 편집할 시퀀스를 열어 주세요.');if(!state?.gateOpen||stopped)throw new Error('현재 작업 상태를 확인한 뒤 다시 실행하세요.');if(localEditPending||state?.applyRecovery?.blocked)throw Object.assign(new Error('APPLY_RECOVERY_REQUIRED'),{code:'APPLY_RECOVERY_REQUIRED'});}
@@ -258,6 +260,7 @@ function toggle(){
   $('speaker-count').disabled=workLocked()||mode!=='mixed';$('vad-threshold').disabled=workLocked()||mode!=='separate';
   for(const row of calibrationRows)for(const field of [row.first,row.last])field.disabled=workLocked()||!calibrationActive(row);
   for(const id of ['analyze','sync','plan','apply-sync','apply','save-settings','load-settings'])$(id).disabled=locked||!connected||(id==='plan'&&!analysisState)||(id==='apply'&&!plan)||(id==='apply-sync'&&!syncResult);
+  for(const [id,active,idle,label] of [['save-settings',settingsSave&&!settingsSave.automatic,'저장','저장 중…'],['load-settings',settingsRestore,'불러오기','불러오는 중…']]){$(id).textContent=active?label:idle;$(id).setAttribute('aria-busy',active?'true':'false');}
   for(const id of ['read-project','read-selection','install-model','save-resources','prune-cache'])$(id).disabled=locked;
   for(const el of document.querySelectorAll('[data-work]'))el.disabled=locked;
   $('add-override').disabled=locked||!connected;for(const row of overrideRows)row.remove.disabled=locked||!connected;
@@ -707,7 +710,7 @@ async function followSequence(){
     else throw e;
   }
 }
-async function requireCurrent({responseCurrent=()=>true,guardFactory=null,onSettledRead=null}={}){
+async function requireCurrent({responseCurrent=()=>true,guardFactory=null,onSettledRead=null,guidanceCurrent=()=>true}={}){
   admitted();const scope=projectScope(),read=projectRead;
   const current=()=>!binding&&projectRead===read&&projectScopeCurrent(scope)&&responseCurrent();
   if(!current())throw currentCheckDiscarded;
@@ -716,13 +719,13 @@ async function requireCurrent({responseCurrent=()=>true,guardFactory=null,onSett
   if(!current())throw currentCheckDiscarded;
   const changed=fresh.snapshot.snapshotHash!==scope.hostSnapshotHash;
   if(changed){
-    const receipt=await readProject({fresh,automatic:true,guardFactory,onSettledRead});
+    const receipt=await readProject({fresh,automatic:true,guardFactory,onSettledRead,guidanceCurrent});
     if(!receipt||binding||projectRead||!projectScopeCurrent(receipt)||!responseCurrent())throw currentCheckDiscarded;
     throw new Error('타임라인이 변경됐습니다. 갱신된 트랙 설정을 확인하세요.');
   }
   const issue=rangeFeedback();if(issue)throw Object.assign(new Error(issue),{code:'RANGE_INPUT_INVALID'});
   if(rangeDirty){
-    const receipt=await readProject({fresh,guardFactory,onSettledRead});
+    const receipt=await readProject({fresh,guardFactory,onSettledRead,guidanceCurrent});
     if(!receipt||binding||projectRead||!projectScopeCurrent(receipt)||!responseCurrent())throw currentCheckDiscarded;
   }
 }

@@ -1949,6 +1949,31 @@ async function heldSettingsSave(mode,automatic=false){
  let run;if(automatic){f.evaluate('scheduleSettings()');run=f.timeouts[f.evaluate('settingsTimer')-1]();}else run=f.click('save-settings');
  for(let i=0;i<100&&!entered;i++)await Promise.resolve();assert.equal(entered,true);return {f,run,resume,reject,writes};
 }
+test('settings progress manual buttons identify storage waits and reset after success or failure',async()=>{
+ for(const mode of ['separate','mixed'])for(const action of ['save','load'])for(const outcome of ['success','error']){
+  const h=await (action==='save'?heldSettingsSave(mode):heldSettingsRestore(mode)),f=h.f,id=action==='save'?'save-settings':'load-settings';
+  assert.equal(f.get(id).disabled,true);assert.equal(f.get(id).getAttribute('aria-busy'),'true');assert.match(f.get(id).textContent,action==='save'?/저장 중/:/불러오는 중/);assert.match(f.get('status').textContent,action==='save'?/설정을 저장하고/:/설정을 불러오고/);assert.equal(f.get('progress').className,'running');
+  const calls=f.calls.length;await f.click(id);assert.equal(f.calls.length,calls);
+  if(outcome==='error')h.reject(new Error('Owned settings storage error'));else if(action==='load'){h.settings.analysisReference=null;h.resume(JSON.stringify(h.settings));}else h.resume(true);await h.run;
+  assert.equal(f.get(id).getAttribute('aria-busy'),'false');assert.equal(f.get(id).textContent,action==='save'?'저장':'불러오기');assert.equal(f.get('progress').className,'');assert.match(f.get('status').textContent,outcome==='error'?/저장|불러오|Owned settings storage error/:action==='save'?/설정을 저장했습니다/:/저장한 설정을 불러왔습니다/);
+ }
+});
+test('settings progress completion preserves newer guidance while completing the owned settings operation',async()=>{
+ for(const mode of ['separate','mixed'])for(const action of ['save','load'])for(const outcome of ['success','error']){
+  const h=await (action==='save'?heldSettingsSave(mode):heldSettingsRestore(mode)),f=h.f,id=action==='save'?'save-settings':'load-settings';f.evaluate('say("Owned newer settings guidance")');
+  if(outcome==='error')h.reject(new Error('Owned earlier settings error'));else if(action==='load'){h.settings.analysisReference=null;h.resume(JSON.stringify(h.settings));}else h.resume(true);await h.run;
+  assert.equal(f.get('status').textContent,'Owned newer settings guidance');assert.equal(f.get(id).getAttribute('aria-busy'),'false');assert.equal(f.evaluate(action==='save'?'settingsSave':'settingsRestore'),null);if(action==='load'&&outcome==='success')assert.equal(f.get('min-shot').value,'4.25');
+ }
+});
+test('settings progress autosave leaves current guidance and manual save button idle',async()=>{
+ for(const mode of ['separate','mixed']){const h=await heldSettingsSave(mode,true),f=h.f;assert.equal(f.get('save-settings').getAttribute('aria-busy'),'false');assert.equal(f.get('save-settings').textContent,'저장');assert.match(f.get('status').textContent,/화자 분석이 끝났습니다/);const before=f.get('status').textContent;h.resume(true);await h.run;assert.equal(f.get('status').textContent,before);}
+});
+test('settings progress preserves immediate update start and its guidance through storage completion',async()=>{
+ for(const mode of ['separate','mixed'])for(const action of ['save','load'])for(const outcome of ['success','error']){
+  const h=await (action==='save'?heldSettingsSave(mode):heldSettingsRestore(mode)),f=h.f,id=action==='save'?'save-settings':'load-settings';assert.equal(f.get('update').disabled,false);await f.click('update');const before=f.get('status').textContent;assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.equal(f.evaluate('stopped'),true);
+  if(outcome==='error')h.reject(new Error('Owned old storage error'));else h.resume(action==='save'?true:await h.result());await h.run;assert.equal(f.get('status').textContent,before);assert.equal(f.get(id).getAttribute('aria-busy'),'false');assert.equal(f.evaluate('stopped'),true);
+ }
+});
 test('manual settings save completion and failure after update preserve guidance in both modes',async()=>{
  for(const mode of ['separate','mixed'])for(const outcome of ['success','error']){const {f,run,resume,reject,writes}=await heldSettingsSave(mode);await f.click('update');const before=savedRestoreState(f),calls=f.calls.length;if(outcome==='success')resume(true);else reject(new Error('Owned late settings write'));await run;assert.equal(savedRestoreState(f),before);assert.equal(f.calls.length,calls);assert.equal(writes.length,1);assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);}
 });

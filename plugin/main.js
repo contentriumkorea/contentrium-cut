@@ -484,8 +484,9 @@ function syncClockDateValid(value){
   return year>0&&month>=1&&month<=12&&day>=1&&day<=days[month-1];
 }
 function syncClockFeedback(row){
-  const active=$('sync-method').value==='timecode'&&row.check.checked,date=row.date.value.trim(),valid=syncClockDateValid(date),text=!active?'':!row.clockId.value.trim()?'공통 시계 이름을 입력하세요. 같은 시계의 소스만 타임코드로 연결할 수 있습니다.':!date?'촬영 날짜를 입력하세요. 날짜가 없는 소스는 싱크 결과에서 확인이 필요합니다.':!valid?'촬영 날짜를 YYYY-MM-DD 형식의 실제 날짜로 입력하세요. 잘못된 날짜는 싱크 결과에서 확인이 필요합니다.':!row.clockConfirmed.checked?'날짜와 공통 시계가 같고 촬영 중 리셋하지 않았는지 확인하세요. 미확인 정보는 싱크 결과에서 검토가 필요합니다.':'';
+  const active=$('sync-method').value==='timecode'&&row.check.checked,date=row.date.value.trim(),valid=syncClockDateValid(date),dropMismatch=row.drop.checked&&!['30000/1001','60000/1001'].includes(row.fps.value),text=!active?'':!row.clockId.value.trim()?'공통 시계 이름을 입력하세요. 같은 시계의 소스만 타임코드로 연결할 수 있습니다.':!date?'촬영 날짜를 입력하세요. 날짜가 없는 소스는 싱크 결과에서 확인이 필요합니다.':!valid?'촬영 날짜를 YYYY-MM-DD 형식의 실제 날짜로 입력하세요. 잘못된 날짜는 싱크 결과에서 확인이 필요합니다.':dropMismatch?'Drop-frame은 타임코드 FPS 29.97 또는 59.94에서 사용할 수 있습니다. FPS를 확인하거나 Drop-frame을 해제하세요. 이 소스는 싱크 결과에서 검토가 필요합니다.':!row.clockConfirmed.checked?'날짜와 공통 시계가 같고 촬영 중 리셋하지 않았는지 확인하세요. 미확인 정보는 싱크 결과에서 검토가 필요합니다.':'';
   const invalid=active&&!valid?'true':'false';if(row.date.getAttribute('aria-invalid')!==invalid)row.date.setAttribute('aria-invalid',invalid);
+  for(const field of [row.fps,row.drop]){const invalid=active&&dropMismatch?'true':'false';if(field.getAttribute('aria-invalid')!==invalid)field.setAttribute('aria-invalid',invalid);}
   if(row.clockHint.textContent!==text)row.clockHint.textContent=text;row.clockHint.className=text?'hint':'hint hidden';
 }
 function syncFeedback(){

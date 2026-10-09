@@ -1281,3 +1281,13 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 빌드 입력 검사에서 build_runtime.py가 config/bundle/manifest3개를 Windows 기본 CRLF로 재저장해 raw hash가 달라짐을 감지했다.3개 각각 CRLF→LF 바이트 정규화 SHA가 이전 고정 SHA와 정확히 같고 나머지49개는 raw SHA 동일함을 검증했다. 의미/신뢰 키/버전 변경이 아닌 줄바꿈 변화다. 이전 freeze를 cycle49-build-before-runtime-crlf-source-hashes.json으로 보존하고 빌드가 실제 사용하는 CRLF52입력을 새로 고정했다. 제품 소스 변경·재테스트 누락으로 처리하지 않으며 패키지에서 실제 raw CCX·metadata 일치를 재검증한다.
 
 - 엔진/CCX native59685·Setup native33366·패키지 검사 native29709 모두 실제 exit0. [0.1.50 패키지 증거](package-0.1.50-proof.json): ZIP/CCX CRC·경로·크기·비공개 자료 제외·raw 최종 CCX source/metadata·Silero 해시·runtime29/Setup26모듈·진입점2개 일치. 추출 engine runtimeReady=true/0.1.50·Setup help exit0·53.188초. 최종 CRLF52개 입력과 신뢰 키 유지·공개694개 비공개 패턴 검사 통과. optional/torchcodec 경고 보존. 현재 단계는 기획·설계·구현·회귀·독립 검수·패키지 실행 완료이며0.1.50 공개 및 익명 AVAILABLE/서명/실제3다운로드/CURRENT/고정v0.1.1 검증을 이어간다. 사용자 실제 설치/활성화·Premiere 조작 없음.
+
+### 공개 결과
+
+- [v0.1.50](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.50): release `407669765`, 제목 `Contentrium CUT`, draft/prerelease 아님. 공개 시각 2026-10-09 16:50:54 KST (`2026-10-09T07:50:54Z`), target/tag commit `befe84333a9fa428bf0a486ca10eca700d9f2056` 확인.
+- [공개 실제 재다운로드](release-0.1.50-proof.json): 익명 제품 경로0.1.49 →0.1.50 AVAILABLE·서명·실제 ZIP/CCX/Setup3개 크기/SHA-256 일치.
+- [현재 버전](release-0.1.50-current-proof.json): 빈 상태0.1.50 CURRENT/후보 없음. 공개 자산5개 ID·크기·digest 및 서명 문서 실제 바이트 일치.
+- [고정 복구 조회](migration-pinned-0.1.1-after-0.1.50-proof.json): latest0.1.50에서도 정확한 서명 v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+- 현재 단계: 기획 → 설계 → 구현 → 검증 →0.1.50 공개 및 공개 재검증 완료. 다음 회차는 분석 자원 설정 저장의 진행 UI다. actual 활성 save-resources 클릭 두 모드×POST/후속GET4개에서 generic progress/잠금은 작동하나 aria-busy와 작업 구분 안내 없이 이전 분석 완료 안내가 유지함을 cycle49-next-inspect.js/.log(native exit0)에 기록했다. 자원 저장/후속 조회·버튼 문구/aria-busy/진행 안내를 설계하며 기존 resource owner/범위·입력 revision·캐시 정보·즉시 업데이트를 회귀 검증한다. 사용자 실제 시각/UI 시험이 아닌 VM evidence다.
+- root 최종 Node572/572·Python496/496·실제 native exit0, 최종 독립335/335·각 exit0·scoped C/I/M0/0/0. 독립 full448/448은 안내 보완 전 소스의 정확히1회 검사이며 최종 전체는 root572로 확인했다. 최초3valid RED·안내 보완 valid RED1과 최초 내부 rebind 안내2회귀실패·모델 환경 누락2skip/하위 경로2error·독립fixture16오류와 anchor/PowerShell 구성 오류·CRLF 입력 감지 증거를 보존하고 최종 수정 범위를 구분한다. 새 안내 덮기 Important1은 공개 전 보완했고 모델 부모 경로 무결성 확인 뒤 전체496이 실제 exit0이다.
+- 활성0.1.0 active/journal/first-install 해시 동일·서명 키 존재·ACTIVE15분·기존 공개 파일/사용자 자료/실패 증거 보존. 컴퓨터유즈·브라우저·Premiere 조작·재설치·provider/미디어 업로드 없음. 실제 UXP/Premiere 편집·설치 전환·Community-1 품질·이미 발행한 API/저장소/재생/물리 전송 취소/rollback 미검증. 기존 간헐 실패는 이번 최종 전체 회귀에서 재현되지 않았고 원인은 미확정이다.

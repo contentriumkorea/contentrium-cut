@@ -1998,3 +1998,13 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 독립10raw/HEAD/indexdigest/scopedstatus 동일·최종52/52. VM214/timer214/timeout164 정리·held/interval잔여0·두childreaped. 유효3/4source/literal markup/모든method/unknown/blank/emptyrows/독립errorpriority/rawsync restore/attr idempotence/stale/result/update 검증. 실제Premiere/스크린리더/사용자설치/Community/package/public은독립범위밖.
 
 - [0.1.77 패키지 검증](package-0.1.77-proof.json): runtime/CCX native5694/exit0·Setup native23775/exit0·추출 proof native8795/exit0·57.610초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.77·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.
+
+
+### 공개 결과
+
+- [v0.1.77](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.77): release408161425·제목 Contentrium CUT·공개2026-10-09T17:23:17Z·target/tag c43ea7cc5c8ca43d4af19dc51b75db74e3a914d5·draft/prerelease 아님. [실제 재다운로드](release-0.1.77-proof.json): 익명0.1.76→0.1.77 AVAILABLE·서명·ZIP/CCX/Setup3개 실제 size/SHA 일치. [현재 조회](release-0.1.77-current-proof.json): CURRENT/후보 없음·5자산 ID/size/digest/서명 바이트 일치. [고정 복구](migration-pinned-0.1.1-after-0.1.77-proof.json): latest0.1.77에도 서명v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+- 기획→설계→구현→검증→0.1.77 공개/재검증 완료. 정식 Node663/Python496·독립 검수는 별도 evidence와 집계를 따른다. RED3/native1·관련12/12 native0 및 신규3 RED 보존 및 optional/torchcodec 경고 보존. 실제 Premiere/UXP 화면·편집·기존0.1.0 설치 업데이트 전환·Community-1 품질 미검증. 사용자 설치/활성화·컴퓨터유즈/브라우저/Premiere 조작·provider 동의/토큰/미디어 업로드 없음.
+
+- 종료근거: 업로드 native20490/exit0·실제3다운로드 native14550/exit0·CURRENT/5자산/고정v0.1.1 closeout 즉시exit0/session없음. package native8795/exit0·57.610초·runtime5694/Setup23775 모두0. 공개815파일/비공개패턴·신뢰키불변·52raw 일치·설치0.1.0 hash동일·서명키존재만확인·자동화ACTIVE15분·helper종료후순차자체CLI0. 정식Node663/Python496·독립540+216고유(actual-main214/static2/raw216) 별도집계·C/I/M/미해결0·독립fixture작성오류/rerun0.
+- 실패근거보존: 신규3 RED/native1·156.3505ms은기준컨트롤 aria-invalid 부재·구현후관련12/12 native0·807.9319ms. 이전실패/공개파일보존·이번회차기타실패/중복시험/제품추가변경없음. optional/torchcodec경고보존·Community-1품질근거아님. 실제Premiere/UXP 편집·screenreader·사용자설치전환·Community-1품질미검증. 컴퓨터유즈/브라우저/Premiere조작·사용자재설치/활성화·terms/결제/token/media외부업로드없음.
+- 이어갈 단계: actual-main3source 양모드×audio/timecode4행에서기준dropdown은정상이지만source row제목에기준소스식별표시가없는후보근거를바탕으로소스목록내기준표시기획→설계. 현재선택기준/제외/기준교체/방법변경/연결준비/작업잠금에맞는표시수용과 raw/hash/result/경고우선순위/즉시update/late응답보존조건부터진행. 이번동결뒤제품추가변경없음·정식집계가산없음.

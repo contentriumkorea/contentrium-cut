@@ -262,7 +262,7 @@ function toggle(){
   for(const el of document.querySelectorAll('input,select,button.mode'))el.disabled=inputLocked();
   for(const value of ['separate','mixed'])$('mode-'+value).disabled=locked;
   for(const row of microphoneRows)for(const field of [row.check,row.speaker,row.channel,row.stream])field.disabled=locked||batchRunning||!connected;
-  for(const row of cameraRows){row.role.disabled=locked||!connected;cameraCoverageFeedback(row,locked);}
+  for(const row of cameraRows){row.role.disabled=locked||batchRunning||!connected;cameraCoverageFeedback(row,locked);}
   for(const row of speakerRows)row.select.disabled=locked||!connected;
   for(const id of ['start-camera','reserve-camera'])$(id).disabled=locked||!connected;
   for(const id of ['range-start','range-end','min-shot','short-turn','overlap'])$(id).disabled=locked||!connected;
@@ -324,7 +324,7 @@ function toggle(){
   const guidance=actionGuidance();if($('action-readiness').textContent!==guidance)$('action-readiness').textContent=guidance;
 }
 function cameraCoverageFeedback(row,locked=workLocked()){
-  const protectedTrack=row.role.value==='protected';row.covered.disabled=locked||!connected||protectedTrack;
+  const protectedTrack=row.role.value==='protected';row.covered.disabled=locked||batchRunning||!connected||protectedTrack;
   row.hint.textContent=protectedTrack?'보호 트랙은 자동 컷에 사용하지 않습니다. 보이는 화자 설정은 카메라 역할로 바꾸면 사용할 수 있습니다.':'';
   row.hint.className=protectedTrack?'hint':'hint hidden';row.coveredValue=row.covered.value;
 }
@@ -550,9 +550,9 @@ function renderSources(){
     options(role,[['speaker','화자 카메라'],['wide','전체샷'],['two-shot','투샷'],['reserve','예비'],['protected','보호 트랙']]);covered.placeholder='A, B';role.value=track.muted?'protected':'speaker';
     fields.appendChild(label('트랙 역할',role));fields.appendChild(label('보이는 화자',covered));row.appendChild(fields);$('cameras').appendChild(row);
     const hint=element('p','','hint hidden');hint.id='camera-coverage-hint-'+cameraRows.length;covered.setAttribute('aria-describedby',hint.id);row.appendChild(hint);
-    const cameraRow={id:track.trackRef,track,title,role,covered,hint};cameraRows.push(cameraRow);role.disabled=workLocked()||!connected;cameraCoverageFeedback(cameraRow);
-    role.onchange=()=>{if(cameraRows.includes(cameraRow)&&!workLocked()&&connected)mappingInputs();};covered.oninput=covered.onchange=()=>{
-      if(!cameraRows.includes(cameraRow))return;
+    const cameraRow={id:track.trackRef,track,title,role,covered,hint};cameraRows.push(cameraRow);role.disabled=workLocked()||batchRunning||!connected;cameraCoverageFeedback(cameraRow);
+    role.onchange=()=>{if(cameraRows.includes(cameraRow)&&!workLocked()&&!batchRunning&&connected)mappingInputs();};covered.oninput=covered.onchange=()=>{
+      if(!cameraRows.includes(cameraRow)||batchRunning)return;
       if(role.value==='protected'){covered.value=cameraRow.coveredValue;return;}
       if(!workLocked()&&connected)invalidatePlan();
     };

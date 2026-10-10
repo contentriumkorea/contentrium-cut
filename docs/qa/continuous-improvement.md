@@ -2641,3 +2641,13 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - root 증거스키마조회 도우미실패2/native1: seal.entries 추정과files[0]배열추정 KeyError. 원본tool입력/출력chunk184b2e/e4f8f3·실패JSON보존·실제files mapping확인후조회native0/수집native0. 제품·시험수정/재실행0.
 
 - [0.1.99 패키지 검증](package-0.1.99-proof.json): runtime/CCX native13337/exit0·Setup native58993/exit0·추출 proof native90232/exit0·54.125초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.99·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.
+
+
+### 공개 결과
+
+- [v0.1.99](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.99): release408436932·제목 Contentrium CUT·공개2026-10-10T00:02:14Z·target/tag 613911e1671cd961da19f50228235ef1fc2a2c2a·draft/prerelease 아님. [실제 재다운로드](release-0.1.99-proof.json): 익명0.1.98→0.1.99 AVAILABLE·서명·ZIP/CCX/Setup3개 실제 size/SHA 일치. [현재 조회](release-0.1.99-current-proof.json): CURRENT/후보 없음·5자산 ID/size/digest/서명 바이트 일치. [고정 복구](migration-pinned-0.1.1-after-0.1.99-proof.json): latest0.1.99에도 서명v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+- 기획→설계→구현→검증→0.1.99 공개/재검증 완료. 정식 Node749/Python496·독립 검수는 별도 집계. 신규4 RED 일시잠금/행별기록소실/batch초기화허용3fail·기존identity/중단1pass/native1→GREEN4/4/native0·helper/제품실패/통과재실행0·관련60/60·기존시험본문불변. 실제 Premiere/UXP 화면·편집·스크린리더·기존0.1.0 설치 전환·Community-1 품질 미검증. 사용자 설치/활성화·컴퓨터유즈/브라우저/Premiere 조작·terms/결제/token/미디어 외부 업로드 없음.
+
+- 종료 근거: 0.1.99 공개 업로드 native61489/exit0·실제3다운로드 native27820/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native13337/exit0·Setup native58993/exit0·추출 패키지 native90232/exit0/54.125초. 공개903파일 비공개패턴검사·신뢰키불변·52raw 동결 일치·설치0.1.0 hash동일·서명키 존재만확인·자동화ACTIVE15분·자체CLI0. Node749/Python496 정식 통과·독립287고유/288raw는 별도 집계.
+- 실패 원인/보존: 신규4 RED 일시잠금/행별기록소실/batch초기화허용3fail·기존identity/중단1pass/native1→GREEN4/4/native0·helper/제품실패/통과재실행0·기존시험본문불변. 독립 시험의 실제 실패·교정·재실행 집계와 원본 근거는 위 독립 검수 기록을 따른다. optional/torchcodec 경고 원본 보존·Community품질 근거 아님.
+- 이어갈 단계: actual-main raw7/19에서batchRunning=true·toggle후클립범위입력이활성화되어클릭시0/300으로값변경됨·nextprobe native0. 다음회차일괄작업동안클립범위입력admission차단을기획→설계·잠금중값/설정/분석/hash/HTTP불변·해제후사용복귀·실제중단/update즉시차단수용조건→실패재현부터진행. 이번제품동결 뒤 추가제품변경 없음. 실제 Premiere/UXP 화면·편집·스크린리더·기존0.1.0 설치 전환·Community-1 실제 품질 미검증. CUA/browser/Premiere 실행조작종료/사용자 설치활성화/terms/결제/token/media 외부 업로드 없음.

@@ -2803,3 +2803,12 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - [0.1.105 패키지 검증](package-0.1.105-proof.json): runtime/CCX native20434/exit0·Setup native37309/exit0·추출 proof native73611/exit0·53.797초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.105·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.
 
 - 보조검색오류: toolf8a7d0에서PowerShell의literal cycle103* 경로를rg에넘겨검색실패; c96a9b에서-g 필터로교정. 제품/시험실행없음·원본tool증거보존·root helper총4.
+
+
+### 공개 결과
+
+- [v0.1.105](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.105): release408497498·제목 Contentrium CUT·공개2026-10-10T01:38:11Z·target/tag 1a5efcb56edc229b8ee8e8a5cad4831d433d3a55·draft/prerelease 아님. [실제 재다운로드](release-0.1.105-proof.json): 익명0.1.104→0.1.105 AVAILABLE·서명·ZIP/CCX/Setup3개 실제size/SHA 일치. [현재 조회](release-0.1.105-current-proof.json): CURRENT/후보 없음·5자산 ID/size/digest/서명 바이트 일치. [고정 복구](migration-pinned-0.1.1-after-0.1.105-proof.json): latest0.1.105에도 서명v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+
+- 종료 근거: 0.1.105 공개 native36269/exit0·실제3다운로드 native22785/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native20434/exit0·Setup native37309/exit0·추출패키지 native73611/exit0/53.797초. 공개927파일패턴검사·신뢰키불변·52raw동결일치·설치0.1.0 hash동일·서명키존재만확인·자동화ACTIVE15분·자체CLI0. 정식 Node775/Python496·독립33고유/35raw별도집계.
+- 실패 원인/보존: 신규RED4fail/1pass는기존/새 매핑select enabled·batch콜백과이전행콜백의acceptedplan/savedmapping 변경; batch조건5개+현재select소유권1개추가후GREEN5/5·관련81/81·제품결함0/root helper4(시험경쟁1·schema조회1·collector구문1·검색경로1) 교정(초기Python495pass/1error→실패1만retry통과/총497실행/최신496고유통과). 독립실패/교정집계는위검수근거따름. 기존정식본문로컬raw불변/HEAD줄바꿈만정규화동일. optional/torchcodec경고원본보존·Community품질근거아님.
+- 이어갈 단계: actual-main에서batch중range-start입력활성화·callback으로acceptedanalysis/plan폐기·nextprobe native0. 다음회차분석범위·컷정책입력batch차단기획→설계·raw/settings/analysis/plan/보호트랙보존과해제후정상복귀수용조건→RED부터진행. 이번동결뒤추가제품변경없음. 실제Premiere/UXP렌더/편집/스크린리더/0.1.0설치전환/Community품질미검증. CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/payment/token/media외부업로드없음.

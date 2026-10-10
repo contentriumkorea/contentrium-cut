@@ -380,7 +380,7 @@ function calibrationClipBounds(row){
   return first<last&&last<=BigInt(Number.MAX_SAFE_INTEGER)?{first:String(first),last:String(last)}:null;
 }
 function calibrationClipRangeReady(row){
-  if(workLocked()||!connected||!calibrationRows.includes(row)||!calibrationActive(row))return false;
+  if(workLocked()||batchRunning||!connected||!calibrationRows.includes(row)||!calibrationActive(row))return false;
   const bounds=calibrationClipBounds(row);return !!bounds&&(row.first.value!==bounds.first||row.last.value!==bounds.last);
 }
 function calibrationClipScopeGuard(){
@@ -414,7 +414,7 @@ function calibrationJumpTicks(row,edge){
   if(start<BigInt(row.clip.startTicks)||end>BigInt(row.clip.endTicks))return null;
   return String(edge==='start'?start:end-frame);
 }
-function calibrationJumpReady(row){return !workLocked()&&calibrationRows.includes(row)&&calibrationJumpTicks(row,'start')!==null;}
+function calibrationJumpReady(row){return !workLocked()&&!batchRunning&&calibrationRows.includes(row)&&calibrationJumpTicks(row,'start')!==null;}
 function calibrationDurationText(first,last){
   const fps=connected.snapshot.fps;
   if(!Number.isSafeInteger(fps?.num)||!Number.isSafeInteger(fps?.den)||fps.num<=0||fps.den<=0)return '';

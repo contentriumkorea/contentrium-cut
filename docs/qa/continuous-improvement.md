@@ -2651,3 +2651,21 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 종료 근거: 0.1.99 공개 업로드 native61489/exit0·실제3다운로드 native27820/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native13337/exit0·Setup native58993/exit0·추출 패키지 native90232/exit0/54.125초. 공개903파일 비공개패턴검사·신뢰키불변·52raw 동결 일치·설치0.1.0 hash동일·서명키 존재만확인·자동화ACTIVE15분·자체CLI0. Node749/Python496 정식 통과·독립287고유/288raw는 별도 집계.
 - 실패 원인/보존: 신규4 RED 일시잠금/행별기록소실/batch초기화허용3fail·기존identity/중단1pass/native1→GREEN4/4/native0·helper/제품실패/통과재실행0·기존시험본문불변. 독립 시험의 실제 실패·교정·재실행 집계와 원본 근거는 위 독립 검수 기록을 따른다. optional/torchcodec 경고 원본 보존·Community품질 근거 아님.
 - 이어갈 단계: actual-main raw7/19에서batchRunning=true·toggle후클립범위입력이활성화되어클릭시0/300으로값변경됨·nextprobe native0. 다음회차일괄작업동안클립범위입력admission차단을기획→설계·잠금중값/설정/분석/hash/HTTP불변·해제후사용복귀·실제중단/update즉시차단수용조건→실패재현부터진행. 이번제품동결 뒤 추가제품변경 없음. 실제 Premiere/UXP 화면·편집·스크린리더·기존0.1.0 설치 전환·Community-1 실제 품질 미검증. CUA/browser/Premiere 실행조작종료/사용자 설치활성화/terms/결제/token/media 외부 업로드 없음.
+
+
+## 99회차: 일괄 작업 중 단독 발화 범위 입력·확인 차단 — 0.1.100
+
+- 시작 clean HEADe9f1478c3bf2f16ca8cd60b2b025c685cadecf92/latest v0.1.99/release408436932/제목 Contentrium CUT/target613911e1671cd961da19f50228235ef1fc2a2c2a·자체CLI0. batchRunning=true만으로클립범위버튼이잠기지않아raw7/19가0/300으로변경됨을이전회차재현. 시작/끝확인도활성화되는동일UI불편을함께개선한다.
+- 설계/수용 조건: calibrationClipRangeReady와calibrationJumpReady의admission에batchRunning차단추가. 일괄작업중렌더·toggle·직접onclick모두범위입력/시작·끝확인차단·raw/backup/settings/analysis/plan/hash/snapshot/HTTP/host호출불변. batch해제후원래행과clipbounds기준사용복귀·정확fill/undo/시작과마지막포함프레임이동유지. 기존reset/restore/clipundo batch차단·일시잠금backup보존·입력/identity/실제cancel/update폐기유지. 혼합·제외·행교체·0/0·무효·범위없음차단유지. 신규RED→최소구현→관련/전체회귀·독립readonlyreview→추출패키지CLI→공개발견·서명·실제3downloadsize/hash·고정v0.1.1검증. 승인범위자율진행·CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/payment/token/media외부업로드없음. 실제Premiere/UXP/스크린리더/0.1.0전환/Community품질미검증.
+
+- 신규4시험 RED3실패/1통과/native1/166.7844ms: 일괄작업중클립입력·확인·재렌더행 admission 실패; 기존update/무효범위시험통과. 최소2guard에batchRunning추가·global workLocked불변. 경로조회2건은존재하지않는premiere-panel/AGENTS와freeze후보조회로해결·제품시험실패아님·원본도구출력보존.
+
+- 신규GREEN4/4/native0/199.1743ms·helper/제품GREEN실패/통과재실행0. 두admission guard변경만으로일괄중클립입력·시작끝확인·새행차단과해제후fill/undo/seek회복·기존update차단통과. 메타5파일0.1.100으로정렬후52입력을동결하고독립readonlyreview와회귀·빌드를시작한다.
+
+- 최종 정식 Node753/753/native9518/exit0/78106.8486ms·fail/cancel/skip/todo0. Python496고유/native22117/exit0/99.593초·fail/error/skip/excluded0·import중복41만제거. 관련64/64/native0/3009.256ms. 신규4 GREEN4/4·helper/제품실패/통과재실행0·기존시험본문불변. 독립 추가시험은 정식 집계 가산 없음.
+
+- 집계helper의relatedTests필드에이전60값이남아있어실제로그64와불일치·원본JSON보존후64로교정. 검증assert·QA에는처음부터64/64이며제품변경/시험재실행없음.
+
+- 독립readonly검수: C/I/M/unresolved0·156고유/160raw·최종156pass·formal630등록/0실행·제품실패0·helper4실패(미flush저장3·disconnected captureSettings1)원본보존→실패4만보정재시험통과·통과replay0. initialPID187344/exit1/747.2401ms·retry3PID184608/exit0/37.0580ms·supplementPID185744/exit1/566.8490ms·retry1PID176304/exit0/18.9283ms. 12raw·17일시잠금·21invalidate·rowownership·acceptedanalysis/plan/storage/hash/snapshot·cancel/update·staleasyncseek·정확lastincludedticks검증. 4rawsnapshot52/main/fixture/freeze/HEAD/index/stage-z/status-z불변·QA809940→810497/prefix동일557append. report23583SHA6e635d7facfa2fb131a7309af4141f69b77972dfe71b817012f00793df798f9a·seal43211SHAbccc3ba909f8bcee560c1bbda0f38d308f72db85249d6b4d6a7d4ef2d00c0d1e/267files10458088bytes·별도receipt468SHAe51753ac0b1f8ac4debaf93c391721bafda67b578600255105ba374b0f686577/PID181508/native0/148.1381ms·root전체seal size/SHA/현재raw/HEAD/index/status교차검증통과. 근거C:\Users\JeYun\AppData\Local\Temp\contentrium-cycle99-review-00964d157126410182b4b7e2362b8a48. 실제host/설치/화면/Community품질미검증.
+
+- [0.1.100 패키지 검증](package-0.1.100-proof.json): runtime/CCX native46890/exit0·Setup native52999/exit0·추출 proof native42722/exit0·55.266초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.100·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.

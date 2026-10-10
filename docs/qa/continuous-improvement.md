@@ -2750,3 +2750,13 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - Root조회helper추가실패1/native1/15162b: seal.files list에mapping items가정·원본도구입출력보존후list스키마확인·전체봉인검증native0; probe/제품/시험재실행없음. roothelper총2(cp949파일read+seal스키마조회).
 
 - [0.1.103 패키지 검증](package-0.1.103-proof.json): runtime/CCX native93643/exit0·Setup native33799/exit0·추출 proof native38556/exit0·50.562초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.103·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.
+
+
+### 공개 결과
+
+- [v0.1.103](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.103): release408477494·제목 Contentrium CUT·공개2026-10-10T01:07:53Z·target/tag f5d28a45d3316c7ddcbfb257615e05f98d938f4b·draft/prerelease 아님. [실제 재다운로드](release-0.1.103-proof.json): 익명0.1.102→0.1.103 AVAILABLE·서명·ZIP/CCX/Setup3개 실제 size/SHA 일치. [현재 조회](release-0.1.103-current-proof.json): CURRENT/후보 없음·5자산 ID/size/digest/서명 바이트 일치. [고정 복구](migration-pinned-0.1.1-after-0.1.103-proof.json): latest0.1.103에도 서명v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+- 기획→설계→구현→검증→0.1.103 공개/재검증 완료. 정식 Node766/Python496·독립 검수는 별도 집계. 신규5 RED4fail/1pass(추가stale1만별도RED)→GREEN5/5·관련33/33·기존정식본문불변. 집계helper cp949파일read오류1원본보존/UTF8교정·제품GREEN실패0. 실제 Premiere/UXP 화면·편집·스크린리더·기존0.1.0 설치 전환·Community-1 품질 미검증. 사용자 설치/활성화·컴퓨터유즈/브라우저/Premiere 조작·terms/결제/token/미디어 외부 업로드 없음.
+
+- 종료 근거: 0.1.103 공개 업로드 native33449/exit0·실제3다운로드 native63429/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native93643/exit0·Setup native33799/exit0·추출 패키지 native38556/exit0/50.562초. 공개919파일패턴검사·신뢰키불변·52raw동결일치·설치0.1.0 hash동일·서명키존재만확인·자동화ACTIVE15분·자체CLI0. Node766/Python496 정식통과·독립54고유/56raw별도집계.
+- 실패 원인/보존: 신규RED4초기시험3fail/1pass와추가stale1fail/native1·필드잠금/제외행예약저장소실/새행·이전행분석무효화재현. 최소3batch조건+1소유권guard추가후GREEN5/5/native0. 제품GREEN실패0·roothelper2: 집계cp949파일read오류1(845032)/seal.files list조회가정1(15162b)원본소스/도구출력보존·UTF8/list교정·dependentprobe실행전중단되어시험재실행없음. 독립실패/교정집계는위검수근거따름. optional/torchcodec경고원본보존·Community품질근거아님.
+- 이어갈 단계: actual-main에서batchRunning=true·toggle후카메라역할/보이는화자설정활성화·직접보이는화자입력시acceptedplan폐기·nextprobe native0. 다음회차카메라역할/보이는화자입력batch차단을기획→설계·원문/settings/analysis/plan/보호트랙보존과해제후정상변경복귀수용조건→RED부터진행. 이번동결뒤추가제품변경없음. 실제Premiere/UXP렌더/편집/스크린리더/0.1.0설치전환/Community품질미검증·CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/payment/token/media외부업로드없음.

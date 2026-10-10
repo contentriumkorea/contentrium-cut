@@ -272,7 +272,7 @@ function toggle(){
   for(const row of syncRows){for(const field of [row.check,row.stream,row.channel,row.offset,row.confirmed,row.clockId,row.date,row.fps,row.drop,row.clockConfirmed])field.disabled=locked||!connected;syncManualFeedback(row,locked);syncClockFeedback(row);}
   for(const row of selectedRows)selectedSourceFeedback(row,locked);
   $('speaker-count').disabled=workLocked()||mode!=='mixed';$('vad-threshold').disabled=workLocked()||mode!=='separate';
-  for(const row of calibrationRows)for(const field of [row.first,row.last])field.disabled=workLocked()||!connected||!calibrationActive(row);
+  for(const row of calibrationRows)for(const field of [row.first,row.last])field.disabled=workLocked()||batchRunning||!connected||!calibrationActive(row);
   for(const id of ['analyze','sync','plan','apply-sync','apply','save-settings','load-settings'])$(id).disabled=locked||!connected||(id==='plan'&&!analysisState)||(id==='apply'&&!plan)||(id==='apply-sync'&&!syncResult);
   for(const [id,active,idle,label] of [['save-settings',settingsSave&&!settingsSave.automatic,'저장','저장 중…'],['load-settings',settingsRestore,'불러오기','불러오는 중…']]){$(id).textContent=active?label:idle;$(id).setAttribute('aria-busy',active?'true':'false');}
   for(const id of ['read-project','read-selection','install-model','save-resources','prune-cache'])$(id).disabled=locked;
@@ -464,7 +464,7 @@ function calibrationFeedback(){
   return firstIssue;
 }
 function calibrationOptions(legacy=false){return calibrationRows.filter(r=>(legacy||calibrationActive(r))&&Number(r.last.value)>Number(r.first.value)).map(r=>({speakerId:r.speaker.value.trim(),inputKey:ContentriumHost.hash({instanceKey:r.instanceKey,streamIndex:Number(r.stream.value)-1,channelIndex:Number(r.channel.value)-1}),startFrame:Number(r.first.value),endFrame:Number(r.last.value)}));}
-function calibrationChanged(row){if(!calibrationRows.includes(row)||workLocked()||!connected)return;row.resetBackup=null;row.clipRangeBackup=null;if(calibrationActive(row))invalidateAnalysis();else {scheduleSettings();toggle();}}
+function calibrationChanged(row){if(!calibrationRows.includes(row)||workLocked()||batchRunning||!connected)return;row.resetBackup=null;row.clipRangeBackup=null;if(calibrationActive(row))invalidateAnalysis();else {scheduleSettings();toggle();}}
 function microphoneFeedback(){
   const scalarIssue=analysisOptionsFeedback();
   const calibrationIssue=calibrationFeedback();
@@ -541,7 +541,7 @@ function renderSources(){
     const restoreHint=element('p','','hint hidden');restoreHint.id='calibration-restore-guide-'+(calibrationRows.length-1);restoreHint.setAttribute('role','status');restoreHint.setAttribute('aria-live','polite');calibration.appendChild(restoreHint);calibrationRow.restoreHint=restoreHint;restore.setAttribute('aria-describedby',restore.getAttribute('aria-describedby')+' '+restoreHint.id);
     const restoreIssue=element('p','','hint input-error hidden');restoreIssue.id='calibration-restore-error-'+(calibrationRows.length-1);restoreIssue.setAttribute('role','status');restoreIssue.setAttribute('aria-live','polite');calibration.appendChild(restoreIssue);calibrationRow.restoreIssue=restoreIssue;restore.setAttribute('aria-describedby',restore.getAttribute('aria-describedby')+' '+restoreIssue.id);
     const restoreLengthHint=element('p','','hint hidden');restoreLengthHint.id='calibration-restore-length-'+(calibrationRows.length-1);restoreLengthHint.setAttribute('role','status');restoreLengthHint.setAttribute('aria-live','polite');calibration.appendChild(restoreLengthHint);calibrationRow.restoreLengthHint=restoreLengthHint;restore.setAttribute('aria-describedby',restore.getAttribute('aria-describedby')+' '+restoreLengthHint.id);
-    for(const field of [first,last]){field.min='0';field.step='1';field.setAttribute('aria-describedby',calibrationIssue.id+' '+calibrationHint.id+(positionGuide?' '+positionGuide.id:''));field.disabled=workLocked()||!connected||!calibrationActive(calibrationRow);field.oninput=field.onchange=()=>calibrationChanged(calibrationRow);}
+    for(const field of [first,last]){field.min='0';field.step='1';field.setAttribute('aria-describedby',calibrationIssue.id+' '+calibrationHint.id+(positionGuide?' '+positionGuide.id:''));field.disabled=workLocked()||batchRunning||!connected||!calibrationActive(calibrationRow);field.oninput=field.onchange=()=>calibrationChanged(calibrationRow);}
   }
   for(const track of s.tracks.filter(t=>t.mediaType==='video'&&s.clips.some(c=>c.trackRef===t.trackRef))){
     const row=element('div',undefined,'camera-row'),clips=s.clips.filter(c=>c.trackRef===track.trackRef),title='V'+(track.index+1)+' · '+track.name;

@@ -1,6 +1,6 @@
 {
   "name": "contentrium-cut",
-  "version": "0.1.101",
+  "version": "0.1.102",
   "description": "Contentrium CUT Premiere Pro UXP panel with local speaker editing",
   "scripts": {
     "test": "node --test tests/host-guard.test.js tests/test-cut-output.js tests/test-sync.js tests/test-mutation.js tests/test-panel-workflow.js tests/test-panel-main.js tests/test-selection.js tests/test-connection.js tests/test-continuation.js tests/test-install-enrollment.js tests/test-panel-service.js tests/test-native-qa.js"

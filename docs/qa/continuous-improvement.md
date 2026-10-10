@@ -2707,3 +2707,19 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 종료 근거: 0.1.101 공개 업로드 native41248/exit0·실제3다운로드 native5750/exit0·CURRENT/5자산통과후고정hash기대값오기로원본closeout native1→migration단계만retry native0·통과조회재실행없음. runtime/CCX native22621/exit0·Setup native5560/exit0·추출 패키지 native44203/exit0/55.219초. 공개911파일 비공개패턴검사·신뢰키불변·52raw 동결 일치·설치0.1.0 hash동일·서명키 존재만확인·자동화ACTIVE15분·자체CLI0. Node757/Python496 정식 통과·독립276고유/370raw는 별도 집계.
 - 실패 원인/보존: 신규4 RED batch기존/새행/unlock전버튼admission3fail·기존update/disconnected/stale1pass/native1→GREEN4/4/native0·제품GREEN실패0·준비helpercp949실패1/변경전부수시험4/기통과replay1별도보존·기존시험본문불변. 독립 시험의 실제 실패·교정·재실행 집계와 원본 근거는 위 독립 검수 기록을 따른다. optional/torchcodec 경고 원본 보존·Community품질 근거 아님.
 - 이어갈 단계: actual-main에서batchRunning=true·toggle후단독발화시작/끝숫자필드가활성화되어직접입력시accepted분석과plan이폐기됨·nextprobe native0. 다음회차일괄작업중단독발화숫자입력잠금·change handler admission차단을기획→설계·기존입력/backup/settings/analysis/plan/hash/storage불변·해제후정상입력/invalidation복귀·cancel/update즉시차단수용조건→RED부터진행. 이번동결뒤추가제품변경없음. 실제Premiere/UXP/스크린리더/기존0.1.0설치전환/Community품질미검증·CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/payment/token/media외부업로드없음.
+
+
+## 101회차: 일괄 작업 중 단독 발화 숫자 입력 차단 — 0.1.102
+
+- 시작 clean HEAD960cf4fad3c9f362b49cf48b47e6e9fcdf85c7c9/latestv0.1.101/release408456843/제목Contentrium CUT·자체CLI0. 실제main에서batch중시작/끝숫자필드가활성화되어accepted분석과plan을폐기하는이전probe확인.
+- 설계/수용조건: 숫자필드toggle·최초렌더disabled와calibrationChanged admission에batchRunning추가; globalworkLocked·입력계산·레이아웃불변. batch중원문·reset/clipbackup·settings/storage·analysis/plan/hash/snapshot·HTTP/host/status보존, 직접oninput/onchange차단. disabled는사용자입력을차단하며프로그램value대입은별도시험. 해제후기존원문유지·정상입력시backup폐기와분석/plan무효화복귀. 새행·반복행·stale행·mixed/excluded·끊김·기존잠금·cancel/update즉시차단유지. 신규RED→최소구현→관련/전체회귀·독립readonlyreview→추출패키지실행→공개업데이트발견/서명/실제3downloadsizeSHA/고정v0.1.1검증. 사용자설치/CUA/browser/Premiere실행조작종료/terms/payment/token/media외부업로드없음. 실제Premiere/UXP/스크린리더/0.1.0설치전환/Community품질미검증.
+
+- 신규4 RED3fail/1pass/native1: 기존필드enabled·callback의backup폐기·새행enabled재현, 해제후기존invalidation/잠금보호1pass. 최소3조건에batchRunning추가·globalguard/계산/레이아웃불변·원본실패로그보존.
+
+- 신규GREEN4/4/native0/208.4554ms·제품GREEN/준비helper실패0. 新규정식본문외기존시험보존·5메타0.1.102정렬후52raw동결·회귀/독립readonlyreview/빌드시작.
+
+- 최종 정식 Node761/761/native52681/exit0/109435.3134ms·fail/cancel/skip/todo0. Python496고유/native5342/exit0/100.937초·fail/error/skip/excluded0·import중복41만제거. 관련68/68/native0/3236.2691ms. 신규4 RED3fail/1pass→GREEN4/4·제품GREEN/준비helper실패0·기존정식본문불변. 독립 추가시험은 정식 집계 가산 없음.
+
+- 독립readonly검수 C/I/M/제품미해결0·37고유/37raw/37pass·제품/helper실패/기통과재실행0. formal638등록/0실행·초기lexical612집계는실행없는등록계측으로638교정·원본보고서보존. 숫자렌더/toggle/직접callback·accepted결과·reset/clipbackup해제후정확복원·programmatic value대입한계·inactive/mixed/excluded/stale/disconnected/기존잠금/cancel/update검증. probePID174608/staticPID191584/sealPID186484 모두native0·각시각원본receipt보존. 봉인49파일 size/SHA·reportac613087170efc21c0f2a37df2c9742e6093bd848768a0d1d17ad2e4d6c846cb/seal684bcaeb182c9cb8faee0f25b9b5869707210a4d0e25a01cd75e245a2890e87f/별도receipt396c9f359d02663ffc2052638d977c3fb8f72f7ae6ef96a62de0650895629477를root전체교차검증. frozen52/main/fixture/HEAD/index/stage/status불변·QA prefix보존. 근거C:\Users\JeYun\AppData\Local\Temp\contentrium-cycle101-review-05c5dabde2974148bb63fa30e19c3f9a. 실제Premiere/UXP렌더/스크린리더/설치전환/Community품질은report미검증목록이며제품finding집계와별도.
+
+- [0.1.102 패키지 검증](package-0.1.102-proof.json): runtime/CCX native90764/exit0·Setup native75965/exit0·추출 proof native20170/exit0·54.344초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.102·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.

@@ -2812,3 +2812,21 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 종료 근거: 0.1.105 공개 native36269/exit0·실제3다운로드 native22785/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native20434/exit0·Setup native37309/exit0·추출패키지 native73611/exit0/53.797초. 공개927파일패턴검사·신뢰키불변·52raw동결일치·설치0.1.0 hash동일·서명키존재만확인·자동화ACTIVE15분·자체CLI0. 정식 Node775/Python496·독립33고유/35raw별도집계.
 - 실패 원인/보존: 신규RED4fail/1pass는기존/새 매핑select enabled·batch콜백과이전행콜백의acceptedplan/savedmapping 변경; batch조건5개+현재select소유권1개추가후GREEN5/5·관련81/81·제품결함0/root helper4(시험경쟁1·schema조회1·collector구문1·검색경로1) 교정(초기Python495pass/1error→실패1만retry통과/총497실행/최신496고유통과). 독립실패/교정집계는위검수근거따름. 기존정식본문로컬raw불변/HEAD줄바꿈만정규화동일. optional/torchcodec경고원본보존·Community품질근거아님.
 - 이어갈 단계: actual-main에서batch중range-start입력활성화·callback으로acceptedanalysis/plan폐기·nextprobe native0. 다음회차분석범위·컷정책입력batch차단기획→설계·raw/settings/analysis/plan/보호트랙보존과해제후정상복귀수용조건→RED부터진행. 이번동결뒤추가제품변경없음. 실제Premiere/UXP렌더/편집/스크린리더/0.1.0설치전환/Community품질미검증. CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/payment/token/media외부업로드없음.
+
+
+## 105회차: 일괄 작업 중 분석 범위·컷 정책 입력 잠금 — 0.1.106
+
+- 시작 clean HEAD101c2632c04770b0b222cc48bad6da012f8f44cc/latestv0.1.105/release408497498/제목Contentrium CUT·자체CLI0. 이전 actual-main probe에서batch중range-start활성화·callback이acceptedanalysis/plan을폐기함을재현. 같은toggle그룹의range-end/min-shot/short-turn/overlap과policyInputsChanged에도batch조건누락.
+- 설계/수용조건: 해당5개toggle disabled와range handler/policyInputsChanged에batchRunning조건 총3개추가. global workLocked·범위/정책계산·레이아웃은유지. separate/mixed acceptedanalysis/plan/hash/settings/raw/storage/timer/snapshot/status/API 보존, input/change 직접callback에도부작용없음. batch해제후범위는analysis/plan폐기·rangeDirty=true, 정책은analysis유지/plan폐기·저장예약 정상동작. update즉시차단/중단/시작·cancel/pending/validation/연결보호유지. disabled는물리입력차단,외부programmatic값대입자체는별도한계. 신규RED→최소구현→전체/관련회귀→독립readonlyreview→패키지실행→공개발견/서명/실제3다운로드sizeSHA/고정v0.1.1 검증. 단일모노패널·최상단수정가능개별CUT·원본/오디오/별도자막보존, 로고/추가그래픽불변. 실제Premiere/UXP렌더/편집/스크린리더/0.1.0설치전환/Community품질미검증. CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/payment/token/media외부업로드없음.
+
+- 신규4 RED3fail/1pass/native1: range/policy 입력enabled·range callback의analysis/plan폐기·policy callback의plan폐기 재현. 해제후정상편집/update/cancel/연결보호1pass. RED소스/log/native보존. toggle/range/policy에batch조건3개만추가·globalguard/계산/레이아웃불변·5메타0.1.106 정렬.
+
+- 시험실행helper2/원본보존: Python native25700/exit1은환경 CONTENTRIUM_TEST_MODEL_ROOT 누락으로494pass/2skip/0fail/0error. 검증된기존Silero root를지정해건너뛴2ID만tool6636d1/exit0/3.656초로완료·총498raw/최신496고유통과. Node native3309/exit1은tests/*.js가package.json 정식12파일외CLI helper2개를포함: 정식779pass+panel-continuation-peer 파일pass1+enrollment_receipt 파일error1=raw781/780pass/1fail. enrollment JSON인수누락으로connect호출전파싱오류·정식제품실패아님·정식시험재실행없음. 기존suite명세/보조스크립트본문불변, 초기log/native/result보존.
+
+- 최종 정식 Node779/779 통과/native3309/exit1(추가CLI helper오류1)/110917.9519ms·정식실패0. Python496고유/native25700/exit1(초기2skip)→해당2ID tool6636d1/exit0/95.171초·최신496고유통과/498raw/0finalskip·import중복만제거. 관련120/120/native0/7420.0413ms. 신규4 RED3fail/1pass→GREEN4/4·기존정식본문로컬raw불변/HEAD줄바꿈만정규화동일·제품GREEN실패0/roothelper2. 독립추가probe정식집계가산없음.
+
+- 독립 리뷰62고유/63raw/최신62pass/제품지적0/정식실행0. actual-main→workflow→mutation-controller의begin/operation/receipt대기6사례·separate/mixed/5입력·게이트·해제·blank/NaN/음수콜백검증. 기존workLocked LF/CRLF 비교helper1(native child192580/exit1/1310.8461ms)은원본보존후실패ID만줄바꿈비교교정(native195156/exit0/688.7754ms). root가봉인16파일 size/SHA 및현재52입력/main/fixture/freeze/HEAD/index/stage/status일치교차검증. 범위밖9항목root판단: 실제UXP/Adobe편집/설치/Community/접근성미검증·service/formal/release는root검증·직접프로그램값대입은물리disabled범위밖·다른입력은후속회차. 변경된값의추후toggle 재검증으로plan무효화될수있는한계명시. 근거C:\Users\JeYun\AppData\Local\Temp\contentrium-cycle105-review-e381583a48ae4f02a74c0f5abd9b5451.
+
+- 보조상태조회 tool00bd25/exit1은runtime압축진행중아직생성되지않은완료native파일조회. Test-Path후읽기로교정·빌드/시험재시작없음·root helper누계3. 빌드완료대기·기존공개/설치파일보존.
+
+- [0.1.106 패키지 검증](package-0.1.106-proof.json): runtime/CCX native99393/exit0·Setup native42968/exit0·추출 proof native89134/exit0·55.172초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.106·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.

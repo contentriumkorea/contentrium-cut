@@ -2830,3 +2830,12 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 보조상태조회 tool00bd25/exit1은runtime압축진행중아직생성되지않은완료native파일조회. Test-Path후읽기로교정·빌드/시험재시작없음·root helper누계3. 빌드완료대기·기존공개/설치파일보존.
 
 - [0.1.106 패키지 검증](package-0.1.106-proof.json): runtime/CCX native99393/exit0·Setup native42968/exit0·추출 proof native89134/exit0·55.172초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.106·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.
+
+
+### 공개 결과
+
+- [v0.1.106](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.106): release408509556·제목 Contentrium CUT·공개2026-10-10T01:53:41Z·target/tag 438b5da88c70143d1f0fcc50b750c1a712c50825·draft/prerelease 아님. [실제 재다운로드](release-0.1.106-proof.json): 익명0.1.105→0.1.106 AVAILABLE·서명·ZIP/CCX/Setup3개 실제size/SHA 일치. [현재 조회](release-0.1.106-current-proof.json): CURRENT/후보 없음·5자산 ID/size/digest/서명 바이트 일치. [고정 복구](migration-pinned-0.1.1-after-0.1.106-proof.json): latest0.1.106에도 서명v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+
+- 종료 근거: 0.1.106 공개 native99978/exit0·실제3다운로드 native15524/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native99393/exit0·Setup native42968/exit0·추출패키지 native89134/exit0/55.172초. 공개931파일패턴검사·신뢰키불변·52raw동결일치·설치0.1.0 hash동일·서명키존재만확인·자동화ACTIVE15분·자체CLI0. 정식 Node779/Python496 최신통과·독립62고유/63raw별도집계.
+- 실패 원인/보존: 신규RED3fail/1pass는range/policy입력enabled 및callback의acceptedanalysis/plan폐기; batch조건3개추가후GREEN4/4·관련120/120·제품GREEN실패0. root helper3는진행중완료파일조회1(Test-Path교정)과Python 모델root인자누락(초기494pass/2skip/exit1→2ID만추가pass/498raw/최신496통과)와Node wildcard범위오류(정식779pass+추가CLI helper pass1/error1=raw781/780pass/1fail/nativeexit1); 기존정식/제품실패아님·통과사례재실행없음. 독립CRLF비교helper1 원본보존/실패ID만교정재검증. 원본log/native/result/helper소스보존·기존정식본문로컬raw불변/HEAD줄바꿈만정규화동일. optional/torchcodec경고원본보존·Community품질근거아님.
+- 이어갈 단계: actual-main에서separate VAD임계값/mixed 화자수가batch중활성화·input callback으로acceptedanalysis/plan폐기·nextprobe native0. 다음회차화자수·VAD입력batch차단기획→설계·raw/settings/analysis/plan보존과해제후정상복귀수용조건→RED부터진행. 이번동결뒤추가제품변경없음. 실제Premiere/UXP렌더/편집/스크린리더/0.1.0설치전환/Community품질미검증. CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/payment/token/media외부업로드없음.

@@ -2862,3 +2862,18 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 종료 근거: 0.1.107 공개 native50662/exit0·실제3다운로드 native25822/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native11225/exit0·Setup native79388/exit0·추출패키지 native18599/exit0/51.782초. 공개935파일패턴검사·신뢰키불변·52raw동결일치·설치0.1.0 hash동일·서명키존재만확인·자동화ACTIVE15분·자체CLI0. 정식 Node783/Python496 최신통과·독립75고유/91raw별도집계.
 - 실패 원인/보존: 신규RED3fail/1pass는option입력enabled 및callback의acceptedanalysis/plan폐기와예약timer변경; batch조건3개추가후GREEN4/4·관련76/76·제품GREEN실패0. Python초기495pass/1error/nativeexit1는breakaway fixture marker 존재직후부분JSON읽기경합·실패ID1건만재시험pass/exit0→496최신pass/497raw. 원본JSON/log/native보존·제품/기존시험소스교체없음·통과사례재실행없음. 독립helper16는candidate.appVersion mock누락8건과drained-cancel stopped기대오류8건·실패16ID만교정재시험pass. root helper2는리뷰보고서findings list를이전object스키마로읽은수집오류(tool776edf/exit1/0.590초)·실제스키마비교교정·정식사례재실행없음·증거JSON보존, 공개다운로드launcher PYTHONPATH누락1건(tool599997/exit1/0.458초)은import단계실패/실제네트워크검증전·초기log/native복사보존후해당명령만환경교정재실행. 기존정식본문로컬raw불변/HEAD줄바꿈만정규화동일. optional/torchcodec경고원본보존·Community품질근거아님.
 - 이어갈 단계: actual-main separate/mixed의analysis-device/cache-budget이batch중활성화·input callback으로resourceInputRevision/Dirty변경을재현·nextprobe native0. 다음회차자원설정batch입력차단기획→설계·raw/settings/분석/계획/예약보존과해제후정상복귀수용조건→RED부터진행. breakaway marker fixture 원자적게시로부분JSON읽기경합도후속보완후보. 이번동결뒤추가제품변경없음. 실제Premiere/UXP렌더/편집/스크린리더/0.1.0설치전환/Community품질미검증. CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/payment/token/media외부업로드없음.
+
+
+## 107회차: 일괄 작업 중 분석 자원 설정 입력 잠금 — 0.1.108
+
+- 시작 clean HEAD0190eee397595da4284b7daa4d3d42d97dc11381/latestv0.1.107/release408523280/제목Contentrium CUT·자체CLI0. 이전actual-main probe에서analysis-device/cache-budget의separate/mixed batch중활성화 및input callback의resourceInputRevision/Dirty변경재현. 작업중저장/정리가이미차단됐어도입력편집상태가변해종료뒤자원설정판단을흔든다.
+- 설계/수용조건: 자원두입력disabled 및공통input/change early-return에batchRunning 총2조건추가. 작업중dirty/clean상태·revision/viewRevision·설정raw·분석/계획·예약·snapshot·저장소·status/API불변. 해제후두모드모두정상입력/revision/dirty복귀·기존cache/resource save/discard/suggestion 및update즉시차단/중단/시작·cancel/busy게이트유지. global workLocked/자원계산/레이아웃불변. 외부value직접대입자체는물리disabled범위밖.
+- 재현된시험경합도보완: breakaway_worker가marker를직접쓰면exists후부분JSON읽기가가능. 두결과를동일한pending파일완성→replace(marker)로게시. mock된blocked경로에서write중marker미노출/최종완전JSON/pending없음을결정적으로RED→GREEN검증. 실제process-scope 제품로직불변·기존실패증거보존.
+- 신규RED→최소구현→전체/관련회귀→독립readonlyreview→패키지실행→공개발견/서명/실제3다운로드sizeSHA/고정v0.1.1검증. 단일모노패널·최상단수정가능개별CUT·원본/오디오/별도자막보존, 로고/추가그래픽불변. 실제Premiere/UXP렌더/편집/스크린리더/0.1.0설치전환/Community품질미검증. CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/payment/token/media외부업로드없음.
+
+
+### 사용자 중단에 따른 종료 — 2026-10-10T11:16:45.084922+09:00
+
+- 사용자의 "반복작업 중단" 지시로 automation contentrium-cut-ui를PAUSED로변경·확인. 새작업시작없음. 106회차의0.1.107은공개/전체시험/독립리뷰/패키지/서명/실제3다운로드/고정v0.1.1/최종Git확인까지완료됐으며release408523280/target174bd4161d66d4d625f77443c4cd4aeb005e7af5를유지한다.
+- 다음107회차의예정0.1.108은설계와Node4/Python1시험초안작성까지만진행. RED/GREEN/전체시험/독립리뷰/제품구현/버전변경/빌드/패키지/공개배포모두미실행. 시험초안은cycle107-red-test-source.js/cycle107-red-scope-source.py와원본raw에보존하고현재작업폴더의두시험파일만정확한시작raw로복원·HEAD정규화일치검증. 52빌드입력불변·제품0.1.107유지. 실행도중종료할자체CLI없음·프로세스강제종료없음.
+- 새실패사례없음·계획된경합시험은실행되지않음. 기존실패증거/공개파일/서명키/사용자설정/설치0.1.0보존. 중단기록만로컬문서커밋으로정리하고추가GitHubpush/배포없음. 사용자가재개를명시하기전에는새heartbeat가와도작업을재개하지않는다. 재개시자원입력잠금/marker원자게시초안을검토후RED부터시작. 실제설치전환/Premiere편집/Community-1품질미검증.

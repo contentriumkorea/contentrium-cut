@@ -2776,3 +2776,12 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - Root 독립증거집계helper 추가1/native1(c2067a): Python dict(pass=...) 예약어 구문오류·원본collector 보존·literal mapping으로교정·collector만성공재실행/제품·probe·정식시험재실행없음. roothelper총3.
 
 - [0.1.104 패키지 검증](package-0.1.104-proof.json): runtime/CCX native46200/exit0·Setup native23926/exit0·추출 proof native55877/exit0·51.797초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.104·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.
+
+
+### 공개 결과
+
+- [v0.1.104](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.104): release408488939·제목 Contentrium CUT·공개2026-10-10T01:24:12Z·target/tag 7e9149953efd5d823d8567eb04235bbe87708b1d·draft/prerelease 아님. [실제 재다운로드](release-0.1.104-proof.json): 익명0.1.103→0.1.104 AVAILABLE·서명·ZIP/CCX/Setup3개 실제size/SHA 일치. [현재 조회](release-0.1.104-current-proof.json): CURRENT/후보 없음·5자산 ID/size/digest/서명 바이트 일치. [고정 복구](migration-pinned-0.1.1-after-0.1.104-proof.json): latest0.1.104에도 서명v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 AVAILABLE. 실제 설치 전환 없음.
+
+- 종료 근거: 0.1.104 공개 native28315/exit0·실제3다운로드 native73236/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native46200/exit0·Setup native23926/exit0·추출패키지 native55877/exit0/51.797초. 공개923파일패턴검사·신뢰키불변·52raw동결일치·설치0.1.0 hash동일·서명키존재만확인·자동화ACTIVE15분·자체CLI0. 정식 Node770/Python496·독립106고유/108raw별도집계.
+- 실패 원인/보존: RED3fail/1pass는 기존/새 카메라 입력enabled와callback의acceptedplan폐기; 카메라조건5개추가후GREEN4/4·관련73/73·제품GREEN실패0. roothelper3는컴파일전빌드인자오류(native2)와집계Git LF/기존작업 CRLF비교가정(native1), 독립증거집계 Python예약어pass keyword구문오류(native1,c2067a)까지 원본소스/log/tool입출력보존·인자/줄바꿈비교/집계구문만교정·정식시험재실행없음. 독립helper/실패교정집계는위검수근거따름. optional/torchcodec경고원본보존·Community품질근거아님.
+- 이어갈 단계: actual-main에서batch중화자카메라select활성화·callback으로acceptedplan폐기·nextprobe native0. 다음회차화자매핑·시작/예비카메라입력batch차단기획→설계·raw/settings/analysis/plan/보호트랙보존과해제후정상복귀수용조건→RED부터진행. 이번동결뒤추가제품변경없음. 실제Premiere/UXP렌더/편집/스크린리더/0.1.0설치전환/Community품질미검증. CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/payment/token/media외부업로드 없음.

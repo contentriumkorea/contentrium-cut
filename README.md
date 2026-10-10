@@ -2,7 +2,7 @@
 
 Premiere Pro 패널에서 트랙을 설정하고, 오디오를 로컬로 분석해 말하는 화자에 맞춰 카메라를 전환하는 플러그인입니다. 자동 싱크와 컷 편집 결과는 Premiere에서 계속 수정할 수 있는 새 시퀀스로 만듭니다.
 
-**[0.1.103를 공개했습니다](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.103).** 일괄 작업 중 마이크 포함 체크·화자 ID·채널·오디오 스트림 입력을 잠그고, 이전 행의 콜백이 현재 분석을 지우는 경로도 차단합니다. 작업 종료 후 정상 입력과 제외된 마이크의 설정 저장이 유지됩니다. Node766/Python496·독립 검수·패키지 실행·공개 서명과 실제3다운로드 해시를 확인했습니다. [반복 개선 기록](docs/qa/continuous-improvement.md)에 시험 한계와 다음 단계를 기록했습니다. 실제 Premiere/UXP 편집·기존0.1.0 설치 전환·Community-1 품질은 미검증입니다.
+**[0.1.104를 공개했습니다](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.104).** 일괄 작업 중 카메라 트랙 역할·보이는 화자 입력을 잠그고, 입력 콜백이 확인한 컷 계획과 예약 설정 저장을 폐기하는 경로를 차단합니다. 작업 종료 후 정상 편집과 보호 트랙 동작은 유지됩니다. Node770/Python496·독립 검수·패키지 실행·공개 서명과 실제3다운로드 해시를 확인했습니다. [반복 개선 기록](docs/qa/continuous-improvement.md)에 시험 한계와 다음 단계를 기록했습니다. 실제 Premiere/UXP 편집·기존0.1.0 설치 전환·Community-1 품질은 미검증입니다.
 
 ## 단일 패널 사용 흐름
 

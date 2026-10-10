@@ -271,7 +271,7 @@ function toggle(){
   for(const id of ['sync-method','sync-reference'])$(id).disabled=locked||!connected;
   for(const row of syncRows){for(const field of [row.check,row.stream,row.channel,row.offset,row.confirmed,row.clockId,row.date,row.fps,row.drop,row.clockConfirmed])field.disabled=locked||!connected;syncManualFeedback(row,locked);syncClockFeedback(row);}
   for(const row of selectedRows)selectedSourceFeedback(row,locked);
-  $('speaker-count').disabled=workLocked()||mode!=='mixed';$('vad-threshold').disabled=workLocked()||mode!=='separate';
+  $('speaker-count').disabled=workLocked()||batchRunning||mode!=='mixed';$('vad-threshold').disabled=workLocked()||batchRunning||mode!=='separate';
   for(const row of calibrationRows)for(const field of [row.first,row.last])field.disabled=workLocked()||batchRunning||!connected||!calibrationActive(row);
   for(const id of ['analyze','sync','plan','apply-sync','apply','save-settings','load-settings'])$(id).disabled=locked||!connected||(id==='plan'&&!analysisState)||(id==='apply'&&!plan)||(id==='apply-sync'&&!syncResult);
   for(const [id,active,idle,label] of [['save-settings',settingsSave&&!settingsSave.automatic,'저장','저장 중…'],['load-settings',settingsRestore,'불러오기','불러오는 중…']]){$(id).textContent=active?label:idle;$(id).setAttribute('aria-busy',active?'true':'false');}
@@ -367,7 +367,7 @@ function analysisReferenceMatches(inputHash){
   return Number.isFinite(count)&&Number.isFinite(threshold)&&inputHash===ContentriumHost.hash({...legacy,speakerCount:count,vadThreshold:threshold});
 }
 function analysisOptionChanged(id){
-  if(workLocked())return;
+  if(workLocked()||batchRunning)return;
   if(id===(mode==='mixed'?'speaker-count':'vad-threshold'))invalidateAnalysis();
   else {scheduleSettings();toggle();}
 }

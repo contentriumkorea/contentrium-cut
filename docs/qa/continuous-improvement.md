@@ -2623,3 +2623,21 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 종료 근거: 0.1.98 공개 업로드 native44987/exit0·실제3다운로드 native41104/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native63334/exit0·Setup native6257/exit0·추출 패키지 native62895/exit0/54.266초. 공개899파일 비공개패턴검사·신뢰키불변·52raw 동결 일치·설치0.1.0 hash동일·서명키 존재만확인·자동화ACTIVE15분·자체CLI0. Node745/Python496 정식 통과·독립105고유/109raw는 별도 집계.
 - 실패 원인/보존: 신규4 RED 길이 사전안내부재/native1→GREEN4/4/native0·helper/제품실패/통과재실행0·기존시험본문불변. 독립 시험의 실제 실패·교정·재실행 집계와 원본 근거는 위 독립 검수 기록을 따른다. optional/torchcodec 경고 원본 보존·Community품질 근거 아님.
 - 이어갈 단계: actual-main 원문7/19를0/0으로 미사용 초기화한 뒤 일시 validationCount 잠금과 toggle만으로 resetBackup이폐기되고 잠금해제후에도 초기화되돌리기가비활성화됨·nextprobe native0. 다음회차 초기화원문복원의 일시 admission 잠금 내구성을 기획→설계·동일맥락의 잠금해제후복귀/실제입력·맥락·중단·update폐기/정확원문·행별독립·설정분석불변 수용조건→실패재현부터 진행. 이번제품동결 뒤 추가제품변경 없음. 실제 Premiere/UXP 화면·편집·스크린리더·기존0.1.0 설치 전환·Community-1 실제 품질 미검증. CUA/browser/Premiere 실행조작종료/사용자 설치활성화/terms/결제/token/media 외부 업로드 없음.
+
+
+## 98회차: 일시 작업 잠금 뒤 초기화 되돌리기 유지 — 0.1.99
+
+- 시작 clean HEADa83b2524f8c63e13f66f718953157911fe617651/latest v0.1.98/release408430327/제목 Contentrium CUT/targetadc7c412ddf343ed024b77e83617c3f41e6c6e79·자체CLI0. 실제main 원문7/19 미사용초기화후 validationCount 일시잠금만으로 backup이폐기됨을 이전회차재현했다.
+- 설계/수용 조건: resetBackup은 기존 calibrationClipScopeGuard의 순수입력identity/stopRevision 가드를 공유하여 일시admission 잠금으로폐기하지않는다. reset/restore는workLocked뿐아니라batchRunning에도즉시차단. 동일맥락에서17종일시잠금해제후 backup/원문안내·오류안내·길이안내복귀·정확raw1회복원. 입력·설정·마이크·mode·connection·projectRead/selection/capability·selectedRows/plan/sync/epoch·stopRevision 변경과행교체·실제cancel/update는폐기. 행별독립/설정저장·분석·plan·hash·snapshot·HTTP불변·동일live반복쓰기0·unused0/0 no-op유지. 신규실패재현→최소구현→관련/전체회귀·독립readonlyreview→추출패키지CLI→공개발견·서명·3downloadsize/hash·고정v0.1.1검증. 회차별승인대기없이자율진행. 실제Premiere/UXP/스크린리더/0.1.0설치전환/Community품질미검증·CUA/browser/Premiere/설치활성화/terms/payment/token/media외부업로드없음.
+
+- 신규4 RED/native1/191.9341ms: 일시잠금 backup폐기/행별기록소실/batch reset허용3fail·기존실제중단/identity폐기1pass·원본시험/log/exit보존. 최소3줄수정: reset/restore batch admission차단·resetBackup에기존순수identity/stopRevision guard공유. rawbytes보존.
+
+- 신규4 GREEN4/4/native0/344.7354ms·helper/제품GREEN실패/통과GREEN재실행0. RED실제3fail/1pass(native1/191.9341ms)를확인하여초기QA초안4fail표기만교정·교정전초안raw보존. 기존시험본문불변·metadata5 0.1.99·52raw동결.
+
+- 최종 정식 Node749/749/native10346/exit0/81781.1943ms·fail/cancel/skip/todo0. Python496고유/native92888/exit0/92.266초·fail/error/skip/excluded0·import중복41만제거. 관련60/60/native0/3546.6668ms. 신규4 GREEN4/4·helper/제품실패/통과재실행0·기존시험본문불변. 독립 추가시험은 정식 집계 가산 없음.
+
+- 독립 C/I/M/미해결0·287고유/288raw/현재287pass. matrix278/278 native0/PID156576/1438ms·supplement8/9 native1/PID112380/71ms·실패1만JSON.parse교정1/1 native0/PID183756/27ms·통과재실행/제품실패/정식콜백0. helper1원인: secureStorage값자체JSON문자열을중첩escape없이검색. 원본source/log/native보존. 17잠금×12raw·행별·identity·잠금없는stopRevision·실제cancel/update·분석plan무효화·동일live쓰기0검증. seal142파일bytes/SHA/root검증·별도seal검증native0/PID186528/222.3019ms. frozen52/main/fixture/freeze/HEAD/index/stage-z/status-z현재동일·QA802860→803211/root351bytes추가prefix정확. report 5656e663bb5115c45a2ea9586d419b3b093f500426c971a12510c8b792b5837c·seal 6336b1c45ce5fd2b1ef4f3f8968ee1449c7da0347b44f35f2b56e224dd29f1a3. 다음회차clipfillbatch차단·실제Premiere/UXP/스크린리더/0.1.0설치전환/Community품질은검수범위밖·미검증.
+
+- root 증거스키마조회 도우미실패2/native1: seal.entries 추정과files[0]배열추정 KeyError. 원본tool입력/출력chunk184b2e/e4f8f3·실패JSON보존·실제files mapping확인후조회native0/수집native0. 제품·시험수정/재실행0.
+
+- [0.1.99 패키지 검증](package-0.1.99-proof.json): runtime/CCX native13337/exit0·Setup native58993/exit0·추출 proof native90232/exit0·54.125초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.99·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.

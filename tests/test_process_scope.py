@@ -45,7 +45,8 @@ def stubborn_worker(kind, payload, cancel, result, cache_root):
             child = subprocess.Popen([payload['ffmpeg'], '-v', 'error', '-nostdin', '-re', '-f', 'lavfi',
                                       '-i', 'anullsrc=r=16000:cl=mono', '-f', 'null', '-'],
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            Path(payload['marker']).write_text(json.dumps([child.pid]))
+            marker = Path(payload['marker']); pending = marker.with_suffix('.pending')
+            pending.write_text(json.dumps([child.pid])); pending.replace(marker)
     else:
         script = ('import subprocess,sys,json,time;from pathlib import Path;'
                   'child=subprocess.Popen([sys.executable,"-c","import time;time.sleep(60)"]);'

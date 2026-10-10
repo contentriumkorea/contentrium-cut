@@ -2785,3 +2785,21 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 종료 근거: 0.1.104 공개 native28315/exit0·실제3다운로드 native73236/exit0·CURRENT/5자산/고정v0.1.1 closeout native0. runtime/CCX native46200/exit0·Setup native23926/exit0·추출패키지 native55877/exit0/51.797초. 공개923파일패턴검사·신뢰키불변·52raw동결일치·설치0.1.0 hash동일·서명키존재만확인·자동화ACTIVE15분·자체CLI0. 정식 Node770/Python496·독립106고유/108raw별도집계.
 - 실패 원인/보존: RED3fail/1pass는 기존/새 카메라 입력enabled와callback의acceptedplan폐기; 카메라조건5개추가후GREEN4/4·관련73/73·제품GREEN실패0. roothelper3는컴파일전빌드인자오류(native2)와집계Git LF/기존작업 CRLF비교가정(native1), 독립증거집계 Python예약어pass keyword구문오류(native1,c2067a)까지 원본소스/log/tool입출력보존·인자/줄바꿈비교/집계구문만교정·정식시험재실행없음. 독립helper/실패교정집계는위검수근거따름. optional/torchcodec경고원본보존·Community품질근거아님.
 - 이어갈 단계: actual-main에서batch중화자카메라select활성화·callback으로acceptedplan폐기·nextprobe native0. 다음회차화자매핑·시작/예비카메라입력batch차단기획→설계·raw/settings/analysis/plan/보호트랙보존과해제후정상복귀수용조건→RED부터진행. 이번동결뒤추가제품변경없음. 실제Premiere/UXP렌더/편집/스크린리더/0.1.0설치전환/Community품질미검증. CUA/browser/Premiere실행조작종료/사용자설치활성화/terms/payment/token/media외부업로드 없음.
+
+
+## 104회차: 일괄 작업 중 화자 매핑·시작/예비 카메라 입력과 이전 화자 행 차단 — 0.1.105
+
+- 시작 clean HEADf596594d92b3b02329db9506334ad70e531e120c/latestv0.1.104/release408488939/제목Contentrium CUT·자체CLI0. 이전실제main probe의batch중speakerselect enabled/acceptedplan폐기와같은toggle/handler에start/reserve조건누락확인. renderSpeakers의이전select콜백도현재소유권확인없음.
+- 설계/수용조건: speaker와start/reserve toggle disabled·speaker 최초render·speaker 및start/reserve onchange에batchRunning 조건5개 추가. speaker 콜백에현재select소유권조건1개 추가. global workLocked·매핑범위/계산/레이아웃/원본/오디오/자막/로고불변. batch중분석/plan/hash/raw/settings/storage/예약timer/snapshot/status/API/매핑scope보존; stale행해제후에도무효. 새행/별도·혼합에서잠금; 해제후정상mapping 저장·plan무효화(analysis유지)·보호트랙옵션배제·update즉시차단/중단/cancel/pending/validation/연결끊김보호유지. disabled는물리입력만차단,외부programmatic값대입자체는별도한계. 신규RED→최소구현→전체/관련회귀→독립readonlyreview→패키지실행→공개발견/서명/실제3다운로드sizeSHA/고정v0.1.1 검증. 실제Premiere/UXP렌더/편집/스크린리더/0.1.0설치전환/Community품질미검증. 사용자설치/활성화/CUA/browser/Premiere실행조작종료/terms/payment/token/media외부업로드없음.
+
+- 신규5 RED4fail/1pass/native1/222.3599ms: 기존speaker/start/reserve enabled·직접callback acceptedplan폐기·새행 enabled·이전화자callback savedmapping/plan변경. 해제후정상편집/보호트랙옵션/update/cancel/연결보호 기존1pass. RED소스/log/native보존. 범위batch조건5개+speakerselect소유권1개만추가·globalguard/계산/레이아웃불변. 5메타0.1.105 정렬.
+
+- 초기정식Python496중495pass/1error/native75899/exit1: test_process_scope.ScopeTests.test_forced_cancel_drains_actual_ffmpeg_with_stubborn_worker JSONDecodeError. Worker의unblocked FFmpeg marker.write_text가exists를먼저노출하여부모가빈JSON을읽는시험helper경쟁조건. 초기전체log/result/native와원본testhelper보존. 해당marker만pending파일작성후replace로완료증거를원자적으로노출하도록교정(제품/frozen52불변); 기통과495재실행없이실패ID1개만재검증.
+
+- 최종 정식 Node775/775/native98980/exit0/91640.0693ms·fail/cancel/skip/todo0. Python496고유/native75899/exit1→실패1retrytool246f54/exit0/96.801초·최신고유496통과/총497실행(초기495pass/1error,실패1만retry통과)/skip/excluded0·import중복41만제거. 관련81/81/native0/5620.3245ms. 신규5 RED4fail/1pass→GREEN5/5·기존정식본문은로컬raw불변·HEAD와는CRLF→LF만정규화동일·제품결함0/roothelper경쟁조건1교정·초기실패로그보존. 독립추가probe는정식집계가산없음.
+
+- 독립 리뷰: core32고유/34raw + atomic-marker helper 확장1고유/1raw = 33고유/35raw/최신33pass/제품지적0/정식실행0. mixed poll 시험fixture에 speaker행이 없는 helper2건은 원본실패보존 후 해당2건만교정재검증. root가 core21+확장7개봉인파일 size/SHA, 현재52입력·main·Nodefixture·freeze·HEAD·index·stage·status·helper소스를확인. 실제Premiere/설치/Community품질과직접select.value프로그램변경은검증범위밖. root읽기전용schema조회 tool36bece/exit1은확장immutable키가정오류; ba2971/exit0로조회교정·시험재실행없음. root collector toolc456fc/exit1은예약어pass 키의Python구문오류; 실행전파싱단계실패원본보존후dict문법교정. root helper실패누계3(시험파일경쟁1+schema조회1+collector구문1), 정식/독립시험재실행없음.
+
+- [0.1.105 패키지 검증](package-0.1.105-proof.json): runtime/CCX native20434/exit0·Setup native37309/exit0·추출 proof native73611/exit0·53.797초. ZIP/CCX CRC/경로/공개 패턴/최종52raw 입력·Silero hash·runtime29/Setup26 모듈·2entrypoint 소스 일치. 추출 runtimeReady true/0.1.105·Setup --help exit0/CREATE_NO_WINDOW. 기존 optional/torchcodec 경고 원본 보존·Community-1 품질 근거 아님. 사용자 PC 설치/활성화 없이 owned scratch에서 실행 확인. 공개 배포/실제 재다운로드를 이어간다.
+
+- 보조검색오류: toolf8a7d0에서PowerShell의literal cycle103* 경로를rg에넘겨검색실패; c96a9b에서-g 필터로교정. 제품/시험실행없음·원본tool증거보존·root helper총4.

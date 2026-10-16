@@ -139,12 +139,13 @@ class GitHubTransport:
                     raise CutError('UPDATE_SIZE', 'Update metadata is too large')
             return HttpResponse(response.code, dict(response.headers.items()), bytes(body), response.geturl())
 
-    def download(self, url, destination, headers, cancel, expected_size):
+    def download(self, url, destination, headers, cancel, expected_size, *, progress=None):
         deadline = time.monotonic() + 1800
         with self._open(url, headers, 15) as response:
             if response.code != 200:
                 raise CutError('UPDATE_HTTP', 'Payload download failed', {'status': response.code})
             written = 0
+            if progress:progress(0,expected_size)
             with open(destination, 'xb') as output:
                 while True:
                     cancel()
@@ -157,6 +158,7 @@ class GitHubTransport:
                     if written > expected_size:
                         raise CutError('UPDATE_SIZE', 'Payload exceeds signed size')
                     output.write(chunk)
+                    if progress:progress(written,expected_size)
                 output.flush()
                 os.fsync(output.fileno())
         cancel()

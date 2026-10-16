@@ -24,6 +24,7 @@ manifest=json.loads((ROOT/'plugin'/'manifest.json').read_text());manifest['versi
 (ROOT/'plugin'/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')
 args=[sys.executable,'-m','PyInstaller','--noconfirm','--onedir','--windowed','--name','Contentrium CUT','--paths',str(ROOT/'companion'),'--add-data',str(ROOT/'config.json')+';.', '--add-data',str(model)+';silero']
 args+=['--add-data',str(ROOT/'licenses')+';licenses']
+args+=['--icon',str(ROOT/'resources/cut.ico')]
 for package in ['numpy','scipy','onnxruntime','cryptography','torch','torchaudio','pyannote.audio','pyannote.core','pyannote.database','pyannote.metrics','huggingface_hub']:
     args+=['--collect-all',package]
 for package in ['torchcodec','torchmetrics','lightning','pytorch_lightning','pytorch_metric_learning','speechbrain','safetensors','einops','yaml','soundfile','rich','requests','filelock','packaging','tqdm','matplotlib','sklearn','pandas','asteroid_filterbanks']:

@@ -20,10 +20,11 @@ def main():
         args=[sys.executable,'-m','PyInstaller','--noconfirm','--onefile','--windowed','--name','Contentrium-CUT-Install',
               '--workpath',str(ROOT/'build/online'),'--paths',str(ROOT/'companion'),'--add-data',str(data)+';.',
               '--add-data',str(ROOT/'licenses')+';licenses']
+        args+=['--icon',str(ROOT/'resources/cut.ico'),'--add-data',str(ROOT/'resources')+';resources']
         # Downloader must not pull the install/analysis graph through lazy imports
         # in the shared updater. Only trust validation and transport are used here.
         for path in (ROOT/'companion/contentrium_cut').glob('*.py'):
-            if path.stem not in {'updater','contract','online_installer'}:args+=['--exclude-module','contentrium_cut.'+path.stem]
+            if path.stem not in {'updater','contract','online_installer','installer_reporting','installer_ui'}:args+=['--exclude-module','contentrium_cut.'+path.stem]
         for package in ['numpy','scipy','torch','torchaudio','onnxruntime','pyannote','matplotlib','pandas','PIL','tkinter.test']:
             args+=['--exclude-module',package]
         subprocess.run(args+[str(ROOT/'tools/online_install_entry.py')],cwd=ROOT,check=True)

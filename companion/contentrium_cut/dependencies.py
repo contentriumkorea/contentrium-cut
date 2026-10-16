@@ -31,30 +31,38 @@ class _Redirect(HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 class ProviderTransport:
-    def download(self, destination):
+    def download(self, destination, *, progress=None, cancel=None):
         deadline, size = time.monotonic() + 1800, 0
         opener = build_opener(_Redirect())
         request = Request(validate_provider_url(FFMPEG_URL), headers={'User-Agent': 'Contentrium-CUT-Setup'})
         with opener.open(request, timeout=20) as response, Path(destination).open('xb') as output:
             validate_provider_url(response.geturl())
             if response.status != 200: raise CutError('DEPENDENCY_HTTP', 'FFmpeg provider download failed.')
+            try:total=int(response.headers.get('Content-Length','0')) or None
+            except ValueError:total=None
+            if progress:progress(0,total)
             while True:
+                if cancel and cancel():raise CutError('CANCELED','다운로드를 중단했습니다.')
                 if time.monotonic() > deadline: raise CutError('DEPENDENCY_TIMEOUT', 'FFmpeg provider download timed out.')
                 chunk = response.read(1024 * 1024)
                 if not chunk: break
                 size += len(chunk)
                 if size > MAX_PROVIDER_BYTES: raise CutError('DEPENDENCY_SIZE', 'FFmpeg provider artifact is too large.')
                 output.write(chunk)
+                if progress:progress(size,total)
             output.flush(); os.fsync(output.fileno())
 
-def install_ffmpeg(root, *, transport=None):
+def install_ffmpeg(root, *, transport=None, progress=None, cancel=None):
     app = Path(root).resolve() / 'app'
     target = app / 'ffmpeg'
     _guard_path(target); app.mkdir(parents=True, exist_ok=True)
     stage = app / ('.ffmpeg-stage-' + uuid.uuid4().hex); stage.mkdir()
     archive = stage / 'provider.zip.part'
     try:
-        (transport or ProviderTransport()).download(archive)
+        options={}
+        if progress:options['progress']=progress
+        if cancel:options['cancel']=cancel
+        (transport or ProviderTransport()).download(archive,**options)
         if archive.stat().st_size > MAX_PROVIDER_BYTES or _hash(archive) != FFMPEG_SHA256:
             raise CutError('DEPENDENCY_HASH', 'Pinned FFmpeg provider artifact hash does not match.')
         validate_zip(archive, max_uncompressed=512 * 1024 * 1024)

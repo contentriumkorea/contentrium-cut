@@ -1,0 +1,87 @@
+{
+  "version": "0.1.109",
+  "executables": [
+    {
+      "name": "Contentrium-CUT-Install.exe",
+      "size": 16958307,
+      "sha256": "b63e97404743e9e6f536d2e2c93ae9a98b587af96371e1ee14466a21e33059f2",
+      "modulesMatchSource": [
+        "contentrium_cut.contract",
+        "contentrium_cut.installer_reporting",
+        "contentrium_cut.installer_ui",
+        "contentrium_cut.online_installer",
+        "contentrium_cut.updater"
+      ],
+      "entryMatchesSource": "tools/online_install_entry.py",
+      "iconResourceCount": 7,
+      "windowPngMatchesSource": true,
+      "execution": {
+        "status": "VERIFIED",
+        "appVersion": "0.1.108",
+        "tag": "v0.1.108",
+        "releaseId": 414451842,
+        "signatureVerified": true,
+        "installer": {
+          "role": "installer",
+          "name": "Contentrium-CUT-Setup.exe",
+          "assetId": 645813171,
+          "size": 93434134,
+          "sha256": "20a0c625761d3565f9315bc4188565bce71c98c5879d54e90c961c4018037d1b"
+        },
+        "installationChanged": false
+      }
+    },
+    {
+      "name": "Contentrium-CUT-Setup.exe",
+      "size": 93437432,
+      "sha256": "48ebdd35cefdd47fdfa4e7781b6ab39e93ca60addf9d751675456134e5267d03",
+      "modulesMatchSource": [
+        "contentrium_cut.analysis_inputs",
+        "contentrium_cut.apply_journal",
+        "contentrium_cut.audio",
+        "contentrium_cut.audio_evidence",
+        "contentrium_cut.auth",
+        "contentrium_cut.bootstrap",
+        "contentrium_cut.cache",
+        "contentrium_cut.contract",
+        "contentrium_cut.coordinator",
+        "contentrium_cut.corrections",
+        "contentrium_cut.dependencies",
+        "contentrium_cut.input_capabilities",
+        "contentrium_cut.installer_preparation",
+        "contentrium_cut.installer_reporting",
+        "contentrium_cut.installer_ui",
+        "contentrium_cut.integration",
+        "contentrium_cut.jobs",
+        "contentrium_cut.launcher_transaction",
+        "contentrium_cut.lifecycle",
+        "contentrium_cut.migration_registration",
+        "contentrium_cut.mixed_chunks",
+        "contentrium_cut.models",
+        "contentrium_cut.policy",
+        "contentrium_cut.process_scope",
+        "contentrium_cut.resource",
+        "contentrium_cut.sync_methods",
+        "contentrium_cut.updater",
+        "contentrium_cut.windows_install",
+        "tools.install_entry"
+      ],
+      "entryMatchesSource": "tools/setup_entry.py",
+      "iconResourceCount": 7,
+      "windowPngMatchesSource": true,
+      "execution": {
+        "schemaVersion": 1,
+        "status": "DIAGNOSED",
+        "appVersion": "0.1.109",
+        "installationChanged": false,
+        "checks": {
+          "installationRootResolved": true,
+          "adobeInstallerPresent": true,
+          "premiereClosed": true
+        }
+      }
+    }
+  ],
+  "nativeUIOperated": false,
+  "liveInstallationChanged": false
+}

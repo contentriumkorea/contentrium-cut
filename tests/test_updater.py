@@ -43,10 +43,12 @@ class Network:
             body, status, response_headers = self.documents[url], 200, {}
         return HttpResponse(status, response_headers, body, url)
 
-    def download(self, url, destination, headers, cancel, expected_size):
+    def download(self, url, destination, headers, cancel, expected_size, *, progress=None):
         self.calls.append((url, headers.copy()))
         cancel()
+        if progress:progress(0,expected_size)
         Path(destination).write_bytes(self.documents[url])
+        if progress:progress(expected_size,expected_size)
         cancel()
 
 

@@ -18,3 +18,9 @@
 
 - 기본 전체 실행에서 환경 변수가 없어 제외된 실제Silero2개를, 복사한 검증된 모델과 명시적인 CONTENTRIUM_TEST_MODEL_ROOT로 별도 실행해2/2통과(4.113초). 로컬 한국어SAPI 합성 음성/무음 감지 및 실제worker/cache재사용 확인. Community-1 실제 품질·사람 녹음 검증을 대체하지 않는다. 첫 지정 명령의 JobTests 클래스명 오타1건은 원본 실패 로그로 보존하고 정확한 JobsTest 이름으로 재검증했다.
 - 라이선스 고지 추가 전 온라인 후보16,341,339바이트도 증거 폴더에 보존했으며 배포 대상은16,961,465바이트 파일 하나로 확정. 전체Setup --help 실제실행 exit0/stderr0. 최종 전체회귀/리뷰 수정 관문 통과 후 제품 소스 커밋을 준비한다.
+
+## 공개 전 패키지 관문
+
+- runtime/CCX·전체Setup·온라인Setup·압축형5파일 생성 완료, 각 빌드 exit0. [기본 패키지 실행](package-0.1.108-proof.json): 새 runtimeReady=true/0.1.108, torch2.14.1+cpu/onnx1.30.0, 실제 frozen29/26제품모듈·2entrypoint 소스 일치, CCX16파일 source 일치, Silero 해시/공개정보 검사 통과. 114.453초.
+- [압축형 검증](portable-0.1.108-proof.json): 332,727,484바이트, 원본18,119항목 보존·전체CRC 통과·동일CCX·등록 필요 안내 포함. 사용자 설치 변경 없음.
+- 제품 소스커밋 d7ff5cf4b8b9fa524aaf04861d1f5fe7c103984a. 공개 후 익명 latest/서명/실제5다운로드 및 고정v0.1.1을 확인할 것.

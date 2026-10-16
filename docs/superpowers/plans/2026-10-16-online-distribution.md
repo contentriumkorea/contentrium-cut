@@ -45,5 +45,5 @@ Files: `tools/distribution.py`, `tools/publish_release.py`, `tests/test_distribu
 
 - [x] Whole Python/Node tests; independent review with security/failure focus; fix material findings with failing regressions.
 - [x] Build runtime, CCX, full Setup, small installer; run package probes and distribution verification without changing live installation.
-- [ ] Push reviewed source, publish v0.1.108 title Contentrium CUT, verify anonymous current/previous discovery and actual downloads/signatures/hashes including v0.1.1.
-- [ ] Record evidence, limitations, final version and next steps. Keep automation PAUSED.
+- [x] Push reviewed source, publish v0.1.108 title Contentrium CUT, verify anonymous current/previous discovery and actual downloads/signatures/hashes including v0.1.1.
+- [x] Record evidence, limitations, final version and next steps. Keep automation PAUSED.

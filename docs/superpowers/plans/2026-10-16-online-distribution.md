@@ -31,19 +31,19 @@ Files: `companion/contentrium_cut/online_installer.py`, `tools/online_install_en
 
 - [x] Write/run failing behavior tests against existing signed fixture transport for latest discovery, exact-tag command, tampering/withdrawal/cancel/overwrite; implement minimal downloader and GUI.
 - [x] Build function produces a frozen downloader without AI/runtime modules and refuses existing outputs or >20MiB.
-- [ ] Run related tests and commit.
+- [x] Run related tests and commit.
 
 ### Task 2: Distribution packaging and publication
 
 Files: `tools/distribution.py`, `tools/publish_release.py`, `tests/test_distribution.py`, `tests/test_publisher.py`, README/version descriptors.
 
 - [x] Write/run failing tests for portable contents, publication order, separate signed metadata, resume immutability and labels.
-- [ ] Package extractable runtime+CCX+Korean guide; publish legacy five assets first, extra two assets and signed distribution metadata before public latest.
+- [x] Package extractable runtime+CCX+Korean guide; publish legacy five assets first, extra two assets and signed distribution metadata before public latest.
 - [x] Update version0.1.108 and Korean download guidance. Run related tests and commit.
 
 ### Task 3: Verify and publish
 
-- [ ] Whole Python/Node tests; independent review with security/failure focus; fix material findings with failing regressions.
-- [ ] Build runtime, CCX, full Setup, small installer; run package probes and distribution verification without changing live installation.
+- [x] Whole Python/Node tests; independent review with security/failure focus; fix material findings with failing regressions.
+- [x] Build runtime, CCX, full Setup, small installer; run package probes and distribution verification without changing live installation.
 - [ ] Push reviewed source, publish v0.1.108 title Contentrium CUT, verify anonymous current/previous discovery and actual downloads/signatures/hashes including v0.1.1.
 - [ ] Record evidence, limitations, final version and next steps. Keep automation PAUSED.

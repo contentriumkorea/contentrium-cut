@@ -16,3 +16,12 @@
 - 본체332,237,248바이트/CCX87,202바이트 생성. [압축형 검증](portable-0.1.109-proof.json): 332,687,340바이트, 원본18,119항목 CRC/크기 일치·같은 CCX·등록 필요 안내·빌더의 전체CRC 검사 통과.
 - [최종 패키지 검사](package-0.1.109-proof.json): ZIP/CCX 전체CRC·공개정보 검사, 본체29개/Setup29개 모듈·2entry의 실제 frozen 소스 일치, CCX16파일 일치, 동봉Silero 해시 통과. 추출 본체 --probe runtimeReady=true/0.1.109, torch2.14.1+cpu/onnx1.30.0, Setup --help exit0, 124초. 실제 설치·Adobe등록·UI 조작 없음.
 - 진행 단계: 구현·회귀·독립 리뷰·패키지 실행 검증 완료. 아직0.1.109 공개 전이며, 검증된 소스를 먼저 올리고 동일 자산으로 공개한다. 아래에 공개 다운로드·서명·고정v0.1.1·사용자 설치 불변 결과를 기록한다.
+
+## 공개 결과와 종료
+
+- [v0.1.109](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.109), release415467201, 제목 Contentrium CUT, target/source edf3d76b4824bfde493c06c5107ed305116becbb. main에 검증 소스를 먼저 push한 뒤 기존 publisher로 새9자산 공개. 기존 배포를 수정하거나 키를 바꾸지 않았다.
+- [공개 검증](distribution-0.1.109-public-proof.json): 익명 latest 발견, update/distribution Ed25519 서명2개, 실제 엔진ZIP/CCX/전체Setup/온라인Setup/압축형ZIP5개의 크기·SHA-256 일치. 실제 frozen 온라인 --download-only 성공. 같은 온라인 EXE가 공개 전0.1.108, 공개 후0.1.109를 발견했다.
+- 실제 frozen 온라인 --diagnose-setup → 공개 full Setup --diagnose 연결도 exit0/DIAGNOSED/installationChanged=false. 명시된 임시 진단 root는 생성되지 않았고 사용자 설치·Premiere를 실행하지 않았다. 공개 검증158.219초. 전체 Setup의 별도 프로세스 환경 초기화와 구조화된 결과 전달을 실제 패키지로 확인했다.
+- 현재0.1.109 CURRENT/후보없음, 이전0.1.108 AVAILABLE. 고정v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 접근·서명 확인.
+- [보존 검증](installer-0.1.109-preservation-proof.json): 기존0.1.108의9자산·v0.1.1의5자산과 release 본문/target/ID/digest 불변, latest 온라인/압축형 링크 HEAD200→v0.1.109 연결. 사용자 설치는0.1.107/중요5파일 해시 불변, 자동화PAUSED 유지. 서명 키·원본 사진·자료·설정·모델·복구/실패 증거를 보존했다.
+- 종료 단계: 기획·설계·구현·회귀·독립 리뷰·패키지 실행·공개 배포·실제 다운로드/서명/고정복구 검증 완료. 다음 반복 작업은 시작하지 않는다. 다음 사용자 시험에서 실패하면 새 설치기의 **진단 내용 복사**로 실제 오류 코드와 단계를 받아 확인한다. 다른 PC의 실제 설치 성공, native UI 시각 검수, Premiere 첫 연결·편집, Community-1 실제 사람 음성 품질은 미검증이다.

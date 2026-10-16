@@ -1,0 +1,39 @@
+{
+  "version": "0.1.109",
+  "existingReleases": [
+    {
+      "tag": "v0.1.108",
+      "releaseId": 414451842,
+      "assets": 9,
+      "unchanged": true
+    },
+    {
+      "tag": "v0.1.1",
+      "releaseId": 404226839,
+      "assets": 5,
+      "unchanged": true
+    }
+  ],
+  "existingInstallationVersion": "0.1.107",
+  "importantInstallFilesUnchanged": {
+    "app/active.json": "a4357a03dcfc5a926141a9bdf48652f8e6b3b761843c89660d5630b81c1705de",
+    "launcher-config.json": "21689d3726e05b97d0f7543c841274827ccb1ef9a4703e19e4efedd1dc8e0215",
+    "updates/journal.json": "d703e43f72a208f831f98158198bc5bdc1c3ccf8da18d8723c86786e68cfcc96",
+    "updates/first-install.json": "c67bf5da0994fb013af40b1459d711208c354d6a2dbba59ab7569a70e3df6bcc",
+    "updates/install-preparation.json": "f83752d5099e9dcc1dfd7bcff03144660f29de6b99f62322d8fb59071840df2d"
+  },
+  "automationStatus": "PAUSED",
+  "latestAliases": [
+    {
+      "name": "Contentrium-CUT-Install.exe",
+      "status": 200,
+      "redirectsToVersion": "0.1.109"
+    },
+    {
+      "name": "Contentrium-CUT-Portable-Windows-x64.zip",
+      "status": 200,
+      "redirectsToVersion": "0.1.109"
+    }
+  ],
+  "liveInstallationChanged": false
+}

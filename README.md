@@ -16,6 +16,8 @@ Premiere Pro 패널에서 트랙을 설정하고, 오디오를 로컬로 분석�
 
 각 공개 버전은 `Contentrium CUT`이라는 제목으로 게시합니다. 버전별 원본 자산을 교체하지 않습니다. 기존 업데이트용 `update-manifest.json/.sig`와 추가 배포용 `distribution-manifest.json/.sig`의 Ed25519 서명 및 SHA-256으로 파일을 검증합니다. Windows Authenticode 서명과는 별개입니다.
 
+**[0.1.108 공개](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.108).** [패키지·공개 다운로드 검증](docs/qa/distribution-0.1.108-public-proof.json)을 완료했습니다.
+
 **0.1.108 변경:** 작은 온라인 설치 진입점과 압축형 배포를 분리했습니다. 실제 사용자 PC 설치·Premiere 편집·첫 연결·Community-1 실제 품질은 CLI/패키지 검증과 별개이며 이번 배포에서 시험하지 않습니다. [설계](docs/superpowers/specs/2026-10-16-online-distribution-design.md)
 
 ## 단일 패널 사용 흐름

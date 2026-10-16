@@ -1,0 +1,70 @@
+{
+  "version": "0.1.108",
+  "releaseId": 414451842,
+  "releaseTitle": "Contentrium CUT",
+  "url": "https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.108",
+  "targetCommit": "d7ff5cf4b8b9fa524aaf04861d1f5fe7c103984a",
+  "anonymousLatestVerified": true,
+  "updateSignatureVerified": true,
+  "distributionSignatureVerified": true,
+  "downloadedAssets": [
+    {
+      "role": "companion",
+      "name": "Contentrium-CUT-Windows-x64.zip",
+      "size": 332277392,
+      "sha256": "16df19cfa0e8fc9ffaf199a521d0ce8957d7ae7de0f94129fc966083dfd69d1c"
+    },
+    {
+      "role": "panel",
+      "name": "Contentrium-CUT.ccx",
+      "size": 87203,
+      "sha256": "d91f883914dce8f4c4861290bbf345d41918e06e3f0e31946becc4b85e39ec32"
+    },
+    {
+      "role": "installer",
+      "name": "Contentrium-CUT-Setup.exe",
+      "size": 93434134,
+      "sha256": "20a0c625761d3565f9315bc4188565bce71c98c5879d54e90c961c4018037d1b"
+    },
+    {
+      "role": "onlineInstaller",
+      "name": "Contentrium-CUT-Install.exe",
+      "size": 16961465,
+      "sha256": "3f9dad20e4139190b4acb8c156369cd2ef20e3f05158de89bec7fedbcd241516"
+    },
+    {
+      "role": "portable",
+      "name": "Contentrium-CUT-Portable-Windows-x64.zip",
+      "size": 332727484,
+      "sha256": "217683015040982fad5c0dc968d17c7a872f14b5e3669dccb5d48cb70c5dcc13"
+    }
+  ],
+  "currentCheck": "CURRENT",
+  "previousCheck": "AVAILABLE",
+  "frozenOnlineDownloadVerified": true,
+  "pinnedMigration": {
+    "tag": "v0.1.1",
+    "releaseId": 404226839,
+    "signatureVerified": true
+  },
+  "liveInstallationChanged": false,
+  "nativePremiereTested": false,
+  "elapsedSeconds": 89.29700000000594,
+  "latestDownloadAliases": [
+    {
+      "name": "Contentrium-CUT-Install.exe",
+      "latestDownloadUrl": "https://github.com/contentriumkorea/contentrium-cut/releases/latest/download/Contentrium-CUT-Install.exe",
+      "resolvedVersionedUrl": "https://github.com/contentriumkorea/contentrium-cut/releases/download/v0.1.108/Contentrium-CUT-Install.exe",
+      "status": 200
+    },
+    {
+      "name": "Contentrium-CUT-Portable-Windows-x64.zip",
+      "latestDownloadUrl": "https://github.com/contentriumkorea/contentrium-cut/releases/latest/download/Contentrium-CUT-Portable-Windows-x64.zip",
+      "resolvedVersionedUrl": "https://github.com/contentriumkorea/contentrium-cut/releases/download/v0.1.108/Contentrium-CUT-Portable-Windows-x64.zip",
+      "status": 200
+    }
+  ],
+  "liveInstallFilesUnchanged": 5,
+  "installedVersionUnchanged": "0.1.107",
+  "automationStatus": "PAUSED"
+}

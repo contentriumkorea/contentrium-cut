@@ -24,3 +24,11 @@
 - runtime/CCX·전체Setup·온라인Setup·압축형5파일 생성 완료, 각 빌드 exit0. [기본 패키지 실행](package-0.1.108-proof.json): 새 runtimeReady=true/0.1.108, torch2.14.1+cpu/onnx1.30.0, 실제 frozen29/26제품모듈·2entrypoint 소스 일치, CCX16파일 source 일치, Silero 해시/공개정보 검사 통과. 114.453초.
 - [압축형 검증](portable-0.1.108-proof.json): 332,727,484바이트, 원본18,119항목 보존·전체CRC 통과·동일CCX·등록 필요 안내 포함. 사용자 설치 변경 없음.
 - 제품 소스커밋 d7ff5cf4b8b9fa524aaf04861d1f5fe7c103984a. 공개 후 익명 latest/서명/실제5다운로드 및 고정v0.1.1을 확인할 것.
+
+## 공개 결과·마무리
+
+- [v0.1.108](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.108), release414451842, 제목 Contentrium CUT, target d7ff5cf4b8b9fa524aaf04861d1f5fe7c103984a. draft/prerelease 아님, 최신 안정 배포. 9개 자산의 실제 GitHub 크기/digest와 로컬 파일 일치.
+- [공개 검증](distribution-0.1.108-public-proof.json): 익명 latest 발견, update/distribution Ed25519 서명2개, 엔진ZIP/CCX/전체Setup/온라인Setup/압축형ZIP5개 실제 다운로드 크기·SHA-256 일치. 실제 frozen 온라인 설치기 --download-only로 공개0.1.108 전체Setup을 내려받고 검증(exit0, 설치실행 없음). 같은 온라인 파일이 공개 전0.1.107, 공개 후0.1.108을 발견했다. 공개 검증89.297초.
+- 현재0.1.108 조회CURRENT/후보 없음, 이전0.1.107은AVAILABLE. 고정v0.1.1/release404226839/commit268d27e6665c8b1f0753a634f8021dfa86935b37 접근·서명 확인. 기존 공개 파일 변경 없음.
+- 추천 온라인/압축형 latest/download 두 링크도 HEAD200 및 v0.1.108의 실제 다운로드 주소로 연결됨을 확인. 사용자 설치 중요5파일 해시 불변·버전0.1.107 유지, 반복 자동화PAUSED 유지.
+- 종료 단계: 구현·회귀·독립검수·패키지 실행·공개배포·실제 다운로드/고정복구 검증 완료. 다음 반복작업 없음. 실제 PC 재설치/Adobe등록/첫 패널 연결/Premiere편집/Community-1 사람 음성 품질은 이번 범위에서 미검증. 사용자 첫 패널 연결 단계는 자동으로 대신하지 않았다.

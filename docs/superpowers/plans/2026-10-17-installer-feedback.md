@@ -40,5 +40,5 @@ Files: new installer_ui.py, setup_entry.py, assets, install_entry.py/online_inst
 ### Task 3: Build and publish
 
 - [x] New0.1.109 versions; frozen check/diagnose/transfer plus PE icons and source/package validation.
-- [ ] Publish reviewed new release with same9 assets; anonymous discovery/signatures/actual5 downloads/pinnedv0.1.1.
-- [ ] Record failures/limits/actual status and clean Git; no recurring work or live reinstall.
+- [x] Publish reviewed new release with same9 assets; anonymous discovery/signatures/actual5 downloads/pinnedv0.1.1.
+- [x] Record failures/limits/actual status and clean Git; no recurring work or live reinstall.

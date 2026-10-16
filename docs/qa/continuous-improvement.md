@@ -2885,3 +2885,13 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - 약17MB 온라인 설치기, 압축형 수동 구성, 기존 설치·업데이트 호환5파일을 구분해 Contentrium CUT 제목으로 공개. release414451842/targetd7ff5cf4b8b9fa524aaf04861d1f5fe7c103984a. 설계→구현→전체회귀→독립검수2건수정→패키지실행→공개실제5다운로드/서명2개/고정v0.1.1 검증 완료.
 - [실행·실패·수정 기록](distribution-0.1.108.md), [공개 검증](distribution-0.1.108-public-proof.json). Node783통과, Python551실행0실패/2제외 후 해당 실제Silero2개별도통과. 설치기 취소경합과 불완전압축게시를 회귀로 고쳤다.
 - 사용자 설치는0.1.107 유지, 중요5파일 해시 불변. 원본·설정·모델·복구백업·서명키·기존공개파일·기존실패증거 보존. 실제 사용자 설치/Adobe등록/첫 연결/Premiere편집/Community-1 실제품질은 미검증. 다음 작업은 사용자 요청이 있을 때만 시작한다.
+
+
+## 별도 사용자 요청: 설치 진행·실패 안내 개선 — 2026-10-17 / 0.1.109
+
+- 반복 자동화를 재개하지 않은 단일 수정 작업. 다른 PC에서 Premiere 종료 후에도 일반 실패 안내가 반복된다는 보고와 진행률·디자인·깃털 아이콘 개선 요청을 반영했다. 실제 다른 PC의 실패 원인은 아직 미확인이다.
+- 온라인/전체 Setup 공통 모노 UI, 실제 bytes 기준 진행률/용량/속도/ETA, C 아이콘, 구조화된 오류 코드·해결 안내·진단 복사·재시도, main 이전 실패 포착, 독립 frozen child 환경과 읽기 전용 진단을 구현했다. 기존 등록 파일 확인도 UI 생성 후 worker에서 수행한다.
+- Python572/skip0/실패0(실제Silero2 포함), Node783/실패0, 독립 리뷰 중요2건 수정·관련 회귀, 실제 패키지 소스/아이콘/CRC/본체probe/Setup진단 실행 통과. Minor 표시 경합과 도우미 실패/timeout·fixture 격리·수정 경위는 [실행 기록](installer-feedback-0.1.109.md)에 보존했다.
+- [v0.1.109](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.109), release415467201/title Contentrium CUT/target edf3d76b4824bfde493c06c5107ed305116becbb/9자산. [공개 검증](distribution-0.1.109-public-proof.json): 익명 발견·서명2개·실제5다운로드 sizeSHA·frozen 온라인→공개Setup 읽기 전용 진단·CURRENT/AVAILABLE·고정v0.1.1 모두 확인.
+- [보존 검증](installer-0.1.109-preservation-proof.json): 기존0.1.108/v0.1.1 공개 파일 불변, 사용자 설치0.1.107/중요5파일 해시 불변, 자동화PAUSED. 실제 재설치/활성화·CUA·브라우저 자동화·Premiere 조작·terms/payment/token/media외부업로드 없음.
+- 종료 단계: 배포와 공개 확인 완료. 다음 사용자 시험이 실패하면 새 설치기의 진단 내용 복사로 실제 코드를 확인한다. 새 반복 작업 시작 없음. 다른 PC 실제 설치 성공·native UI 시각 검수·Premiere 첫 연결/편집·Community-1 실제 품질은 미검증이다.

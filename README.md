@@ -2,11 +2,25 @@
 
 Premiere Pro 패널에서 트랙을 설정하고, 오디오를 로컬로 분석해 말하는 화자에 맞춰 카메라를 전환하는 플러그인입니다. 자동 싱크와 컷 편집 결과는 Premiere에서 계속 수정할 수 있는 새 시퀀스로 만듭니다.
 
-**[0.1.107를 공개했습니다](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.107).** 일괄 작업 중 화자 수와 VAD 임계값 변경을 잠그고, 입력 콜백이 확정한 분석과 컷 계획을 폐기하거나 저장 예약을 바꾸는 경로를 차단합니다. 작업 종료 후 정상 편집과 보호 트랙 동작은 유지됩니다. Node783/Python496(초기 시험 fixture JSON 경합1건은 실패ID만 재검증; 원본 증거 보존)·독립 검수·패키지 실행·공개 서명과 실제3다운로드 해시를 확인했습니다. [반복 개선 기록](docs/qa/continuous-improvement.md)에 시험 한계와 다음 단계를 기록했습니다. 실제 Premiere/UXP 편집·기존0.1.0 설치 전환·Community-1 품질은 미검증입니다.
+## 다운로드와 설치
+
+| 구분 | 다운로드 | 용도 |
+| --- | --- | --- |
+| **온라인 설치기 · 권장** | [Contentrium-CUT-Install.exe](https://github.com/contentriumkorea/contentrium-cut/releases/latest/download/Contentrium-CUT-Install.exe) | 작은 파일을 실행하면 GitHub 최신 안정 버전의 서명·해시를 검증하고 설치 창을 엽니다. 인터넷 필요 |
+| **포터블 · 압축형 수동 구성** | [Windows x64 ZIP](https://github.com/contentriumkorea/contentrium-cut/releases/latest/download/Contentrium-CUT-Portable-Windows-x64.zip) | 분석 엔진 전체·같은 버전 CCX·한국어 안내. Premiere 사용에는 최초 패널 등록과 Setup의 보안 연결이 필요합니다. 완전 무설치 버전은 아닙니다. |
+| 수동 설치·복구 구성요소 | [전체 Setup](https://github.com/contentriumkorea/contentrium-cut/releases/latest/download/Contentrium-CUT-Setup.exe) / [원본 엔진 ZIP](https://github.com/contentriumkorea/contentrium-cut/releases/latest/download/Contentrium-CUT-Windows-x64.zip) / [패널 CCX](https://github.com/contentriumkorea/contentrium-cut/releases/latest/download/Contentrium-CUT.ccx) | 기존 설치·자동 업데이트와 복구 도구의 호환 경로 |
+
+1. **온라인 설치기**를 내려받아 실행하고 **최신 버전 다운로드 및 설치**를 누릅니다. 처음 받은 설치기도 실행 시점의 최신 안정 버전을 찾습니다.
+2. 검증된 전체 설치 창이 열리면 프로젝트를 저장하고 Premiere를 정상 종료한 뒤 설치합니다. 선택 후 최신 버전이 바뀌어도 같은 버전으로 설치를 이어갑니다.
+3. 패널 등록 후 Premiere에서 Contentrium CUT을 직접 열어 첫 연결을 마칩니다. 이미 설치되어 있다면 기존 패널의 **업데이트**로 갱신합니다. 설치기를 실행했다고 기존 설치가 자동으로 삭제되지는 않습니다.
+
+각 공개 버전은 `Contentrium CUT`이라는 제목으로 게시합니다. 버전별 원본 자산을 교체하지 않습니다. 기존 업데이트용 `update-manifest.json/.sig`와 추가 배포용 `distribution-manifest.json/.sig`의 Ed25519 서명 및 SHA-256으로 파일을 검증합니다. Windows Authenticode 서명과는 별개입니다.
+
+**0.1.108 변경:** 작은 온라인 설치 진입점과 압축형 배포를 분리했습니다. 실제 사용자 PC 설치·Premiere 편집·첫 연결·Community-1 실제 품질은 CLI/패키지 검증과 별개이며 이번 배포에서 시험하지 않습니다. [설계](docs/superpowers/specs/2026-10-16-online-distribution-design.md)
 
 ## 단일 패널 사용 흐름
 
-설치 파일은 [콘텐츠리움 GitHub](https://github.com/contentriumkorea/contentrium-cut/releases)의 `Contentrium-CUT-Setup.exe`로 제공합니다. 설치할 때 Premiere를 정상 종료하며, 설치기는 서명된 배포 정보와 파일 해시를 검증합니다.
+설치 파일은 [콘텐츠리움 GitHub](https://github.com/contentriumkorea/contentrium-cut/releases)의 `Contentrium-CUT-Install.exe`를 권장합니다. 설치할 때 Premiere를 정상 종료하며, 설치기는 서명된 배포 정보와 파일 해시를 검증합니다.
 
 1. Premiere의 **Window → UXP Plugins → Contentrium CUT** 패널을 엽니다. 패널이 현재 시퀀스와 백그라운드 엔진을 자동으로 확인합니다.
 2. **트랙**에서 실제 V/A 트랙의 카메라 역할, 분석할 마이크, 오디오 스트림·채널과 적용 범위를 지정합니다. 필요한 경우 자동·수동·타임코드 싱크를 설정합니다.
@@ -48,4 +62,4 @@ GitHub 확인은 백그라운드에서 처리하며 이미 검증된 후보의 �
 
 Python 3.12 환경에 `requirements.lock`을 설치하고 `PYTHONPATH=companion python -m unittest discover -s tests`를 실행합니다. CPU PyTorch 배포 인덱스는 `https://download.pytorch.org/whl/cpu`입니다. Node 테스트는 `npm test`입니다. 실제 Premiere 시험 자료·접근 토큰·게시 서명 개인키는 저장소에 포함하지 않습니다.
 
-패키지 생성은 `tools/collect_licenses.py`, `tools/build_runtime.py --silero-dir <검증된 모델 경로>`, `tools/build_setup.py` 순서입니다. 모델 경로는 명시적으로 지정하며 공개 자산에 설치별 인증 정보가 있으면 빌드를 차단합니다. 이미 생성한 같은 버전의 배포 파일은 덮어쓰지 않습니다. 서명 개인키는 저장소 외부에 보관합니다. 제3자 라이선스와 귀속 자료는 `licenses/` 및 패널의 `vendor/`에 있습니다.
+패키지 생성은 `tools/collect_licenses.py`, `tools/build_runtime.py --silero-dir <검증된 모델 경로>`, `tools/build_setup.py`, `tools/build_online_setup.py`, `tools/distribution.py --version <버전>` 순서입니다. 모델 경로는 명시적으로 지정하며 공개 자산에 설치별 인증 정보가 있으면 빌드를 차단합니다. 이미 생성한 같은 버전의 배포 파일은 덮어쓰지 않습니다. 서명 개인키는 저장소 외부에 보관합니다. 제3자 라이선스와 귀속 자료는 `licenses/` 및 패널의 `vendor/`에 있습니다.

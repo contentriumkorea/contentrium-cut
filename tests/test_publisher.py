@@ -31,7 +31,7 @@ class PublisherTests(unittest.TestCase):
         key_file = self.root/'Contentrium CUT Publisher/ed25519.pem'; key_file.parent.mkdir()
         key_file.write_bytes(self.key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption()))
         self.notes = self.root/'notes.md'; self.notes.write_text('Reviewed fixture notes.',encoding='utf-8')
-        for name in ['Contentrium-CUT-Windows-x64.zip','Contentrium-CUT.ccx','Contentrium-CUT-Setup.exe']:
+        for name in ['Contentrium-CUT-Windows-x64.zip','Contentrium-CUT.ccx','Contentrium-CUT-Setup.exe','Contentrium-CUT-Install.exe','Contentrium-CUT-Portable-Windows-x64.zip']:
             (self.output/name).write_bytes(('fixture '+name).encode())
         self.target = 'a'*40
         self.release = dict(id=71,tag_name='v0.1.1',draft=True,name='Contentrium CUT',target_commitish=self.target,
@@ -153,7 +153,7 @@ class PublisherTests(unittest.TestCase):
             self.run_publisher()
         self.assertEqual(len(created),1)
         self.assertEqual(sleep.call_count,2)
-        self.assertEqual(len(self.remote),5)
+        self.assertEqual(len(self.remote),9)
         self.assertFalse(self.release['draft'])
 
     def test_missing_created_draft_stops_bounded_before_upload_or_signing(self):
@@ -170,6 +170,23 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(sum(call[:2]==('release','create') for call in calls),1)
         self.assertEqual(sleep.call_count,5)
         self.assertFalse((self.output/'update-manifest.json').exists())
+
+    def test_extra_downloads_are_signed_separately_and_legacy_roles_unchanged(self):
+        self.interrupt=False;self.run_publisher()
+        self.assertIn('distribution-manifest.json',self.remote)
+        raw=self.remote['distribution-manifest.json'];signature=json.loads(self.remote['distribution-manifest.sig'])
+        self.key.public_key().verify(base64.b64decode(signature['signature']),raw)
+        manifest=json.loads(raw)
+        self.assertEqual({a['role'] for a in manifest['assets']},{'onlineInstaller','portable'})
+        self.assertEqual({a['role'] for a in json.loads(self.remote['update-manifest.json'])['assets']},{'companion','panel','installer'})
+        self.assertEqual(manifest['releaseId'],71)
+        for asset in manifest['assets']:
+            self.assertEqual(hashlib.sha256(self.remote[asset['name']]).hexdigest(),asset['sha256'])
+
+    def test_missing_small_installer_never_creates_or_publishes_release(self):
+        (self.output/'Contentrium-CUT-Install.exe').unlink()
+        with self.assertRaises(RuntimeError):self.run_publisher()
+        self.assertFalse(self.calls)
 
 
 if __name__=='__main__':unittest.main()

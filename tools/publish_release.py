@@ -64,9 +64,9 @@ def upload_missing(tag,paths):
             raise RuntimeError('Uploaded asset verification failed: '+path.name)
     return verified
 
-def signed_documents(output, fields, key):
+def signed_documents(output, fields, key, prefix='update-manifest'):
     """Retain exact staged bytes when resuming an interrupted draft upload."""
-    manifest_path, signature_path = output/'update-manifest.json', output/'update-manifest.sig'
+    manifest_path, signature_path = output/(prefix+'.json'), output/(prefix+'.sig')
     if signature_path.exists() and not manifest_path.exists():
         raise RuntimeError('Staged manifest is missing; preserve the existing signature for recovery')
     if manifest_path.exists():
@@ -119,9 +119,12 @@ def main():
     output = ROOT / 'output' / version
     files = [('companion', 'Contentrium-CUT-Windows-x64.zip'),
              ('panel', 'Contentrium-CUT.ccx'), ('installer', 'Contentrium-CUT-Setup.exe')]
-    for _, name in files:
+    downloads=[('onlineInstaller','Contentrium-CUT-Install.exe'),('portable','Contentrium-CUT-Portable-Windows-x64.zip')]
+    for _, name in files+downloads:
         if not (output / name).is_file():
             raise RuntimeError('Build is missing: ' + name)
+    if (output/'Contentrium-CUT-Install.exe').stat().st_size>20*1024*1024:
+        raise RuntimeError('Small online installer exceeds 20MiB budget')
     release=selected_release(tag)
     if release:
         if not release['draft'] or release['name']!='Contentrium CUT' or release['target_commitish']!=args.target:
@@ -153,6 +156,13 @@ def main():
     if base64.b64encode(key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)).decode('ascii') != config['publicKey']:
         raise RuntimeError('Publisher key does not match the configured public key')
     verified = upload_missing(tag, signed_documents(output, manifest, key))
+    extra_release=upload_missing(tag,[output/name for _,name in downloads])
+    distribution=dict(schemaVersion=1,productId=config['productId'],displayName='Contentrium CUT',
+                      appVersion=version,releaseId=release['id'],tag=tag,signingKeyId=config['signingKeyId'],assets=[])
+    for role,name in downloads:
+        actual=next(a for a in extra_release['assets'] if a['name']==name)
+        distribution['assets'].append(dict(role=role,name=name,assetId=actual['id'],size=actual['size'],sha256=digest(output/name)))
+    verified=upload_missing(tag,signed_documents(output,distribution,key,prefix='distribution-manifest'))
     if verified['name']!='Contentrium CUT' or verified['target_commitish']!=args.target:
         raise RuntimeError('Reviewed draft target changed before publication')
     gh('release', 'edit', tag, '--repo', REPO, '--draft=false', '--latest')

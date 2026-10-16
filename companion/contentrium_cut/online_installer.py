@@ -7,6 +7,7 @@ import subprocess
 import uuid
 from .contract import CutError
 from .updater import UpdateManager, API_ROOT, BINARY_HEADERS, _json
+from .installer_reporting import child_environment
 
 
 def guard_destination(path):
@@ -74,7 +75,7 @@ class OnlineInstaller:
             raise CutError('UPDATE_RELEASE','선택한 배포 정보가 변경됐습니다. 설치 프로그램을 다시 실행해 주세요.')
         self.manager._verify_manifest(*selected['documents'],release)
 
-    def download(self,selected,destination,cancel=lambda:False):
+    def download(self,selected,destination,cancel=lambda:False,*,progress=None):
         path=Path(destination).absolute();guard_destination(path)
         if path.exists():raise CutError('INSTALL_DESTINATION','기존 파일은 덮어쓰지 않습니다. 다른 저장 경로를 선택해 주세요.')
         def check_cancel():
@@ -83,7 +84,8 @@ class OnlineInstaller:
         asset=selected['installer'];actual=next(a for a in selected['release']['assets'] if a['id']==asset['assetId'])
         partial=path.with_name(path.name+'.'+uuid.uuid4().hex+'.part')
         try:
-            self.manager.transport.download(actual['browser_download_url'],partial,dict(BINARY_HEADERS),check_cancel,asset['size'])
+            options={'progress':progress} if progress else {}
+            self.manager.transport.download(actual['browser_download_url'],partial,dict(BINARY_HEADERS),check_cancel,asset['size'],**options)
             check_cancel();self._verify_file(selected,partial);self.confirm(selected);check_cancel()
             guard_destination(path)
             # Exclusive destination creation prevents clobbering a concurrent file.
@@ -102,8 +104,14 @@ class OnlineInstaller:
         if path.stat().st_size!=asset['size'] or digest(path)!=asset['sha256']:
             raise CutError('UPDATE_HASH','다운로드 파일이 서명된 해시와 다릅니다. 실행하지 않았습니다.')
 
-    def launch(self,selected,path,*,cancel=lambda:False):
+    def launch(self,selected,path,*,cancel=lambda:False,result_path=None,diagnose=False,diagnostic_root=None,before_launch=None):
         path=Path(path).absolute();self._verify_file(selected,path);self.confirm(selected)
         if cancel():raise CutError('CANCELED','설치 창을 열기 전에 취소했습니다.')
         self._verify_file(selected,path)
-        return subprocess.run([str(path),'--tag',selected['manifest']['tag']],shell=False).returncode
+        command=[str(path),'--tag',selected['manifest']['tag']]
+        if result_path:command+=['--result',str(result_path)]
+        if diagnose:command+=['--diagnose']
+        if diagnose and diagnostic_root:command+=['--root',str(diagnostic_root)]
+        if before_launch:before_launch()
+        if cancel():raise CutError('CANCELED','설치 창을 열기 전에 취소했습니다.')
+        return subprocess.run(command,shell=False,cwd=path.parent,env=child_environment()).returncode

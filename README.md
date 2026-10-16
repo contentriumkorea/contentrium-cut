@@ -10,15 +10,15 @@ Premiere Pro 패널에서 트랙을 설정하고, 오디오를 로컬로 분석�
 | **포터블 · 압축형 수동 구성** | [Windows x64 ZIP](https://github.com/contentriumkorea/contentrium-cut/releases/latest/download/Contentrium-CUT-Portable-Windows-x64.zip) | 분석 엔진 전체·같은 버전 CCX·한국어 안내. Premiere 사용에는 최초 패널 등록과 Setup의 보안 연결이 필요합니다. 완전 무설치 버전은 아닙니다. |
 | 수동 설치·복구 구성요소 | [전체 Setup](https://github.com/contentriumkorea/contentrium-cut/releases/latest/download/Contentrium-CUT-Setup.exe) / [원본 엔진 ZIP](https://github.com/contentriumkorea/contentrium-cut/releases/latest/download/Contentrium-CUT-Windows-x64.zip) / [패널 CCX](https://github.com/contentriumkorea/contentrium-cut/releases/latest/download/Contentrium-CUT.ccx) | 기존 설치·자동 업데이트와 복구 도구의 호환 경로 |
 
-1. **온라인 설치기**를 내려받아 실행하고 **최신 버전 다운로드 및 설치**를 누릅니다. 처음 받은 설치기도 실행 시점의 최신 안정 버전을 찾습니다.
+1. **온라인 설치기**를 내려받아 실행하고 **다운로드 및 설치**를 누릅니다. 처음 받은 설치기도 실행 시점의 최신 안정 버전을 찾습니다.
 2. 검증된 전체 설치 창이 열리면 프로젝트를 저장하고 Premiere를 정상 종료한 뒤 설치합니다. 선택 후 최신 버전이 바뀌어도 같은 버전으로 설치를 이어갑니다.
 3. 패널 등록 후 Premiere에서 Contentrium CUT을 직접 열어 첫 연결을 마칩니다. 이미 설치되어 있다면 기존 패널의 **업데이트**로 갱신합니다. 설치기를 실행했다고 기존 설치가 자동으로 삭제되지는 않습니다.
 
 각 공개 버전은 `Contentrium CUT`이라는 제목으로 게시합니다. 버전별 원본 자산을 교체하지 않습니다. 기존 업데이트용 `update-manifest.json/.sig`와 추가 배포용 `distribution-manifest.json/.sig`의 Ed25519 서명 및 SHA-256으로 파일을 검증합니다. Windows Authenticode 서명과는 별개입니다.
 
-**[0.1.108 공개](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.108).** [패키지·공개 다운로드 검증](docs/qa/distribution-0.1.108-public-proof.json)을 완료했습니다.
+**0.1.109 변경:** 설치 창에 실제 다운로드 진행률·용량·속도를 추가하고, 전체 Setup 오류 코드와 해결 안내를 온라인 설치기에 전달합니다. 기본 깃털 아이콘을 교체했습니다. [설치 개선 설계](docs/superpowers/specs/2026-10-17-installer-feedback-design.md), [실행·검증 기록](docs/qa/installer-feedback-0.1.109.md).
 
-**0.1.108 변경:** 작은 온라인 설치 진입점과 압축형 배포를 분리했습니다. 실제 사용자 PC 설치·Premiere 편집·첫 연결·Community-1 실제 품질은 CLI/패키지 검증과 별개이며 이번 배포에서 시험하지 않습니다. [설계](docs/superpowers/specs/2026-10-16-online-distribution-design.md)
+설치가 실패하면 **진단 내용 복사**로 오류 코드와 내용을 확인하세요. Premiere 종료 후에도 실패한다면 일반 인계 안내만으로 원인을 단정할 수 없습니다. 기존 폴더·자료·설정을 임의로 삭제하지 마세요. 실제 사용자 PC 설치·설치 화면 시각 검수·Premiere 첫 연결/편집·Community-1 실제 품질은 CLI/패키지 검증과 별개입니다.
 
 ## 단일 패널 사용 흐름
 

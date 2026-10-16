@@ -17,6 +17,7 @@ from contentrium_cut.dependencies import install_ffmpeg
 from contentrium_cut.integration import install_integration, open_active, resolve_setup_root
 from contentrium_cut.bootstrap import known_folder, canonical_root
 from contentrium_cut.installer_preparation import prepare_installation
+from contentrium_cut.installer_reporting import failure,write_report
 
 def release_url(tag=None):
     if tag is None: return API_ROOT + '/releases/latest'
@@ -68,7 +69,7 @@ def setup_action(root):
 
 def install(config, root, tag=None, *, installation=None, transport=None, launcher_source=None,
             resource_root=None, dependency_installer=None, integration_installer=None,
-            mutex=WindowsNamedMutex, progress=None, mapping_evidence=None, preparation=None, cancel=None, wait=None):
+            mutex=WindowsNamedMutex, progress=None, mapping_evidence=None, preparation=None, cancel=None, wait=None, transfer_progress=None):
     root = canonical_root(root)
     def integrate(manifest):
         nonlocal journal
@@ -186,7 +187,8 @@ def install(config, root, tag=None, *, installation=None, transport=None, launch
                 _guard_path(path); _guard_path(partial)
                 if not path.exists():
                     partial.unlink(missing_ok=True)  # Only this journal's named incomplete payload, never user data.
-                    manager.transport.download(actual['browser_download_url'],partial,dict(BINARY_HEADERS),check_cancel,asset['size'])
+                    options={'progress':lambda received,total,name=asset['name']:transfer_progress(name,received,total)} if transfer_progress else {}
+                    manager.transport.download(actual['browser_download_url'],partial,dict(BINARY_HEADERS),check_cancel,asset['size'],**options)
                     if partial.stat().st_size!=asset['size'] or _hash(partial)!=asset['sha256']:
                         raise CutError('UPDATE_HASH','Download hash differs from signed manifest.')
                     os.replace(partial,path)
@@ -198,7 +200,8 @@ def install(config, root, tag=None, *, installation=None, transport=None, launch
             _atomic_json(journal_path,journal)
             check_cancel()
             notify('제공자의 고정 FFmpeg 패키지를 설치하고 있습니다.')
-            (dependency_installer or install_ffmpeg)(root)
+            if dependency_installer:dependency_installer(root)
+            else:install_ffmpeg(root,cancel=cancel,progress=(lambda received,total:transfer_progress('FFmpeg 제공자 패키지',received,total)) if transfer_progress else None)
             _confirm_selection(manager,release,documents)
             installation._require_host_exit()
             check_cancel()
@@ -224,72 +227,120 @@ def run_setup_worker(config, root, events, cancel_event, **options):
     """Tk-free worker boundary; waiting/cancel never blocks the Setup event loop."""
     try:
         result = install(config,root,progress=lambda message:events.put(('progress',message)),
-                         cancel=cancel_event.is_set,wait=cancel_event.wait,**options)
+                         cancel=cancel_event.is_set,wait=cancel_event.wait,
+                         transfer_progress=lambda name,received,total:events.put(('transfer',dict(name=name,received=received,total=total))),**options)
+        if result.get('canceled'):raise CutError('CANCELED','패널 연결 준비를 중단했습니다. 보존된 준비 상태에서 다시 이어갈 수 있습니다.')
         events.put(('pending' if result.get('status')=='PENDING_PROVISIONING' else 'success',result))
     except Exception as error:
-        events.put(('error',getattr(error,'message','설치 중 오류가 발생했습니다.')))
+        events.put(('error',failure(error,'install',version=config.get('appVersion'))))
 
-def show_gui(config, root, *, tag=None, launcher_source=None, resource_root=None):
-    import tkinter as tk
-    from tkinter import messagebox
-    events = queue.Queue()
-    window = tk.Tk(); window.title('Contentrium CUT Setup'); window.geometry('500x330'); window.resizable(False, False)
-    window.configure(bg='#151515')
-    tk.Label(window, text='CONTENTRIUM  CUT', bg='#151515', fg='#eeeeea', font=('Segoe UI',20)).pack(pady=(25,12))
-    action=setup_action(root)
-    try: pending_setup=_json((Path(root)/'updates/first-install.json').read_bytes()).get('state') in {'PROVISIONING_PENDING','INTEGRATION_PENDING'}
-    except (OSError,ValueError):pending_setup=False
-    status = tk.StringVar(value='설치 연결 준비를 이어서 진행합니다.\nPremiere Pro에서 Contentrium CUT 패널을 열어 주세요.' if pending_setup else
-                         '진행 중이던 정확한 버전의 설치를 복구합니다.\n프로젝트를 저장하고 Premiere Pro 창을 닫아 주세요.' if action=='repair' else
-                         '프로젝트를 저장하고 모든 Premiere Pro 창을 닫은 뒤 설치하세요.\n프로그램과 패널은 서명된 배포에서 설치됩니다.')
-    tk.Label(window, textvariable=status, bg='#151515', fg='#bbbbbb', wraplength=440, justify='left').pack(padx=30,pady=15)
-    running = [False]; cancel_event = threading.Event()
+def run_root_worker(config,events,cancel_event,*,explicit_root=None):
+    try:
+        root=resolve_setup_root(config,explicit=explicit_root)
+        if cancel_event.is_set():raise CutError('CANCELED','설치 위치 확인 후 중단했습니다. 설치 파일은 변경하지 않았습니다.')
+        events.put(('resolved',root))
+    except Exception as error:events.put(('error',failure(error,'location',version=config.get('appVersion'))))
+
+
+def show_gui(config, root, *, tag=None, launcher_source=None, resource_root=None, result_path=None,explicit_root=None):
+    from contentrium_cut.installer_ui import InstallerWindow
+    from contentrium_cut.installer_reporting import save_diagnostic
+    view=InstallerWindow('프로그램 설치 및 연결');window=view.window
+    events=queue.Queue();cancel_event=threading.Event();running=[False];closing=[False]
+    version=config.get('appVersion');outcome=failure(CutError('CANCELED','설치를 시작하지 않고 닫았습니다.'),'not-started',version=version)
+    action=setup_action(root) if root is not None else None
+    def record(value):
+        outcome.clear();outcome.update(value)
+        if result_path:write_report(result_path,outcome)
+    def failed(report):
+        record(report)
+        try:log=save_diagnostic(report)
+        except (OSError,ValueError):log=None
+        view.failure(report,log)
+        view.primary_button.configure(command=launch if action=='open' else begin)
     def launch():
-        try: open_active(root); window.destroy()
-        except Exception as error: messagebox.showerror('Contentrium CUT', getattr(error,'message','프로그램을 열 수 없습니다.'))
+        try:
+            open_active(root);record(dict(schemaVersion=1,status='OPENED',appVersion=version,phase='open-existing'));window.destroy()
+        except Exception as error:failed(failure(error,'open-existing',version=version))
     def begin():
-        running[0] = True; cancel_event.clear(); button.configure(state='disabled')
+        running[0]=True;closing[0]=False;cancel_event.clear();view.error_text.set('');view.copy_button.configure(state='disabled')
+        view.primary_button.configure(state='disabled');view.cancel_button.configure(text='취소',state='normal')
+        if root is None:
+            view.phase(1,'설치 위치와 기존 파일을 확인합니다','기존 설치의 서명과 파일 해시를 확인합니다. 파일 수에 따라 시간이 걸릴 수 있습니다.')
+            threading.Thread(target=run_root_worker,args=(config,events,cancel_event),kwargs=dict(explicit_root=explicit_root),name='CUT-install-location',daemon=False).start();return
+        view.phase(1,'설치 환경을 확인합니다','프로젝트를 저장하고 모든 Premiere Pro 창을 정상 종료해 주세요.')
         threading.Thread(target=run_setup_worker,args=(config,root,events,cancel_event),
-            kwargs=dict(tag=tag,launcher_source=launcher_source,resource_root=resource_root),
-            name='Contentrium-CUT-Setup',daemon=False).start()
-    button = tk.Button(window,text='Contentrium CUT 열기' if action=='open' else '설치 복구' if action=='repair' else '설치',
-                       command=launch if action=='open' else begin,bg='#ddddda',fg='#151515',padx=25,pady=8)
-    button.pack(pady=18)
+            kwargs=dict(tag=tag,launcher_source=launcher_source,resource_root=resource_root),name='Contentrium-CUT-Setup',daemon=False).start()
+    def close():
+        if running[0]:
+            closing[0]=True;cancel_event.set();view.phase(4,'안전하게 중단하고 있습니다','현재 작업 경계에서 중단합니다. 기존 설치와 자료는 보존합니다.');view.cancel_button.configure(state='disabled');return
+        if result_path and not Path(result_path).exists():write_report(result_path,outcome)
+        window.destroy()
+    def initial_state():
+        view.primary_button.configure(text='Contentrium CUT 열기' if action=='open' else '설치 복구' if action=='repair' else '설치 시작',command=launch if action=='open' else begin,state='normal')
+        view.cancel_button.configure(text='닫기',state='normal')
+        view.ready('기존 설치를 확인했습니다' if action=='open' else '설치 연결을 이어갑니다' if action=='repair' else 'Contentrium CUT을 설치합니다',
+                   '기존 패널의 업데이트로 새 버전을 설치할 수 있습니다.' if action=='open' else '중단된 설치 준비와 실패 기록을 보존해 이어갑니다.' if action=='repair' else '서명된 본체와 Adobe 패널을 내려받습니다. Premiere는 정상 종료한 상태에서 설치하세요.')
+    initial_state()
+    view.cancel_button.configure(command=close)
     def poll():
+        nonlocal root,action
         try:
             while True:
-                kind,value = events.get_nowait()
-                if kind == 'progress': status.set(value)
-                elif kind == 'success':
-                    running[0]=False;status.set('설치 연결 준비가 완료됐습니다.\nPremiere Pro의 Contentrium CUT 패널에서 계속하세요.')
-                    button.configure(text='Contentrium CUT 열기',state='normal',command=launch)
-                elif kind == 'pending':
-                    running[0]=False;status.set('설치 연결 준비를 보존했습니다. 같은 Setup으로 이어서 진행할 수 있습니다.');button.configure(state='normal')
-                else:
-                    running[0]=False;status.set(value);button.configure(state='normal')
-        except queue.Empty: pass
-        window.after(150,poll)
-    def close():
-        cancel_event.set();window.destroy()
+                kind,value=events.get_nowait()
+                if kind=='resolved':
+                    running[0]=False;root=value;action=setup_action(root)
+                    if closing[0]:window.destroy();return
+                    initial_state()
+                elif kind=='transfer':view.transfer(value['name'],value['received'],value['total'])
+                elif kind=='progress':
+                    step=4 if 'Adobe' in value or '패널을 열어' in value else 2 if '내려받' in value or 'FFmpeg' in value else 3 if '검증' in value else 1
+                    view.phase(step,'패널 연결 대기' if '패널을 열어' in value else '설치 파일을 준비하고 있습니다',value)
+                elif kind=='error':
+                    running[0]=False;failed(value);view.cancel_button.configure(text='닫기',state='normal')
+                    if closing[0]:window.destroy();return
+                elif kind in {'success','pending'}:
+                    running[0]=False
+                    status='PENDING_PROVISIONING' if kind=='pending' else 'READY_TO_OPEN'
+                    record(dict(schemaVersion=1,status=status,appVersion=value.get('appVersion',version),phase='panel-connection'))
+                    view.ready('Premiere 패널 연결을 준비해 주세요','파일 준비를 마쳤습니다. Premiere에서 Window → UXP Plugins → Contentrium CUT 패널을 열어 첫 연결을 마무리하세요.')
+                    view.primary_button.configure(text='연결 준비 계속' if kind=='pending' else 'Contentrium CUT 열기',state='normal',command=begin if kind=='pending' else launch)
+                    view.cancel_button.configure(text='닫기',state='normal')
+                    if closing[0]:window.destroy();return
+        except queue.Empty:pass
+        window.after(120,poll)
     window.protocol('WM_DELETE_WINDOW',close)
-    poll(); window.mainloop()
+    if root is None:begin()
+    poll();window.mainloop()
+    if result_path:write_report(result_path,outcome)
+    return outcome
 
 def main(argv=None):
     parser=argparse.ArgumentParser()
-    mode=parser.add_mutually_exclusive_group();mode.add_argument('--install',action='store_true');mode.add_argument('--open',action='store_true');mode.add_argument('--supervise',action='store_true')
+    mode=parser.add_mutually_exclusive_group();mode.add_argument('--install',action='store_true');mode.add_argument('--open',action='store_true');mode.add_argument('--supervise',action='store_true');mode.add_argument('--diagnose',action='store_true')
     parser.add_argument('--tag');parser.add_argument('--config');parser.add_argument('--result');parser.add_argument('--root');parser.add_argument('--launcher-source');parser.add_argument('--mapping-evidence')
     args, unknown=parser.parse_known_args(argv)
     if unknown and not args.open: parser.error('Unrecognized arguments')
     resources=Path(getattr(sys,'_MEIPASS',Path(__file__).resolve().parents[1]))
+    config={};phase='startup'
     try:
         if args.open or args.supervise:
             root=canonical_root(args.root or Path(sys.executable).parent)
             open_active(root); return 0
         config_path=Path(args.config) if args.config else resources/'config.json'
         config=json.loads(config_path.read_text(encoding='utf-8-sig'))
+        if not (args.install or args.diagnose):
+            result=show_gui(config,None,explicit_root=args.root,tag=args.tag,launcher_source=args.launcher_source,resource_root=resources,result_path=args.result)
+            return 1 if isinstance(result,dict) and result.get('status')=='FAILED' else 0
+        phase='location'
         root=resolve_setup_root(config,explicit=args.root)
-        if not args.install:
-            show_gui(config,root,tag=args.tag,launcher_source=args.launcher_source,resource_root=resources); return 0
+        if args.diagnose:
+            from contentrium_cut.windows_install import DEFAULT_UPIA
+            result=dict(schemaVersion=1,status='DIAGNOSED',appVersion=config.get('appVersion'),installationChanged=False,
+                        checks=dict(installationRootResolved=True,adobeInstallerPresent=DEFAULT_UPIA.is_file(),premiereClosed=WindowsInstallation(root).host_exited()))
+            if args.result:write_report(args.result,result)
+            if sys.stdout:print(json.dumps(result))
+            return 0
         evidence=None
         if args.mapping_evidence:
             source=Path(args.mapping_evidence);_guard_path(source)
@@ -300,13 +351,13 @@ def main(argv=None):
         if sys.stdout: print(json.dumps(result))
         return 0
     except Exception as error:
-        failure={'error':{'code':getattr(error,'code','INSTALL_FAILED'),'message':getattr(error,'message','Contentrium CUT installation or launch failed.')}}
-        if args.result: _atomic_json(Path(args.result).resolve(),failure)
-        if args.install:
-            if sys.stderr: print(failure['error']['code']+' '+failure['error']['message'],file=sys.stderr)
+        report=failure(error,phase,version=config.get('appVersion') or (args.tag[1:] if args.tag and args.tag.startswith('v') else None))
+        if args.result: write_report(args.result,report)
+        if args.install or args.diagnose:
+            if sys.stderr: print(report['error']['code']+' '+report['error']['message'],file=sys.stderr)
         elif not (args.open or args.supervise):
-            import tkinter.messagebox as messagebox
-            messagebox.showerror('Contentrium CUT',failure['error']['message'])
+            from contentrium_cut.installer_ui import InstallerWindow
+            view=InstallerWindow('설치 환경 확인');view.failure(report);view.primary_button.configure(text='닫기',command=view.window.destroy);view.cancel_button.configure(command=view.window.destroy);view.window.mainloop()
         return 1
 
 if __name__ == '__main__':

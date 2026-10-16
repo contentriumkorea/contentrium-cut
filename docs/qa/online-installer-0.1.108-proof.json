@@ -1,0 +1,29 @@
+{
+  "size": 16961465,
+  "sha256": "3f9dad20e4139190b4acb8c156369cd2ef20e3f05158de89bec7fedbcd241516",
+  "sourceModulesVerified": [
+    "contentrium_cut.contract",
+    "contentrium_cut.online_installer",
+    "contentrium_cut.updater"
+  ],
+  "entrypointVerified": "tools/online_install_entry.py",
+  "aiModulesIncluded": false,
+  "licenseNoticesIncluded": true,
+  "liveInstallationChanged": false,
+  "frozenCheck": {
+    "status": "VERIFIED",
+    "appVersion": "0.1.107",
+    "tag": "v0.1.107",
+    "releaseId": 408523280,
+    "signatureVerified": true,
+    "installer": {
+      "role": "installer",
+      "name": "Contentrium-CUT-Setup.exe",
+      "assetId": 626749049,
+      "size": 93422710,
+      "sha256": "f5555d8d7f031d7757e37d7d4ac97e3d192b45a8f4d26a11409f7300222a5e5c"
+    },
+    "installationChanged": false
+  },
+  "exitCode": 0
+}

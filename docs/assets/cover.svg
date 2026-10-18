@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-labelledby="title desc">
+  <title id="title">Contentrium CUT</title>
+  <desc id="desc">Premiere Pro plugin. Local analysis, automatic sync, and editable speaker-led cuts. Stylized timeline illustration.</desc>
+  <rect width="1200" height="520" rx="24" fill="#151515"/>
+  <g font-family="Segoe UI, Arial, sans-serif">
+    <text x="64" y="67" font-size="22" font-weight="600" letter-spacing="3" fill="#bbbbba">PREMIERE PRO PLUGIN</text>
+    <text x="60" y="175" font-size="90" font-weight="700" letter-spacing="-3" fill="#f5f5ef">CONTENTRIUM CUT</text>
+    <text x="64" y="237" font-size="36" fill="#d4d4d0">Your voices. Your timeline.</text>
+    <line x1="64" y1="279" x2="1136" y2="279" stroke="#3e3e3b"/>
+    <text x="64" y="332" font-size="23" font-weight="600" fill="#d4d4d0">CUT</text>
+    <rect x="181" y="302" width="305" height="50" rx="6" fill="#ededdf"/>
+    <rect x="492" y="302" width="344" height="50" rx="6" fill="#9a9a96"/>
+    <rect x="842" y="302" width="294" height="50" rx="6" fill="#ededdf"/>
+    <g font-size="24" font-weight="700" fill="#151515"><text x="201" y="336">A</text><text x="512" y="336">B</text><text x="862" y="336">A</text></g>
+    <text x="64" y="403" font-size="23" font-weight="600" fill="#d4d4d0">VOICE</text>
+    <line x1="181" y1="392" x2="1136" y2="392" stroke="#4b4b47"/>
+    <path d="M190 392h20m8-8v16m9-29v42m9-33v24m9-17v10m28-24v44m9-52v60m9-43v26m9-37v48m9-37v26m9-18v10m80-10v10m9-25v40m9-44v48m9-39v30m9-23v16m100-10v4m9-15v26m9-36v46m9-43v40m9-30v20m9-24v28m95-21v14m9-23v32m9-38v44m9-28v12m9-26v40m9-30v20m110-16v12m9-24v36m9-44v52m9-36v20m9-27v34m9-26v18m70-20v22m9-28v34m9-24v14m9-16v18" fill="none" stroke="#d4d4d0" stroke-width="4" stroke-linecap="round"/>
+    <text x="64" y="478" font-size="24" letter-spacing="1.5" fill="#bbbbba">LOCAL ANALYSIS / AUTO SYNC / EDITABLE CUTS</text>
+  </g>
+</svg>

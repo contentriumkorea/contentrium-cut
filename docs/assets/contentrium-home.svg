@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="252" height="52" viewBox="0 0 252 52" role="img" aria-labelledby="title">
+  <title id="title">콘텐츠리움 홈페이지</title>
+  <rect x="1" y="1" width="250" height="50" rx="9" fill="#222221" stroke="#5e5e58"/>
+  <text x="22" y="33" font-family="Malgun Gothic, Noto Sans CJK KR, Arial, sans-serif" font-size="18" font-weight="700" fill="#fff">콘텐츠리움 홈페이지</text>
+  <path d="M219 20l6 6-6 6m-10-6h16" stroke="#fff" stroke-width="2" fill="none"/>
+</svg>

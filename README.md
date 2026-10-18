@@ -1,69 +1,58 @@
+![Contentrium CUT — 말하는 화자를 따라 이어지는 편집 가능한 컷](docs/assets/cover.svg)
+
 # Contentrium CUT
 
-Premiere Pro 패널에서 트랙을 설정하고, 오디오를 로컬로 분석해 말하는 화자에 맞춰 카메라를 전환하는 플러그인입니다. 자동 싱크와 컷 편집 결과는 Premiere에서 계속 수정할 수 있는 새 시퀀스로 만듭니다.
+말하는 화자에 맞춰 카메라를 선택하고, Premiere Pro에서 계속 다듬는 **컷 편집 플러그인**입니다. 트랙 설정부터 싱크, 화자 분석, 컷 검토까지 하나의 패널에서 진행합니다.
 
-## 다운로드와 설치
+**[온라인 설치기 다운로드](https://github.com/contentriumkorea/contentrium-cut/releases/latest/download/Contentrium-CUT-Install.exe)** · **[압축형 수동 구성 다운로드](https://github.com/contentriumkorea/contentrium-cut/releases/latest/download/Contentrium-CUT-Portable-Windows-x64.zip)** · [현재 버전 0.1.109](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.109)
 
-| 구분 | 다운로드 | 용도 |
-| --- | --- | --- |
-| **온라인 설치기 · 권장** | [Contentrium-CUT-Install.exe](https://github.com/contentriumkorea/contentrium-cut/releases/latest/download/Contentrium-CUT-Install.exe) | 작은 파일을 실행하면 GitHub 최신 안정 버전의 서명·해시를 검증하고 설치 창을 엽니다. 인터넷 필요 |
-| **포터블 · 압축형 수동 구성** | [Windows x64 ZIP](https://github.com/contentriumkorea/contentrium-cut/releases/latest/download/Contentrium-CUT-Portable-Windows-x64.zip) | 분석 엔진 전체·같은 버전 CCX·한국어 안내. Premiere 사용에는 최초 패널 등록과 Setup의 보안 연결이 필요합니다. 완전 무설치 버전은 아닙니다. |
-| 수동 설치·복구 구성요소 | [전체 Setup](https://github.com/contentriumkorea/contentrium-cut/releases/latest/download/Contentrium-CUT-Setup.exe) / [원본 엔진 ZIP](https://github.com/contentriumkorea/contentrium-cut/releases/latest/download/Contentrium-CUT-Windows-x64.zip) / [패널 CCX](https://github.com/contentriumkorea/contentrium-cut/releases/latest/download/Contentrium-CUT.ccx) | 기존 설치·자동 업데이트와 복구 도구의 호환 경로 |
+대상 환경: **Windows x64 · Premiere Pro 26.5.2**. 처음 사용하는 PC에서는 약 17MB의 온라인 설치기를 실행하고, 파일 준비 후 Premiere에서 패널을 열어 첫 연결을 마칩니다.
 
-1. **온라인 설치기**를 내려받아 실행하고 **다운로드 및 설치**를 누릅니다. 처음 받은 설치기도 실행 시점의 최신 안정 버전을 찾습니다.
-2. 검증된 전체 설치 창이 열리면 프로젝트를 저장하고 Premiere를 정상 종료한 뒤 설치합니다. 선택 후 최신 버전이 바뀌어도 같은 버전으로 설치를 이어갑니다.
-3. 패널 등록 후 Premiere에서 Contentrium CUT을 직접 열어 첫 연결을 마칩니다. 이미 설치되어 있다면 기존 패널의 **업데이트**로 갱신합니다. 설치기를 실행했다고 기존 설치가 자동으로 삭제되지는 않습니다.
+> Premiere 플러그인이므로 압축형 구성도 최초 패널 등록과 보안 연결이 필요합니다. 완전 무설치 포터블 앱은 아닙니다. 이미 설치했다면 패널의 **업데이트**를 사용하세요.
 
-각 공개 버전은 `Contentrium CUT`이라는 제목으로 게시합니다. 버전별 원본 자산을 교체하지 않습니다. 기존 업데이트용 `update-manifest.json/.sig`와 추가 배포용 `distribution-manifest.json/.sig`의 Ed25519 서명 및 SHA-256으로 파일을 검증합니다. Windows Authenticode 서명과는 별개입니다.
+## 핵심 기능
 
-**[0.1.109 공개](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.109).** [패키지·공개 다운로드 검증](docs/qa/distribution-0.1.109-public-proof.json)을 완료했습니다.
+| 기능 | 할 수 있는 일 |
+| --- | --- |
+| 트랙별 설정과 싱크 | 카메라·마이크·채널·사용 범위를 지정하고 자동·수동·타임코드 싱크를 설정합니다. |
+| 화자 중심 컷 | 화자별 마이크 또는 혼합 녹음을 분석하고, 화자와 카메라를 연결해 편집안을 검토합니다. |
+| 계속 수정하는 결과 | 새 결과 시퀀스의 최상단 **Contentrium CUT** 영상 트랙에 개별 컷을 만듭니다. 원본·오디오·별도 자막은 보존합니다. |
+| 로컬 분석 | 준비한 모델로 오디오를 PC에서 분석합니다. 원음·프로젝트·화자 정보를 GitHub로 보내지 않습니다. |
 
-**0.1.109 변경:** 설치 창에 실제 다운로드 진행률·용량·속도를 추가하고, 전체 Setup 오류 코드와 해결 안내를 온라인 설치기에 전달합니다. 기본 깃털 아이콘을 교체했습니다. [설치 개선 설계](docs/superpowers/specs/2026-10-17-installer-feedback-design.md), [실행·검증 기록](docs/qa/installer-feedback-0.1.109.md).
+## 사용 예시
 
-설치가 실패하면 **진단 내용 복사**로 오류 코드와 내용을 확인하세요. Premiere 종료 후에도 실패한다면 일반 인계 안내만으로 원인을 단정할 수 없습니다. 기존 폴더·자료·설정을 임의로 삭제하지 마세요. 실제 사용자 PC 설치·설치 화면 시각 검수·Premiere 첫 연결/편집·Community-1 실제 품질은 CLI/패키지 검증과 별개입니다.
+![트랙 연결, 싱크와 화자 검토, 개별 컷 생성의 세 단계 기능 흐름도. 실제 제품 화면이 아닙니다.](docs/assets/workflow.svg)
 
-## 단일 패널 사용 흐름
+*위 이미지는 기능 흐름도이며 실제 제품 화면이 아닙니다.*
 
-설치 파일은 [콘텐츠리움 GitHub](https://github.com/contentriumkorea/contentrium-cut/releases)의 `Contentrium-CUT-Install.exe`를 권장합니다. 설치할 때 Premiere를 정상 종료하며, 설치기는 서명된 배포 정보와 파일 해시를 검증합니다.
+1. **트랙**에서 카메라와 마이크를 연결하고 싱크를 확인합니다.
+2. **화자 → 컷 편집 → 검토**에서 이름·카메라·최소 샷 길이 등을 설정하고 불확실한 구간을 교정합니다.
+3. 결과를 적용한 뒤 Premiere에서 각 컷을 계속 수정합니다. 로고 배치와 추가 그래픽 편집은 사용자가 직접 합니다.
 
-1. Premiere의 **Window → UXP Plugins → Contentrium CUT** 패널을 엽니다. 패널이 현재 시퀀스와 백그라운드 엔진을 자동으로 확인합니다.
-2. **트랙**에서 실제 V/A 트랙의 카메라 역할, 분석할 마이크, 오디오 스트림·채널과 적용 범위를 지정합니다. 필요한 경우 자동·수동·타임코드 싱크를 설정합니다.
-3. **화자**에서 화자별 마이크 또는 혼합 녹음을 분석합니다. 예시를 듣고 이름·카메라를 연결하며, 겹침이나 불확실한 화자는 직접 교정합니다.
-4. **컷 편집**에서 최소 샷 길이, 짧은 발화, 동시 발화와 수동 고정 구간을 설정합니다.
-5. **검토**에서 컷을 50개씩 이동하며 카메라·선택 이유·프레임 범위와 길이로 찾아볼 수 있습니다. 원본 프레임은 0부터 시작하고 종료는 다음 구간의 시작 경계이며, 표시 시간은 경과 시간입니다. 필터는 표시만 바꾸고 적용할 전체 편집안은 유지합니다. 원본을 보존한 결과 시퀀스가 생성됩니다.
+## 설치
 
-영상 결과는 모든 영상 트랙 위의 **Contentrium CUT** 트랙에 개별 컷으로 정리합니다. 기존 자막 트랙과 오디오·그래픽 데이터는 보존합니다. 로고 배치와 추가 그래픽 편집은 사용자가 직접 합니다.
+1. **온라인 설치기**를 실행하고 **다운로드 및 설치**를 누릅니다. 실행 시점의 최신 정식 버전을 찾아 파일을 내려받고 검증합니다.
+2. 전체 설치 창의 안내에 따라 프로젝트를 저장하고 Premiere를 정상 종료한 뒤 설치를 진행합니다.
+3. Premiere의 **Window → UXP Plugins → Contentrium CUT**을 열어 첫 연결을 마칩니다.
 
-모델, 자원·캐시, 업데이트와 중단된 편집 복구도 패널의 설정에서 제어합니다.
+[자세한 설치·실패 진단·수동 구성 안내](docs/installation.md)
 
-하단 실행 버튼 위의 안내는 단계 이동과 작업 상태 변화에 맞춰 갱신됩니다. 동봉된 발화 모델이 없으면 Setup 복구를, 혼합 녹음 모델이 없으면 설정에서 준비하도록 안내합니다. 업데이트와 중단 작업 복구 안내는 일반 단계 안내보다 먼저 표시합니다. 이 안내는 실제 모델·호스트 검증을 대신하지 않습니다.
+## 업데이트와 데이터 보존
 
-현재 실제 호스트 검증 대상은 **Windows / Premiere Pro 26.5.2**입니다. 다른 호스트 버전은 검증 없이 편집을 허용하지 않습니다.
+패널의 **업데이트**를 누르면 즉시 새 작업을 차단하고 중단을 요청합니다. 진행 중인 작업이 끝나고 Premiere가 정상 종료된 뒤 파일을 교체합니다. 중단된 편집은 자동으로 재개하지 않습니다.
 
-## 모델과 개인정보
+혼합 녹음 모델은 제공자 계정의 접근 권한과 이용 조건 동의가 필요하며 별도로 준비합니다. [모델·개인정보와 지원 범위](docs/installation.md#모델과-개인정보)를 확인하세요.
 
-화자별 마이크 모드는 포함된 Silero VAD를 사용합니다. 혼합 녹음의 Community-1 모델은 제공자의 계정 접근 권한과 이용 조건 동의가 필요합니다. 패널 설정에서 Hugging Face 토큰과 고정 리비전으로 설치하며 토큰을 저장하지 않습니다. 모델 설치 후 오디오 분석은 로컬에서 수행합니다. 원음·프로젝트·화자 정보는 GitHub에 전송하지 않습니다.
+실제 다른 PC의 설치 성공, Premiere 첫 연결·편집, Community-1의 실제 화자 구분 품질은 아직 미검증입니다. 검증하지 않은 호스트 버전이나 미디어 구성의 편집 적용은 차단합니다.
 
-FFmpeg는 설치 중 제공자의 고정 버전 패키지를 사용자의 PC에 직접 내려받습니다. 콘텐츠리움의 배포 파일에는 FFmpeg 바이너리를 재배포하지 않습니다. 다운로드 출처·버전·해시·공급자 라이선스는 로컬에 보관합니다.
+<details>
+<summary>버전 변경 사항·검증 자료·개발 안내</summary>
 
-## 업데이트
+- **0.1.109:** 다운로드 진행률·용량·속도·남은 시간, 오류 코드·진단 복사·재시도, 설치 아이콘을 개선했습니다. [변경 사항](docs/releases/0.1.109.md)
+- [패키지·공개 다운로드 검증](docs/qa/distribution-0.1.109-public-proof.json) · [설치 개선 검증](docs/qa/installer-feedback-0.1.109.md)
+- [설계와 검증 범위·개발 안내](docs/development.md) · [기존 0.1.0 전환 안내](docs/source-assisted-migration.md)
+- [제3자 라이선스·귀속 자료](licenses/)와 패널의 `vendor/` 고지를 유지합니다.
 
-패널을 열면 같은 저장소의 게시된 업데이트를 확인합니다. 새 버전이 없으면 편집을 계속하고, 있으면 패널 안에 업데이트 알림을 표시합니다. **업데이트**를 누르면 즉시 새 CUT 작업을 차단하고 분석을 취소합니다. 이미 실행 중인 Premiere 편집 호출은 반환 경계에서 멈춥니다. 다운로드와 검증 이후 Premiere 정상 종료를 기다려 Adobe 설치기로 패널을 교체합니다. 새 패널과 백그라운드 엔진의 버전·연결이 확인되어야 작업 차단이 해제됩니다. 중단된 편집은 자동 재개하지 않습니다.
+</details>
 
-업데이트 정보는 Ed25519로 서명합니다. Windows 실행 파일의 Authenticode 서명과는 별개입니다.
-
-GitHub 확인은 백그라운드에서 처리하며 이미 검증된 후보의 업데이트 시작을 막지 않습니다. 미리보기 종료가 느려도 서버 중단 요청을 먼저 보냅니다. 응답이 유실되면 편집을 재개하지 않고 같은 요청 ID로 재시도합니다.
-
-원래 공개 0.1.0의 설치 검증 오류와 새 실행 구조 사이 전환은 [소스 보조 0.1.0 → 0.1.1 전환 절차](docs/source-assisted-migration.md)를 사용합니다. 전용 headless 도구의 소스 검증과 실제 설치 성공은 구분하며, 기존 실패 기록을 보존합니다.
-
-## 검증 범위
-
-[상세 설계](docs/superpowers/specs/2026-10-05-premiere-speaker-cut-design.md), [단일 패널 개편 설계](docs/superpowers/specs/2026-10-06-contentrium-cut-single-panel-design.md), [1차 호스트 컷·렌더 증거](docs/qa/native-host-proof.json), [1차 영상·연결 오디오 싱크 증거](docs/qa/native-sync-proof.json), [실행 기록](docs/qa/execution-ledger.md)을 제공합니다. 1차 증거는 개편된 패널의 실제 동작 증거를 대신하지 않습니다. 합성 자료의 SDK 검증과 실제 사람의 목소리 구분 정확도는 구별하며, Community-1의 실제 추론은 아직 검증하지 않았습니다.
-
-일반 속도·일반 미디어 클립을 첫 대상으로 합니다. 검증하지 않은 시간 재매핑·중첩·멀티캠·일부 프록시와 전환 효과 구성은 적용을 차단합니다. 드리프트가 있거나 근거가 부족한 싱크는 자동 적용하지 않습니다. 기본 기능은 영상 컷과 화자 선택이며 전사·자막·음성 복원은 기본 범위에 포함하지 않습니다.
-
-## 개발
-
-Python 3.12 환경에 `requirements.lock`을 설치하고 `PYTHONPATH=companion python -m unittest discover -s tests`를 실행합니다. CPU PyTorch 배포 인덱스는 `https://download.pytorch.org/whl/cpu`입니다. Node 테스트는 `npm test`입니다. 실제 Premiere 시험 자료·접근 토큰·게시 서명 개인키는 저장소에 포함하지 않습니다.
-
-패키지 생성은 `tools/collect_licenses.py`, `tools/build_runtime.py --silero-dir <검증된 모델 경로>`, `tools/build_setup.py`, `tools/build_online_setup.py`, `tools/distribution.py --version <버전>` 순서입니다. 모델 경로는 명시적으로 지정하며 공개 자산에 설치별 인증 정보가 있으면 빌드를 차단합니다. 이미 생성한 같은 버전의 배포 파일은 덮어쓰지 않습니다. 서명 개인키는 저장소 외부에 보관합니다. 제3자 라이선스와 귀속 자료는 `licenses/` 및 패널의 `vendor/`에 있습니다.
+[![콘텐츠리움 홈페이지](docs/assets/contentrium-home.svg)](https://contentrium.com/)

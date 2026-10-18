@@ -2895,3 +2895,10 @@ microphoneOptions/restoreSettings/analysis handler, coordinator.audio_payload, a
 - [v0.1.109](https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.109), release415467201/title Contentrium CUT/target edf3d76b4824bfde493c06c5107ed305116becbb/9자산. [공개 검증](distribution-0.1.109-public-proof.json): 익명 발견·서명2개·실제5다운로드 sizeSHA·frozen 온라인→공개Setup 읽기 전용 진단·CURRENT/AVAILABLE·고정v0.1.1 모두 확인.
 - [보존 검증](installer-0.1.109-preservation-proof.json): 기존0.1.108/v0.1.1 공개 파일 불변, 사용자 설치0.1.107/중요5파일 해시 불변, 자동화PAUSED. 실제 재설치/활성화·CUA·브라우저 자동화·Premiere 조작·terms/payment/token/media외부업로드 없음.
 - 종료 단계: 배포와 공개 확인 완료. 다음 사용자 시험이 실패하면 새 설치기의 진단 내용 복사로 실제 코드를 확인한다. 새 반복 작업 시작 없음. 다른 PC 실제 설치 성공·native UI 시각 검수·Premiere 첫 연결/편집·Community-1 실제 품질은 미검증이다.
+
+
+## 별도 사용자 요청: 공개 문서의 개인 경로 정리 — 2026-10-18
+
+- Premiere 플러그인과 로컬 분석 엔진 구조를 유지한 문서 정리 작업이다. 제품 코드·설정·버전·설치본·기존 릴리스 자산은 변경하지 않는다. 반복 자동화는 재개하지 않는다.
+- 공개 문서의 개인 사용자 폴더 경로 23곳을 환경 변수 기반 표기로 바꿨다. 임시 검증 자료는 `%TEMP%`, 자동화 설정은 `%USERPROFILE%`, MSIX 설치 경로는 `%LOCALAPPDATA%`와 일반 패키지 표기를 사용한다. Adobe 표준 설치 경로는 유지한다.
+- 수정 전 문서 원본은 공개 대상에서 제외된 로컬 검증 폴더에 보존했다. 시험 결과·실패 원인·원본 증거 식별자·해시와 기존 미검증 항목은 유지한다. 과거 Git 커밋과 기존 배포 파일은 변경하지 않으므로 이번 정리는 현재 문서에 적용된다.

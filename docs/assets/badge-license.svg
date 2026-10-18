@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="28" viewBox="0 0 180 28" role="img" aria-labelledby="title">
+<title id="title">프로젝트 라이선스 표기 UNLICENSED</title>
+<defs><clipPath id="round"><rect width="180" height="28" rx="5"/></clipPath></defs>
+<g clip-path="url(#round)"><rect width="180" height="28" fill="#242424"/><rect x="76" width="104" height="28" fill="#eeeeea"/></g>
+<g font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" text-anchor="middle"><text x="38" y="18.5" fill="#fff">LICENSE</text><text x="128" y="18.5" fill="#242424">UNLICENSED</text></g>
+</svg>

@@ -1,0 +1,81 @@
+{
+  "version": "0.1.110",
+  "releaseId": 416890743,
+  "releaseTitle": "Contentrium CUT",
+  "url": "https://github.com/contentriumkorea/contentrium-cut/releases/tag/v0.1.110",
+  "targetCommit": "42c4de8c9bb6985b7ee36d708d6f388a3f4c44f3",
+  "anonymousLatestVerified": true,
+  "updateSignatureVerified": true,
+  "distributionSignatureVerified": true,
+  "downloadedAssets": [
+    {
+      "role": "companion",
+      "name": "Contentrium-CUT-Windows-x64.zip",
+      "size": 332237081,
+      "sha256": "2407cb93619e84334b57f449251a68f000be0ca0abc352749a8b071757309eba"
+    },
+    {
+      "role": "panel",
+      "name": "Contentrium-CUT.ccx",
+      "size": 87617,
+      "sha256": "d487dad1fdf3d37d27967017259bf61733a16f5eef9bf963df06098173b689e4"
+    },
+    {
+      "role": "installer",
+      "name": "Contentrium-CUT-Setup.exe",
+      "size": 93437783,
+      "sha256": "44e111d4411ebe8b06ae56e6543bcd09f42303ca72fa92c09d204a8295d289c8"
+    },
+    {
+      "role": "onlineInstaller",
+      "name": "Contentrium-CUT-Install.exe",
+      "size": 16958152,
+      "sha256": "ba9b0cc9219de08dd4c436a63e5f9dc91cc364c6e1994dda0285deb82289fdec"
+    },
+    {
+      "role": "portable",
+      "name": "Contentrium-CUT-Portable-Windows-x64.zip",
+      "size": 332687580,
+      "sha256": "ed531771e27b56474d325f387275cc764818574b70bf4694d2237b942bcbc561"
+    }
+  ],
+  "currentCheck": "CURRENT",
+  "previousCheck": "AVAILABLE",
+  "frozenOnlineDownloadVerified": true,
+  "frozenOnlineChildDiagnosisVerified": {
+    "status": "VERIFIED",
+    "appVersion": "0.1.110",
+    "tag": "v0.1.110",
+    "releaseId": 416890743,
+    "signatureVerified": true,
+    "installer": {
+      "role": "installer",
+      "name": "Contentrium-CUT-Setup.exe",
+      "assetId": 655196743,
+      "size": 93437783,
+      "sha256": "44e111d4411ebe8b06ae56e6543bcd09f42303ca72fa92c09d204a8295d289c8"
+    },
+    "installationChanged": false,
+    "setupDiagnosis": {
+      "schemaVersion": 1,
+      "status": "DIAGNOSED",
+      "appVersion": "0.1.110",
+      "installationChanged": false,
+      "checks": {
+        "installationRootResolved": true,
+        "adobeInstallerPresent": true,
+        "premiereClosed": true
+      },
+      "exitCode": 0
+    },
+    "downloadHashVerified": true
+  },
+  "pinnedMigration": {
+    "tag": "v0.1.1",
+    "releaseId": 404226839,
+    "signatureVerified": true
+  },
+  "liveInstallationChanged": false,
+  "nativePremiereTested": false,
+  "elapsedSeconds": 144.46899999998277
+}

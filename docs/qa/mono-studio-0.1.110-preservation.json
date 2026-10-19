@@ -2,15 +2,40 @@
   "preparedVersion": "0.1.110",
   "builtAssets": 5,
   "installedVersion": "0.1.107",
-  "latestPublishedVersion": "0.1.109",
+  "latestPublishedVersion": "0.1.110",
+  "releaseId": 416890743,
   "existingReleaseCount": 110,
   "existingAssetCount": 558,
+  "currentReleaseCount": 111,
+  "currentAssetCount": 567,
   "existingReleasesUnchanged": true,
-  "ownedInstallationMetadataUnchanged": true,
+  "metadataUnchanged": {
+    "app/active.json": true,
+    "launcher-config.json": true,
+    "updates/journal.json": true,
+    "updates/first-install.json": true,
+    "updates/install-preparation.json": false,
+    "updates/launcher-transaction.json": true
+  },
+  "expectedMetadataChanges": [
+    "updates/install-preparation.json"
+  ],
   "modelsAndJobDataUnchanged": true,
   "installed": false,
-  "published": false,
-  "newManifestSigned": false,
-  "pendingInput": "publish-first order clarification; existing activation recovery and genuine panel enrollment needed",
-  "premiereExecuted": false
+  "published": true,
+  "newManifestSigned": true,
+  "pendingInput": "Open the actually installed Premiere panel to complete existing 0.1.107 enrollment before 0.1.110 replacement.",
+  "existingPreparation": {
+    "appVersion": "0.1.107",
+    "status": "PENDING_PROVISIONING",
+    "step": "OPEN_PREMIERE_PANEL",
+    "preparationState": "PENDING",
+    "challengeExpiresAt": 1792383652,
+    "updateJournalUnchanged": true,
+    "codeReplaced": false,
+    "premiereLaunched": false,
+    "activationClaimed": false
+  },
+  "premiereExecuted": false,
+  "recurringAutomation": "PAUSED"
 }

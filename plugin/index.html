@@ -1,50 +1,425 @@
 <!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><link rel="stylesheet" href="style.css"></head><body>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
 <div class="studio-shell">
-<header class="studio-header"><div class="brand"><span>CONTENTRIUM</span><b>CUT<span class="brand-slash">/</span></b><span id="header-version" class="header-version"></span></div><button id="open-settings" class="icon-button" title="설정" aria-label="설정">설정</button></header>
-<div class="sequence-strip"><div class="sequence-copy"><div class="eyebrow">ACTIVE SEQUENCE</div><h1 id="project-name">시퀀스를 열어 주세요</h1><p id="sequence-info">Premiere 타임라인을 자동으로 읽습니다.</p></div><button id="read-project" class="icon-button" title="현재 시퀀스 새로고침" aria-label="현재 시퀀스 새로고침">새로고침</button></div>
-<nav class="step-nav" aria-label="편집 단계"><button data-step="tracks" class="step active"><span>01</span>트랙</button><button data-step="speakers" class="step"><span>02</span>화자</button><button data-step="cut" class="step"><span>03</span>컷 편집</button><button data-step="review" class="step"><span>04</span>검토</button></nav>
-<main id="workspace">
-<div id="update-banner" class="hidden"><div class="row"><p id="update-banner-text"></p><button id="update-later" class="text-button">나중에</button></div><button id="update-banner-button" class="primary full">업데이트</button><p class="hint">CUT 작업을 중단하고 업데이트합니다. 설치 시 Premiere 정상 종료가 필요합니다.</p></div>
+<header class="studio-header">
+<div class="brand">
+<span>CONTENTRIUM</span>
+<b>CUT<span class="brand-slash">/</span>
+</b>
+<span id="header-version" class="header-version">
+</span>
+</div>
+<button id="open-settings" class="icon-button" title="설정" aria-label="설정">설정</button>
+</header>
+<div class="sequence-strip">
+<div class="sequence-copy">
+<div class="eyebrow">화자 자동 편집</div>
+<h1 id="project-name">시퀀스를 열어 주세요</h1>
+<p id="sequence-info">Premiere 타임라인을 자동으로 읽습니다.</p>
+</div>
+</div>
 
-<div id="boot-status" class="notice"><span class="status-light"></span><p>편집 준비 중…</p><button id="refresh" class="text-button">다시 확인</button></div>
+<main id="workspace">
+<div id="update-banner" class="hidden">
+<div class="row">
+<p id="update-banner-text">
+</p>
+<button id="update-later" class="text-button">나중에</button>
+</div>
+<button id="update-banner-button" class="primary full">업데이트</button>
+<p class="hint">CUT 작업을 중단하고 업데이트합니다. 설치 시 Premiere 정상 종료가 필요합니다.</p>
+</div>
+
+<div id="boot-status" class="notice">
+<span class="status-light">
+</span>
+<p>편집 준비 중…</p>
+<button id="refresh" class="text-button">다시 확인</button>
+</div>
 <div id="view-tracks" class="page">
-<div class="page-heading"><h2>트랙 설정</h2><span id="track-count" class="meta">TIMELINE</span></div><p class="intro">카메라와 목소리를 연결하세요.</p>
-<section class="control-well"><div class="section-label"><span>비디오</span><span class="meta">CAMERA ASSIGNMENT</span></div><div id="cameras"><div class="empty-state"><b>타임라인의 영상 트랙</b><p>시퀀스를 열면 V1, V2… 트랙을 표시합니다.</p></div></div></section>
-<section class="control-well"><div class="section-label"><span>오디오</span><span class="meta">VOICE SOURCE</span></div><div class="segmented"><button id="mode-separate" class="mode active">화자별 마이크</button><button id="mode-mixed" class="mode">혼합 녹음</button></div><div id="microphones"><p class="hint">분석할 오디오 트랙을 선택하세요.</p></div></section>
-<section class="disclosure control-well"><button type="button" class="disclosure-toggle" data-disclosure="disclosure-1" data-open="false" aria-expanded="false">싱크 맞추기 <span class="summary-meta">SYNC</span></button><div id="disclosure-1" class="disclosure-content hidden"><div class="detail-body"><label>싱크 방식<select id="sync-method" aria-describedby="sync-method-hint"><option value="audio">공통 녹음으로 자동 싱크</option><option value="manual">수동 오프셋</option><option value="timecode">타임코드</option></select></label><p id="sync-method-hint" class="hint hidden"></p><p id="sync-selection-count" class="hint hidden" role="status" aria-live="polite" aria-atomic="true"></p><div id="sync-sources"></div><label>기준 소스<select id="sync-reference" aria-describedby="sync-error"></select></label><p class="hint">싱크 결과를 검토한 뒤 복제 시퀀스에 적용합니다.</p><button id="sync" class="full">싱크 분석</button><pre id="sync-result"></pre><button id="apply-sync" class="full" disabled>싱크 적용</button></div></div><p id="sync-error" class="hint input-error hidden" role="status" aria-live="polite"></p></section>
-<section class="disclosure control-well"><button type="button" class="disclosure-toggle" data-disclosure="disclosure-2" data-open="false" aria-expanded="false">편집 범위 <span class="summary-meta">RANGE</span></button><div id="disclosure-2" class="disclosure-content hidden"><div class="detail-body row"><label>시작 프레임<input id="range-start" type="number" value="0" min="0" step="1" aria-describedby="range-error"></label><label>종료 프레임<input id="range-end" type="number" min="1" step="1" aria-describedby="range-error"></label></div></div><p id="range-error" class="hint input-error hidden" role="status" aria-live="polite"></p></section>
-<section class="disclosure control-well"><button type="button" class="disclosure-toggle" data-disclosure="disclosure-3" data-open="false" aria-expanded="false">선택한 소스로 시작 <span class="summary-meta">NEW SEQUENCE</span></button><div id="disclosure-3" class="disclosure-content hidden"><div class="detail-body"><p class="hint">Premiere 프로젝트 패널에서 영상·음원을 선택하세요.</p><button id="read-selection" class="full">선택 소스 가져오기</button><div id="selected-sources"></div><button id="create-input" class="full" disabled>입력 시퀀스 만들기</button></div></div></section>
+<section class="control-well source-section">
+<div class="section-label">소스 <span id="track-count" class="meta">TIMELINE</span>
+</div>
+<div class="segmented source-actions">
+<button id="read-selection" class="source-button">프로젝트 클립</button>
+<button id="read-project" class="source-button" title="현재 시퀀스 가져오기" aria-label="현재 시퀀스 가져오기">현재 시퀀스</button>
+</div>
+<section id="project-selection-panel" class="disclosure control-well hidden">
+<button type="button" class="disclosure-toggle" data-disclosure="disclosure-3" data-open="false" aria-expanded="false">프로젝트 클립 선택 결과</button>
+<div id="disclosure-3" class="disclosure-content hidden">
+<div class="detail-body">
+<p class="hint">Premiere 프로젝트 패널에서 영상·음원을 선택하세요.</p>
+<div id="selected-sources">
+</div>
+<button id="create-input" class="full" disabled>입력 시퀀스 만들기</button>
+</div>
+</div>
+</section>
+</section>
+<section class="control-well sync-section">
+<div class="section-label sync-heading">
+<span>싱크</span>
+<button id="sync" class="sync-action">자동 싱크</button>
+</div>
+<button type="button" class="disclosure-toggle" data-disclosure="disclosure-1" data-open="false" aria-expanded="false">싱크 소스 · 기준 확인</button>
+<div id="disclosure-1" class="disclosure-content hidden">
+<div class="detail-body">
+<label>싱크 방식<select id="sync-method" aria-describedby="sync-method-hint">
+<option value="audio">공통 녹음으로 자동 싱크</option>
+<option value="manual">수동 오프셋</option>
+<option value="timecode">타임코드</option>
+</select>
+</label>
+<p id="sync-method-hint" class="hint hidden">
+</p>
+<p id="sync-selection-count" class="hint hidden" role="status" aria-live="polite" aria-atomic="true">
+</p>
+<div id="sync-sources">
+</div>
+<label>기준 소스<select id="sync-reference" aria-describedby="sync-error">
+</select>
+</label>
+<p class="hint">싱크 결과를 검토한 뒤 복제 시퀀스에 적용합니다.</p>
+</div>
+</div>
+<p id="sync-error" class="hint input-error hidden" role="status" aria-live="polite">
+</p>
+<pre id="sync-result">
+</pre>
+<button id="apply-sync" class="full" disabled>싱크 적용</button>
+</section>
 </div>
 <div id="view-speakers" class="page hidden">
-<div class="page-heading"><h2>화자 연결</h2><span class="meta">SPEAKERS</span></div><p class="intro">누가 말할 때 어떤 카메라를 보여줄까요?</p>
-<section class="control-well"><div id="speaker-mapping"><div class="empty-state"><b>목소리를 분석해 주세요</b><p>분석 후 화자 이름과 카메라를 확인할 수 있습니다.</p></div></div><p id="model-status" class="hint"></p></section>
-<section class="control-well"><div class="section-label">분석 설정</div><div class="row"><label>예상 화자 수<input id="speaker-count" type="number" value="2" min="1" max="26" step="1" aria-describedby="speaker-count-hint speaker-count-error"><span id="speaker-count-hint" class="hint">혼합 녹음에서 사용 · 1–26명</span><span id="speaker-count-error" class="hint input-error hidden" aria-live="polite"></span></label><label>발화 민감도<input id="vad-threshold" type="number" value="0.5" min="0.05" max="0.95" step="0.05" aria-describedby="vad-threshold-hint vad-threshold-error"><span id="vad-threshold-hint" class="hint">개별 마이크에서 사용 · 0.05–0.95</span><span id="vad-threshold-error" class="hint input-error hidden" aria-live="polite"></span></label></div></section>
-<section class="disclosure control-well"><button type="button" class="disclosure-toggle" data-disclosure="disclosure-4" data-open="false" aria-expanded="false">마이크 누설음 보정</button><div id="disclosure-4" class="disclosure-content hidden"><div class="detail-body"><p class="hint">각 화자가 혼자 말하는 구간을 지정하세요.</p><div id="calibration"></div></div></div></section>
-<section id="correction-panel" class="disclosure control-well"><button type="button" class="disclosure-toggle" data-disclosure="disclosure-5" data-open="false" aria-expanded="false">화자 교정과 이력</button><div id="disclosure-5" class="disclosure-content hidden"><div class="detail-body"><div id="speaker-corrections"></div><div id="correction-history"><p class="hint">분석 결과를 확인한 뒤 교정할 수 있습니다.</p></div><button id="undo-correction" disabled>마지막 교정 되돌리기</button></div></div></section>
-<button id="go-cut" class="secondary full" data-next="cut">컷 설정으로 →</button>
+<div class="page-heading">
+<h2>화자 연결</h2>
+<button id="reanalyze" class="text-button hidden">다시 분석</button>
+</div>
+<div class="segmented">
+<button id="mode-separate" class="mode active">화자별 마이크</button>
+<button id="mode-mixed" class="mode">혼합 녹음</button>
+</div>
+<section class="speaker-links">
+<div id="speaker-mapping">
+<div class="empty-state">
+<b>목소리를 분석해 주세요</b>
+<p>분석 후 화자 이름과 카메라를 확인할 수 있습니다.</p>
+</div>
+</div>
+<p id="model-status" class="hint">
+</p>
+<label>전체샷 · 예비 카메라 <select id="reserve-camera">
+<option value="">지정 안 함</option>
+</select>
+</label>
+<p class="hint compact-hint">전체샷은 화자가 아닌 예비 화면입니다. 트랙 역할은 고급 설정에서 지정하세요.</p>
+</section>
 </div>
 <div id="view-cut" class="page hidden">
-<div class="page-heading"><h2>편집 리듬</h2><span class="meta">CUT</span></div><p class="intro">대화의 흐름에 맞춰 카메라를 전환합니다.</p>
-<section class="control-well"><div class="section-label">샷 유지</div><label>최소 샷 길이 <span class="unit">초</span><input id="min-shot" aria-describedby="min-shot-error" type="number" value="2" min="0" step="0.1"></label><p id="min-shot-error" class="hint input-error hidden" role="status" aria-live="polite"></p><p class="hint">이 길이보다 짧은 잦은 전환을 줄입니다.</p><div class="row cut-duration-row"><label>짧은 발화 · 초<input id="short-turn" aria-describedby="short-turn-error" type="number" value="0.6" min="0" step="0.1"><span id="short-turn-error" class="hint input-error hidden" role="status" aria-live="polite"></span></label><label>동시 발화 · 초<input id="overlap" aria-describedby="overlap-error" type="number" value="0.8" min="0" step="0.1"><span id="overlap-error" class="hint input-error hidden" role="status" aria-live="polite"></span></label></div></section>
-<section class="control-well"><div class="section-label">카메라 운용</div><label>시작 카메라<select id="start-camera"></select></label><label>예비 카메라<select id="reserve-camera"><option value="">지정 안 함</option></select></label><p class="hint">전체샷·투샷의 화자 범위는 트랙 설정에서 지정합니다.</p></section>
-<section class="disclosure control-well"><button type="button" class="disclosure-toggle" data-disclosure="disclosure-6" data-open="false" aria-expanded="false">특정 구간의 카메라 고정</button><div class="override-status"><p id="override-summary" class="hint hidden" role="status" aria-live="polite"></p><button id="override-filter" class="full hidden" data-work="true" aria-controls="disclosure-6" aria-describedby="override-summary" disabled>오류 구간만 보기</button></div><div id="disclosure-6" class="disclosure-content hidden"><div class="detail-body"><div id="overrides"></div><button id="add-override" class="full" data-work="true" disabled>+ 수동 구간 추가</button><p class="hint">수정한 뒤 편집안을 다시 만드세요.</p></div></div></section>
+<div class="page-heading">
+<h2>편집 설정</h2>
+</div>
+<section class="control-well">
+<div class="duration-control"><label for="min-shot">최소 컷 길이 <span class="unit">초</span></label>
+<input id="min-shot-slider" type="range" aria-label="최소 컷 길이 조정" min="0" max="10" step="0.1" value="2">
+<input id="min-shot" aria-describedby="min-shot-error" type="number" value="2" min="0" step="0.1">
+</div>
+<p id="min-shot-error" class="hint input-error hidden" role="status" aria-live="polite">
+</p>
+<p class="hint">이 길이보다 짧은 잦은 전환을 줄입니다.</p>
+<div class="short-response"><span id="short-response-label">짧은 반응에 화면 유지</span>
+<button id="suppress-short" type="button" class="switch active" role="switch" aria-checked="true" aria-labelledby="short-response-label"><span class="switch-thumb"></span></button>
+</div>
+</section>
+<section class="disclosure advanced">
+<button id="advanced-toggle" type="button" class="disclosure-toggle" data-disclosure="advanced-settings" data-open="false" aria-expanded="false" aria-controls="advanced-settings">고급 설정</button>
+<div id="advanced-settings" class="disclosure-content hidden">
+<section class="control-well">
+<div class="section-label">
+<span>비디오</span>
+<span class="meta">CAMERA ASSIGNMENT</span>
+</div>
+<div id="cameras">
+<div class="empty-state">
+<b>타임라인의 영상 트랙</b>
+<p>시퀀스를 열면 V1, V2… 트랙을 표시합니다.</p>
+</div>
+</div>
+</section>
+<section class="control-well">
+<div class="section-label">
+<span>오디오</span>
+<span class="meta">VOICE SOURCE</span>
+</div>
+<div id="microphones">
+<p class="hint">분석할 오디오 트랙을 선택하세요.</p>
+</div>
+</section>
+<section class="disclosure control-well">
+<button type="button" class="disclosure-toggle" data-disclosure="disclosure-2" data-open="false" aria-expanded="false">편집 범위 <span class="summary-meta">RANGE</span>
+</button>
+<div id="disclosure-2" class="disclosure-content hidden">
+<div class="detail-body row">
+<label>시작 프레임<input id="range-start" type="number" value="0" min="0" step="1" aria-describedby="range-error">
+</label>
+<label>종료 프레임<input id="range-end" type="number" min="1" step="1" aria-describedby="range-error">
+</label>
+</div>
+</div>
+<p id="range-error" class="hint input-error hidden" role="status" aria-live="polite">
+</p>
+</section>
+<section class="control-well">
+<div class="section-label">분석 설정</div>
+<div class="row">
+<label>예상 화자 수<input id="speaker-count" type="number" value="2" min="1" max="26" step="1" aria-describedby="speaker-count-hint speaker-count-error">
+<span id="speaker-count-hint" class="hint">혼합 녹음에서 사용 · 1–26명</span>
+<span id="speaker-count-error" class="hint input-error hidden" aria-live="polite">
+</span>
+</label>
+<label>발화 민감도<input id="vad-threshold" type="number" value="0.5" min="0.05" max="0.95" step="0.05" aria-describedby="vad-threshold-hint vad-threshold-error">
+<span id="vad-threshold-hint" class="hint">개별 마이크에서 사용 · 0.05–0.95</span>
+<span id="vad-threshold-error" class="hint input-error hidden" aria-live="polite">
+</span>
+</label>
+</div>
+</section>
+<section class="disclosure control-well">
+<button type="button" class="disclosure-toggle" data-disclosure="disclosure-4" data-open="false" aria-expanded="false">마이크 누설음 보정</button>
+<div id="disclosure-4" class="disclosure-content hidden">
+<div class="detail-body">
+<p class="hint">각 화자가 혼자 말하는 구간을 지정하세요.</p>
+<div id="calibration">
+</div>
+</div>
+</div>
+</section>
+<section id="correction-panel" class="disclosure control-well">
+<button type="button" class="disclosure-toggle" data-disclosure="disclosure-5" data-open="false" aria-expanded="false">화자 교정과 이력</button>
+<div id="disclosure-5" class="disclosure-content hidden">
+<div class="detail-body">
+<div id="speaker-names">
+</div>
+<div id="speaker-corrections">
+</div>
+<div id="correction-history">
+<p class="hint">분석 결과를 확인한 뒤 교정할 수 있습니다.</p>
+</div>
+<button id="undo-correction" disabled>마지막 교정 되돌리기</button>
+</div>
+</div>
+</section>
+<section class="control-well">
+<div class="section-label">컷 전환 세부 설정</div>
+<div class="row cut-duration-row">
+<label>짧은 발화 · 초<input id="short-turn" aria-describedby="short-turn-error" type="number" value="0.6" min="0" step="0.1">
+<span id="short-turn-error" class="hint input-error hidden" role="status" aria-live="polite">
+</span>
+</label>
+<label>동시 발화 · 초<input id="overlap" aria-describedby="overlap-error" type="number" value="0.8" min="0" step="0.1">
+<span id="overlap-error" class="hint input-error hidden" role="status" aria-live="polite">
+</span>
+</label>
+</div>
+</section>
+<section class="control-well">
+<div class="section-label">카메라 운용</div>
+<label>시작 카메라<select id="start-camera">
+</select>
+</label>
+<p class="hint">전체샷·투샷의 화자 범위는 트랙 설정에서 지정합니다.</p>
+</section>
+<section class="disclosure control-well">
+<button type="button" class="disclosure-toggle" data-disclosure="disclosure-6" data-open="false" aria-expanded="false">특정 구간의 카메라 고정</button>
+<div class="override-status">
+<p id="override-summary" class="hint hidden" role="status" aria-live="polite">
+</p>
+<button id="override-filter" class="full hidden" data-work="true" aria-controls="disclosure-6" aria-describedby="override-summary" disabled>오류 구간만 보기</button>
+</div>
+<div id="disclosure-6" class="disclosure-content hidden">
+<div class="detail-body">
+<div id="overrides">
+</div>
+<button id="add-override" class="full" data-work="true" disabled>+ 수동 구간 추가</button>
+<p class="hint">수정한 뒤 편집안을 다시 만드세요.</p>
+</div>
+</div>
+</section>
+</div>
+</section>
 </div>
 <div id="view-review" class="page hidden">
-<div class="page-heading"><h2>편집안 검토</h2><span class="meta">REVIEW</span></div><p class="intro">구간을 누르면 Premiere에서 바로 확인합니다.</p>
-<section class="control-well"><div class="review-summary"><span><b id="cut-count">—</b> 컷</span><span><b id="review-count">—</b> 검토 사항</span></div><div id="timeline"></div><div class="review-filters"><label>카메라<select id="review-camera"><option value="">모든 카메라</option></select></label><label>컷 검색<input id="review-search" type="text" maxlength="120" placeholder="화자 전환, 프레임 범위…"></label></div><div class="review-navigation"><span id="review-page-info" role="status" aria-live="polite">편집안을 만들어 주세요</span><button id="review-clear" class="text-button" disabled>필터 해제</button></div><div id="segments"><div class="empty-state"><b>아직 편집안이 없습니다</b><p>화자를 분석하고 컷 설정에서 편집안을 만드세요.</p></div></div><div class="review-pages"><button id="review-previous" disabled>이전 컷</button><span class="hint">한 페이지에 50컷</span><button id="review-next" disabled>다음 컷</button></div><p class="hint">필터는 표시만 바꿉니다. 적용할 전체 편집안은 유지됩니다.</p><p class="hint">프레임은 0부터 시작하며 종료 프레임은 다음 구간의 시작 경계입니다. 시간은 경과 시간이며 소스 타임코드가 아닙니다.</p></section>
-<section id="review-section" class="disclosure control-well"><button type="button" class="disclosure-toggle" data-disclosure="disclosure-7" data-open="true" aria-expanded="true">확인이 필요한 구간</button><div id="disclosure-7" class="disclosure-content"><div class="detail-body" id="reviews"><p class="hint">불확실한 화자·겹침·싱크를 이곳에 표시합니다.</p></div></div></section>
+<div class="page-heading">
+<h2 id="review-heading" tabindex="-1">편집안 검토</h2>
+<span class="meta">REVIEW</span>
+</div>
+<p class="intro">구간을 누르면 Premiere에서 바로 확인합니다.</p>
+<section class="control-well">
+<div class="review-summary">
+<span>
+<b id="cut-count">—</b> 컷</span>
+<span>
+<b id="review-count">—</b> 검토 사항</span>
+</div>
+<div id="timeline">
+</div>
+<div class="review-filters">
+<label>카메라<select id="review-camera">
+<option value="">모든 카메라</option>
+</select>
+</label>
+<label>컷 검색<input id="review-search" type="text" maxlength="120" placeholder="화자 전환, 프레임 범위…">
+</label>
+</div>
+<div class="review-navigation">
+<span id="review-page-info" role="status" aria-live="polite">편집안을 만들어 주세요</span>
+<button id="review-clear" class="text-button" disabled>필터 해제</button>
+</div>
+<div id="segments">
+<div class="empty-state">
+<b>아직 편집안이 없습니다</b>
+<p>화자를 분석하고 컷 설정에서 편집안을 만드세요.</p>
+</div>
+</div>
+<div class="review-pages">
+<button id="review-previous" disabled>이전 컷</button>
+<span class="hint">한 페이지에 50컷</span>
+<button id="review-next" disabled>다음 컷</button>
+</div>
+<p class="hint">필터는 표시만 바꿉니다. 적용할 전체 편집안은 유지됩니다.</p>
+<p class="hint">프레임은 0부터 시작하며 종료 프레임은 다음 구간의 시작 경계입니다. 시간은 경과 시간이며 소스 타임코드가 아닙니다.</p>
+</section>
+<section id="review-section" class="disclosure control-well">
+<button type="button" class="disclosure-toggle" data-disclosure="disclosure-7" data-open="true" aria-expanded="true">확인이 필요한 구간</button>
+<div id="disclosure-7" class="disclosure-content">
+<div class="detail-body" id="reviews">
+<p class="hint">불확실한 화자·겹침·싱크를 이곳에 표시합니다.</p>
+</div>
+</div>
+</section>
 <p class="preservation-note">원본을 보존하고 새 시퀀스에 적용합니다.<br>적용 후에도 Premiere에서 자유롭게 편집할 수 있습니다.</p>
+<button id="rebuild-plan" class="text-button full">편집안 다시 만들기</button>
 </div>
 <div id="view-settings" class="page hidden">
-<div class="page-heading"><h2>설정</h2><span class="meta">PREFERENCES</span></div>
-<section id="apply-recovery" class="hidden"><p id="apply-recovery-text"></p><p class="hint">결과 시퀀스를 확인하세요. 진행 여부가 불확실하면 Premiere를 정상 종료한 뒤 다시 열어야 합니다.</p><button id="recover-apply" class="full">중단 작업 기록 확인</button></section>
-<section class="control-well"><div class="section-label">로컬 분석 모델</div><p id="models" class="muted">모델 상태 확인 중</p><p class="hint">영상과 음성은 이 PC에서 분석합니다.</p><section class="disclosure"><button type="button" class="disclosure-toggle" data-disclosure="disclosure-8" data-open="false" aria-expanded="false">혼합 녹음 모델 설치</button><div id="disclosure-8" class="disclosure-content hidden"><p class="hint">Community-1 제공자 계정에서 이용 조건 동의와 접근 권한이 필요합니다.</p><button id="open-model-provider" class="full">제공자 모델 페이지</button><label>Hugging Face 접근 토큰<input id="model-token" type="password" autocomplete="off" placeholder="설치할 때만 사용"></label><label class="check-label"><input id="model-terms" type="checkbox">제공자 계정에서 이용 조건에 동의했습니다</label><button id="install-model" class="full">화자 모델 설치</button><p id="model-install-status" class="hint"></p></div></section></section>
-<section class="control-well"><div class="section-label">분석 자원</div><label>분석 장치<select id="analysis-device"><option value="auto">자동</option><option value="cpu">CPU</option><option value="cuda">GPU (CUDA)</option></select></label><label>캐시 예산 · GB<input id="cache-budget" type="number" min="0" step="any" aria-describedby="cache-budget-error" placeholder="미설정 · 정리 전 입력"></label><p id="cache-budget-error" class="hint input-error hidden" role="status" aria-live="polite"></p><p id="cache-suggestion-info" class="hint hidden" role="status" aria-live="polite"></p><button id="use-cache-suggestion" class="full" aria-describedby="cache-suggestion-info resource-save-info" disabled>권장 예산 사용</button><p id="cache-info" class="hint">캐시 상태 확인 중</p><button id="save-resources" class="full">자원 설정 저장</button><button id="discard-resources" class="full" aria-describedby="resource-save-info" disabled>저장된 설정으로 되돌리기</button><p id="resource-save-info" class="hint hidden" role="status" aria-live="polite"></p><button id="prune-cache" class="full" aria-describedby="resource-save-info">완료된 분석 캐시 정리</button><div id="cache-maintenance" class="hidden"><p id="cache-maintenance-text" class="hint"></p><button id="release-cache" class="full" disabled>정리 종료 후 편집 계속</button></div></section>
-<section class="control-well"><div class="section-label">프로젝트 설정</div><p class="hint">트랙·화자·컷 설정을 보관합니다. 같은 타임라인과 음성 입력이면 저장한 분석·교정도 불러옵니다.</p><div class="row"><button id="save-settings">저장</button><button id="load-settings">불러오기</button></div></section>
-<section id="update-section" class="control-well"><div class="section-label"><span>Contentrium CUT</span><span id="version">—</span></div><p id="update-info" class="muted">업데이트 확인 중</p><p id="release-notes" class="hint"></p><button id="update" class="primary full" disabled>업데이트</button><div class="row"><button id="check-update">업데이트 확인</button><button id="recover-update">설치 복구</button></div></section>
+<div class="page-heading">
+<h2>설정</h2>
+<span class="meta">PREFERENCES</span>
+</div>
+<section id="apply-recovery" class="hidden">
+<p id="apply-recovery-text">
+</p>
+<p class="hint">결과 시퀀스를 확인하세요. 진행 여부가 불확실하면 Premiere를 정상 종료한 뒤 다시 열어야 합니다.</p>
+<button id="recover-apply" class="full">중단 작업 기록 확인</button>
+</section>
+<section class="control-well">
+<div class="section-label">로컬 분석 모델</div>
+<p id="models" class="muted">모델 상태 확인 중</p>
+<p class="hint">영상과 음성은 이 PC에서 분석합니다.</p>
+<section class="disclosure">
+<button type="button" class="disclosure-toggle" data-disclosure="disclosure-8" data-open="false" aria-expanded="false">혼합 녹음 모델 설치</button>
+<div id="disclosure-8" class="disclosure-content hidden">
+<p class="hint">Community-1 제공자 계정에서 이용 조건 동의와 접근 권한이 필요합니다.</p>
+<button id="open-model-provider" class="full">제공자 모델 페이지</button>
+<label>Hugging Face 접근 토큰<input id="model-token" type="password" autocomplete="off" placeholder="설치할 때만 사용">
+</label>
+<label class="check-label">
+<input id="model-terms" type="checkbox">제공자 계정에서 이용 조건에 동의했습니다</label>
+<button id="install-model" class="full">화자 모델 설치</button>
+<p id="model-install-status" class="hint">
+</p>
+</div>
+</section>
+</section>
+<section class="control-well">
+<div class="section-label">분석 자원</div>
+<label>분석 장치<select id="analysis-device">
+<option value="auto">자동</option>
+<option value="cpu">CPU</option>
+<option value="cuda">GPU (CUDA)</option>
+</select>
+</label>
+<label>캐시 예산 · GB<input id="cache-budget" type="number" min="0" step="any" aria-describedby="cache-budget-error" placeholder="미설정 · 정리 전 입력">
+</label>
+<p id="cache-budget-error" class="hint input-error hidden" role="status" aria-live="polite">
+</p>
+<p id="cache-suggestion-info" class="hint hidden" role="status" aria-live="polite">
+</p>
+<button id="use-cache-suggestion" class="full" aria-describedby="cache-suggestion-info resource-save-info" disabled>권장 예산 사용</button>
+<p id="cache-info" class="hint">캐시 상태 확인 중</p>
+<button id="save-resources" class="full">자원 설정 저장</button>
+<button id="discard-resources" class="full" aria-describedby="resource-save-info" disabled>저장된 설정으로 되돌리기</button>
+<p id="resource-save-info" class="hint hidden" role="status" aria-live="polite">
+</p>
+<button id="prune-cache" class="full" aria-describedby="resource-save-info">완료된 분석 캐시 정리</button>
+<div id="cache-maintenance" class="hidden">
+<p id="cache-maintenance-text" class="hint">
+</p>
+<button id="release-cache" class="full" disabled>정리 종료 후 편집 계속</button>
+</div>
+</section>
+<section class="control-well">
+<div class="section-label">프로젝트 설정</div>
+<p class="hint">트랙·화자·컷 설정을 보관합니다. 같은 타임라인과 음성 입력이면 저장한 분석·교정도 불러옵니다.</p>
+<div class="row">
+<button id="save-settings">저장</button>
+<button id="load-settings">불러오기</button>
+</div>
+</section>
+<section id="update-section" class="control-well">
+<div class="section-label">
+<span>Contentrium CUT</span>
+<span id="version">—</span>
+</div>
+<p id="update-info" class="muted">업데이트 확인 중</p>
+<p id="release-notes" class="hint">
+</p>
+<button id="update" class="primary full" disabled>업데이트</button>
+<div class="row">
+<button id="check-update">업데이트 확인</button>
+<button id="recover-update">설치 복구</button>
+</div>
+</section>
 </div>
 </main>
-<footer class="action-dock"><div class="activity"><div class="connection"><i id="connection-dot"></i><span id="connection">편집 준비 중</span></div><button id="cancel" class="text-button" disabled>중단</button></div><p id="status" role="status">현재 Premiere 시퀀스를 확인합니다.</p><p id="preview-stop-info" class="hint hidden" role="status" aria-live="polite"></p><div id="progress" aria-busy="false"></div><p id="action-readiness" role="status" aria-live="polite">편집 연결을 준비하고 있습니다.</p><div class="action-row"><button id="back-step" class="back-button" title="이전 단계" aria-label="이전 단계">이전</button><button id="next-step" class="primary">화자 설정으로 →</button><button id="analyze" class="primary hidden">화자 분석 시작</button><button id="plan" class="primary hidden" disabled>편집안 만들기</button><button id="apply" class="primary hidden" disabled>Premiere에 컷 적용</button><button id="close-settings" class="primary hidden">편집으로 돌아가기</button></div><div class="footer-meta"><span>MONO STUDIO</span><span id="host-status">PREMIERE PRO</span></div></footer>
+<footer class="action-dock">
+<div class="activity">
+<div class="connection">
+<i id="connection-dot">
+</i>
+<span id="connection">편집 준비 중</span>
 </div>
-<script src="vendor/sha256.js"></script><script src="view.js"></script><script src="host.js"></script><script src="main.js"></script></body></html>
+<button id="cancel" class="text-button" disabled>중단</button>
+</div>
+<p id="status" role="status">현재 Premiere 시퀀스를 확인합니다.</p>
+<p id="preview-stop-info" class="hint hidden" role="status" aria-live="polite">
+</p>
+<div id="progress" aria-busy="false">
+</div>
+<p id="action-readiness" role="status" aria-live="polite">편집 연결을 준비하고 있습니다.</p>
+<button id="show-review" class="text-button full hidden" aria-controls="view-review">편집안 검토하기</button>
+<div class="action-row">
+<button id="analyze" class="primary hidden">화자 분석 시작</button>
+<button id="plan" class="primary hidden" disabled>편집안 만들기</button>
+<button id="apply" class="primary hidden" disabled>검토한 편집 시퀀스 만들기</button>
+<button id="close-settings" class="primary hidden">편집으로 돌아가기</button>
+</div>
+<div class="footer-meta">
+<span>원본 유지 · 새 시퀀스 생성</span>
+<span id="host-status">PREMIERE PRO</span>
+</div>
+</footer>
+</div>
+<script src="vendor/sha256.js">
+</script>
+<script src="view.js">
+</script>
+<script src="host.js">
+</script>
+<script src="main.js">
+</script>
+</body>
+</html>

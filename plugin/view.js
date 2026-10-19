@@ -1,38 +1,59 @@
 /* Shared by the native panel and the QA-only preview. No host or data calls. */
 (function(root){
   function install(document){
-    const get=id=>document.getElementById(id),steps=['tracks','speakers','cut','review'];
-    let current='tracks',previous='tracks',changed=null;
+    const get=id=>document.getElementById(id),sections=['tracks','speakers','cut'];
+    let current='workbench',changed=null,hasAnalysis=false,hasPlan=false;
+    function render(){
+      const settings=current==='settings';
+      for(const name of sections)get('view-'+name).className='page'+(settings?' hidden':'');
+      get('view-review').className='page'+(!settings&&hasPlan?'':' hidden');
+      get('view-settings').className='page'+(settings?'':' hidden');
+      const action=settings?'close-settings':hasPlan?'apply':hasAnalysis?'plan':'analyze';
+      for(const id of ['analyze','plan','apply','close-settings'])get(id).className='primary'+(id===action?'':' hidden');
+      get('reanalyze').className='text-button'+(hasAnalysis?'':' hidden');
+      get('show-review').className='text-button full'+(!settings&&hasPlan?'':' hidden');
+      get('open-settings').setAttribute('aria-expanded',String(settings));
+    }
     function show(next){
-      if(!steps.includes(next)&&next!=='settings')return;
-      if(next==='settings'&&current!=='settings')previous=current;
-      current=next;
-      for(const name of [...steps,'settings'])get('view-'+name).className='page'+(name===next?'':' hidden');
-      for(const button of document.querySelectorAll('[data-step]')){
-        const active=button.getAttribute('data-step')===next;
-        button.className='step'+(active?' active':'');button.setAttribute('aria-current',active?'step':'false');
+      if(!['workbench','settings','review',...sections].includes(next))return;
+      const target=next==='settings'?'settings':'workbench';
+      if(current!==target){current=target;get('workspace').scrollTop=0;}
+      render();if(changed)changed();
+      if(next==='review'&&hasPlan){
+        const target=get('view-review'),workspace=get('workspace');
+        if(typeof target.scrollIntoView==='function')target.scrollIntoView();
+        else if(Number.isFinite(target.offsetTop)&&Number.isFinite(workspace.offsetTop))workspace.scrollTop=Math.max(0,target.offsetTop-workspace.offsetTop);
+        const heading=get('review-heading');if(typeof heading.focus==='function')heading.focus();
       }
-      const action={tracks:'next-step',speakers:'analyze',cut:'plan',review:'apply',settings:'close-settings'}[next];
-      for(const id of ['next-step','analyze','plan','apply','close-settings'])get(id).className='primary'+(id===action?'':' hidden');
-      get('back-step').disabled=next==='tracks';get('open-settings').setAttribute('aria-expanded',String(next==='settings'));
-      get('workspace').scrollTop=0;
-      if(changed)changed();
     }
-    for(const button of document.querySelectorAll('[data-step]'))button.onclick=()=>show(button.getAttribute('data-step'));
-    for(const button of document.querySelectorAll('[data-next]'))button.onclick=()=>show(button.getAttribute('data-next'));
     function setDisclosure(button,open){
-      const body=get(button.getAttribute('data-disclosure'));
-      button.setAttribute('data-open',String(open));
-      button.setAttribute('aria-expanded',String(open));
-      body.className='disclosure-content'+(open?'':' hidden');
+      const id=button.getAttribute('data-disclosure');
+      button.setAttribute('data-open',String(open));button.setAttribute('aria-expanded',String(open));
+      button.setAttribute('aria-controls',id);
+      get(id).className='disclosure-content'+(open?'':' hidden');
     }
-    function openDisclosure(id){for(const button of document.querySelectorAll('[data-disclosure]'))if(button.getAttribute('data-disclosure')===id)setDisclosure(button,true);}
-    for(const button of document.querySelectorAll('[data-disclosure]'))button.onclick=()=>setDisclosure(button,get(button.getAttribute('data-disclosure')).className.split(/\s+/).includes('hidden'));
-    get('next-step').onclick=()=>show('speakers');
-    get('back-step').onclick=()=>show(current==='settings'?previous:steps[Math.max(0,steps.indexOf(current)-1)]);
-    get('open-settings').onclick=()=>show(current==='settings'?previous:'settings');
-    get('close-settings').onclick=()=>show(previous);
-    show('tracks');return {show,openDisclosure,current:()=>current,onChange:listener=>{changed=listener;}};
+    function openDisclosure(id){
+      // Advanced subcontrols must not remain hidden behind the outer disclosure.
+      if(['disclosure-2','disclosure-4','disclosure-5','disclosure-6'].includes(id))openDisclosure('advanced-settings');
+      for(const button of document.querySelectorAll('[data-disclosure]'))if(button.getAttribute('data-disclosure')===id)setDisclosure(button,true);
+    }
+    function source(value){
+      get('project-selection-panel').className='disclosure control-well'+(value==='project'?'':' hidden');
+      for(const [id,active] of [['read-selection',value==='project'],['read-project',value!=='project']]){
+        get(id).className='source-button'+(active?' active':'');get(id).setAttribute('aria-pressed',String(active));
+      }
+      if(value==='project')openDisclosure('disclosure-3');
+    }
+    for(const button of document.querySelectorAll('[data-disclosure]')){
+      setDisclosure(button,button.getAttribute('data-open')==='true');
+      button.onclick=()=>setDisclosure(button,get(button.getAttribute('data-disclosure')).className.split(/\s+/).includes('hidden'));
+    }
+    get('open-settings').onclick=()=>show(current==='settings'?'workbench':'settings');
+    get('close-settings').onclick=()=>show('workbench');
+    get('show-review').onclick=()=>{if(hasPlan)show('review');};
+    source('sequence');render();
+    return {show,source,openDisclosure,current:()=>current,onChange:listener=>{changed=listener;},
+      readiness:({analysis,plan})=>{hasAnalysis=!!analysis;hasPlan=!!plan;render();}};
   }
   if(typeof module!=='undefined'&&module.exports)module.exports={install};
   else root.ContentriumView={install};

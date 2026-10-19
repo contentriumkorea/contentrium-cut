@@ -7,7 +7,7 @@ get('project-name').textContent='Contentrium Podcast · EP.01';
 get('sequence-info').textContent='01:02:18 · 29.97 fps · 예시 시퀀스';
 get('track-count').textContent='3 VIDEO / 2 AUDIO';
 get('connection').textContent='디자인 미리보기';
-get('status').textContent='트랙·화자·컷·검토 화면을 확인할 수 있습니다.';
+get('status').textContent='단일 작업 화면 · 예시 데이터를 표시합니다.';
 get('action-readiness').textContent='UI 검토용 예시 · 분석과 편집을 실행하지 않습니다.';
 get('version').textContent='DESIGN PREVIEW';
 get('cameras').innerHTML='';
@@ -24,8 +24,8 @@ for(const [id,name,speaker] of [['A1','진행자 마이크','A'],['A2','게스�
 }
 get('speaker-mapping').innerHTML='';
 for(const [id,name,track] of [['A','진행자','V1'],['B','게스트','V2']]){
-  const row=document.createElement('div');row.className='source-row';
-  row.innerHTML='<div class="track-title"><span class="track-badge">'+id+'</span><span class="source-title">'+name+'</span><span class="track-meta">예시 화자</span></div><label>이름<input value="'+name+'"></label><label>카메라<select>'+cameras.map(c=>'<option value="'+c[0]+'">'+c[0]+' · '+c[1]+'</option>').join('')+'</select></label><button class="full" disabled>▶ 단독 발화 듣기</button>';row.querySelector('select').value=track;get('speaker-mapping').appendChild(row);
+  const row=document.createElement('div');row.className='source-row speaker-row';
+  row.innerHTML='<div class="speaker-link"><span class="source-title">'+name+'</span><select aria-label="'+name+' 연결 카메라">'+cameras.map(c=>'<option value="'+c[0]+'">'+c[0]+' · '+c[1]+'</option>').join('')+'</select></div><div class="sample-buttons"><button disabled>▶ 단독 발화 듣기 · 예시</button></div>';row.querySelector('select').value=track;get('speaker-mapping').appendChild(row);
 }
 for(const id of ['start-camera','reserve-camera'])get(id).innerHTML=cameras.map(c=>'<option value="'+c[0]+'">'+c[0]+' · '+c[1]+'</option>').join('');
 get('reserve-camera').value='V3';
@@ -41,3 +41,5 @@ get('cut-count').textContent='5';get('review-count').textContent='1';
 get('timeline').innerHTML='<div class="timeline"><div style="flex:4"></div><div style="flex:8"></div><div style="flex:7"></div><div style="flex:3"></div><div style="flex:9"></div></div>';
 get('reviews').innerHTML='<div class="review-row">00:19 – 00:22 · 겹친 목소리 확인 (예시)</div>';
 for(const id of ['analyze','plan','apply','sync','apply-sync','read-project','read-selection','create-input','save-settings','load-settings','install-model','open-model-provider','save-resources','prune-cache','check-update','recover-update','update','add-override'])get(id).disabled=true;
+
+get('suppress-short').setAttribute('aria-checked','true');get('suppress-short').disabled=true;get('min-shot-slider').disabled=true;previewView.readiness({analysis:true,plan:false});get('reanalyze').disabled=true;get('rebuild-plan').disabled=true;

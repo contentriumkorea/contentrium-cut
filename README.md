@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/contentriumkorea/contentrium-cut/releases/latest"><img src="docs/assets/badge-version.svg" alt="현재 정식 버전 0.1.109" height="28"></a>
+  <a href="https://github.com/contentriumkorea/contentrium-cut/releases/latest"><img src="docs/assets/badge-version.svg" alt="현재 정식 버전 0.1.110" height="28"></a>
   <a href="docs/installation.md"><img src="docs/assets/badge-windows.svg" alt="대상 환경 Windows x64" height="28"></a>
   <a href="package.json"><img src="docs/assets/badge-license.svg" alt="프로젝트 라이선스 표기 UNLICENSED" height="28"></a>
 </p>
@@ -36,6 +36,8 @@
 1. 온라인 설치기에서 **다운로드 및 설치**를 누릅니다.
 2. 전체 설치 창의 안내에 따라 프로젝트를 저장하고 Premiere를 정상 종료한 뒤 설치합니다.
 3. Premiere의 **Window → UXP Plugins → Contentrium CUT**을 열어 첫 연결을 마칩니다.
+
+**0.1.110 변경:** 05 Mono Studio 기준으로 소스·싱크·화자·편집 설정을 한 작업 화면으로 정리했습니다. 상세 옵션은 고급 설정으로 접고, 분석 결과에 따라 주 버튼이 바뀌며 편집안 생성 후 검토 영역으로 이동합니다.
 
 이미 설치했다면 패널의 **업데이트**를 사용하세요. 압축형 구성도 최초 패널 등록과 보안 연결이 필요한 **Premiere 플러그인**이며, 완전 무설치 포터블 앱은 아닙니다.
 

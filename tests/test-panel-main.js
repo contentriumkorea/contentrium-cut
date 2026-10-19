@@ -73,6 +73,73 @@ async function updatePanel(extra={}){
   await f.tick();return f;
 }
 
+test('mono workbench keeps setup together and advances one primary action from real results',async()=>{
+  const f=await panel();
+  for(const id of ['view-tracks','view-speakers','view-cut'])assert.doesNotMatch(f.get(id).className,/hidden/,id);
+  assert.equal(f.nodes.filter(n=>n.attrs['data-step']).length,0);
+  assert.doesNotMatch(f.get('analyze').className,/hidden/);
+  assert.match(f.get('plan').className,/hidden/);assert.match(f.get('apply').className,/hidden/);
+  assert.match(f.get('advanced-settings').className,/hidden/);
+  await f.click('analyze');await f.tick();
+  assert.doesNotMatch(f.get('plan').className,/hidden/);assert.match(f.get('apply').className,/hidden/);
+  await f.click('plan');
+  assert.doesNotMatch(f.get('view-review').className,/hidden/);assert.doesNotMatch(f.get('apply').className,/hidden/);
+  assert.equal(f.calls.some(c=>c.path==='/apply/begin'),false,'review never applies automatically');
+  f.get('min-shot').value='3';f.get('min-shot').oninput();
+  assert.doesNotMatch(f.get('plan').className,/hidden/);assert.match(f.get('apply').className,/hidden/);
+  await f.click('reanalyze');await f.tick();assert.doesNotMatch(f.get('plan').className,/hidden/);
+});
+
+test('mono workbench settings return preserves inputs and open advanced controls without data jobs',async()=>{
+  const f=await panel();const advanced=f.nodes.find(n=>n.attrs['data-disclosure']==='advanced-settings');
+  await advanced.onclick();f.get('min-shot').value='3.5';const before=f.calls.filter(c=>c.path==='/jobs').length;
+  await f.click('open-settings');assert.match(f.get('view-tracks').className,/hidden/);
+  await f.click('close-settings');
+  for(const id of ['view-tracks','view-speakers','view-cut','advanced-settings'])assert.doesNotMatch(f.get(id).className,/hidden/,id);
+  assert.equal(f.get('min-shot').value,'3.5');assert.equal(advanced.getAttribute('aria-expanded'),'true');
+  assert.equal(f.calls.filter(c=>c.path==='/jobs').length,before);
+});
+
+test('short response switch changes the existing policy and invalidates a reviewed plan',async()=>{
+  const f=await panel();assert.equal(f.get('suppress-short').getAttribute('aria-checked'),'true');
+  await f.click('analyze');await f.tick();await f.click('plan');
+  assert.equal(f.calls.find(c=>c.path==='/plan').body.policy.suppressShort,true);
+  f.get('suppress-short').setAttribute('aria-checked','false');f.get('suppress-short').onchange();
+  assert.equal(f.get('apply').disabled,true);assert.doesNotMatch(f.get('plan').className,/hidden/);
+  await f.click('plan');assert.equal(f.calls.filter(c=>c.path==='/plan').at(-1).body.policy.suppressShort,false);
+});
+
+test('mono slider and keyboard switch share policy persistence and work locks',async()=>{
+  const f=await panel();f.get('min-shot-slider').value='4.2';f.get('min-shot-slider').oninput();
+  assert.equal(f.get('min-shot').value,'4.2');await f.click('suppress-short');
+  assert.equal(f.get('suppress-short').getAttribute('aria-checked'),'false');assert.equal(f.get('suppress-short').getAttribute('aria-checked'),'false');
+  await f.click('save-settings');f.get('min-shot').value='2';await f.click('suppress-short');await f.click('load-settings');
+  assert.equal(f.get('min-shot').value,'4.2');assert.equal(f.get('min-shot-slider').value,'4.2');assert.equal(f.get('suppress-short').getAttribute('aria-checked'),'false');
+  f.evaluate('job={jobId:"held",kind:"analysis"};toggle()');const before=f.evaluate('JSON.stringify(policy())');
+  await f.click('suppress-short');f.get('min-shot-slider').oninput();
+  assert.equal(f.evaluate('JSON.stringify(policy())'),before);assert.equal(f.get('min-shot-slider').disabled,true);assert.equal(f.get('suppress-short').disabled,true);
+});
+
+test('project source selection exposes its controls and current sequence keeps the workbench intact',async()=>{
+  const f=await panel();f.host.selectedSources=async()=>{throw new Error('선택한 클립이 없습니다.');};
+  await f.click('read-selection');assert.doesNotMatch(f.get('project-selection-panel').className,/hidden/);
+  assert.doesNotMatch(f.get('disclosure-3').className,/hidden/);assert.equal(f.get('read-selection').getAttribute('aria-pressed'),'true');
+  await f.click('read-project');assert.match(f.get('project-selection-panel').className,/hidden/);
+  assert.equal(f.get('read-project').getAttribute('aria-pressed'),'true');assert.doesNotMatch(f.get('view-speakers').className,/hidden/);
+});
+
+test('generated plan reveals review and its shortcut never applies native edits',async()=>{
+  const f=await panel();let scrolls=0;f.get('view-review').scrollIntoView=()=>{scrolls++;};
+  await f.click('analyze');await f.tick();await f.click('plan');assert.equal(scrolls,1);
+  assert.doesNotMatch(f.get('show-review').className,/hidden/);assert.match(f.get('show-review').textContent,/1컷/);
+  const calls=f.calls.length;await f.click('show-review');assert.equal(scrolls,2);assert.equal(f.calls.length,calls);
+  delete f.get('view-review').scrollIntoView;f.get('workspace').offsetTop=100;f.get('view-review').offsetTop=700;
+  let focused=0;f.get('review-heading').focus=()=>{focused++;};await f.click('show-review');
+  assert.equal(f.get('workspace').scrollTop,600);assert.equal(focused,1);assert.equal(f.calls.length,calls);
+  assert.equal(f.calls.some(c=>c.path==='/apply/begin'),false);
+  f.get('min-shot').value='3';f.get('min-shot').oninput();assert.match(f.get('show-review').className,/hidden/);
+});
+
 async function heldManualUpdate(stage='/updates/check',mode='separate'){
   let armed=false,resume,reject;
   const f=await updatePanel({request:path=>armed&&!resume&&path===stage?new Promise((a,b)=>{resume=a;reject=b;}):undefined});
@@ -757,7 +824,7 @@ test('manual input is validated at direct apply plan response and native permit 
   }
 });
 test('invalid manual rows do not delay immediate update and update guidance wins',async()=>{
-  const f=await updatePanel();await f.click('add-override');overrideRow(f).last.value='';overrideRow(f).last.oninput();await f.nodes.find(n=>n.attrs['data-step']==='cut').onclick();await f.click('update');assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.match(f.get('action-readiness').textContent,/업데이트/);
+  const f=await updatePanel();await f.click('add-override');overrideRow(f).last.value='';overrideRow(f).last.oninput();f.evaluate('view.show("cut")');await f.click('update');assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.match(f.get('action-readiness').textContent,/업데이트/);
 });
 test('manual row errors renumber after deletion and stable guidance does not rewrite live text',async()=>{
   const f=await overridePanel();await f.click('add-override');const row=overrideRow(f,1);row.last.value='';row.last.oninput();const id=row.error.getAttribute('id');let text=row.error.textContent,writes=0;
@@ -869,7 +936,7 @@ test('native permit wait rechecks cut duration before reaching the editing entry
 });
 
 test('invalid cut settings do not prevent immediate update and update guidance takes priority',async()=>{
-  const f=await updatePanel();f.get('overlap').value='';f.get('overlap').onchange();await f.nodes.find(n=>n.attrs['data-step']==='cut').onclick();await f.click('update');
+  const f=await updatePanel();f.get('overlap').value='';f.get('overlap').onchange();f.evaluate('view.show("cut")');await f.click('update');
   assert.equal(f.calls.filter(c=>c.path==='/updates/start').length,1);assert.match(f.get('action-readiness').textContent,/업데이트/);
 });
 
@@ -1266,7 +1333,7 @@ test('model setup completion promises integrity verification on analysis rather 
 });
 
 test('invalid model metadata uses Korean repair instructions for the current recording mode',async()=>{
-  const f=await panel();f.state.models.silero.status='error';f.state.models['community-1'].status='error';await f.tick();await f.click('next-step');
+  const f=await panel();f.state.models.silero.status='error';f.state.models['community-1'].status='error';await f.tick();
   assert.match(f.get('models').textContent,/정보.*확인 필요/);assert.doesNotMatch(f.get('models').textContent,/error/);
   assert.match(f.get('model-status').textContent,/모델 정보.*Setup.*복구/);
   await f.click('mode-mixed');assert.match(f.get('model-status').textContent,/모델 정보.*설정.*다시 설치/);assert.equal(f.get('analyze').disabled,true);
@@ -1322,19 +1389,19 @@ test('retry intent replaces stale canceled failed or rolled-back update informat
   }
 });
 
-test('action guidance follows step navigation and missing analysis or plan without data calls',async()=>{
+test('workbench guidance follows readiness without navigation data calls',async()=>{
   const f=await panel(),before=f.calls.length;
-  await f.nodes.find(n=>n.attrs['data-step']==='cut').onclick();
+  f.evaluate('view.show("cut")');
   assert.match(f.get('action-readiness')?.textContent||'',/화자.*분석/);assert.equal(f.get('plan').disabled,true);
-  await f.nodes.find(n=>n.attrs['data-step']==='review').onclick();
-  assert.match(f.get('action-readiness')?.textContent||'',/컷 편집.*편집안/);assert.equal(f.get('apply').disabled,true);
+  f.evaluate('view.show("review")');
+  assert.match(f.get('action-readiness')?.textContent||'',/화자.*분석/);assert.equal(f.get('apply').disabled,true);
   assert.equal(f.calls.length,before);
   await f.click('analyze');await f.tick();await f.click('plan');
   assert.equal(f.get('apply').disabled,false);assert.match(f.get('action-readiness').textContent,/전체 편집안.*적용/);
 });
 
 test('action guidance names missing models and clears them after readiness changes',async()=>{
-  const f=await panel();f.state.models.silero.status='missing';await f.tick();await f.click('next-step');
+  const f=await panel();f.state.models.silero.status='missing';await f.tick();
   assert.match(f.get('action-readiness')?.textContent||'',/발화 모델.*Setup.*복구/);assert.equal(f.get('analyze').disabled,true);
   assert.match(f.get('model-status').textContent,/발화 모델.*Setup.*복구/);
   f.state.models.silero.status='installed';await f.tick();
@@ -1363,7 +1430,7 @@ test('action guidance distinguishes heartbeat compatibility from a real componen
 
 test('action guidance does not claim an update is running when the updater is unavailable',async()=>{
   const f=await panel();f.state.update={updateState:'UNAVAILABLE',checkState:'UNAVAILABLE'};await f.tick();
-  await f.nodes.find(n=>n.attrs['data-step']==='cut').onclick();
+  f.evaluate('view.show("cut")');
   assert.match(f.get('action-readiness').textContent,/화자.*분석/);assert.doesNotMatch(f.get('action-readiness').textContent,/업데이트를 진행/);
   assert.equal(f.get('analyze').disabled,false);
 });
@@ -1551,7 +1618,7 @@ test('sync method/stream payload follows the visible controls',async()=>{
   const call=f.calls.find(c=>c.path==='/jobs');assert.equal(call.body.options.method,'manual');assert.equal(call.body.options.sourceSelections.length,2);assert.equal(call.body.options.sourceSelections[0].channelIndex,0);assert.equal(call.body.options.manualOffsets.camera.confirmed,false);
 });
 function descendants(node){return [node,...node.children.flatMap(descendants)];}
-function speakerCamera(f,id='A'){const row=f.get('speaker-mapping').children.find(row=>row.children.some(n=>n.textContent==='화자 '+id));return descendants(row).find(n=>n.tag==='select');}
+function speakerCamera(f,id='A'){return descendants(f.get('speaker-mapping')).find(n=>n.tag==='select'&&n.getAttribute('aria-label')==='화자 '+id+' 연결 카메라');}
 function coveredSpeakers(f){return descendants(f.get('cameras')).find(n=>n.tag==='input');}
 async function mixedAnalysis(f){await f.click('mode-mixed');await f.click('analyze');await f.tick();}
 test('a second mixed analysis reseeding A and B requires new camera and coverage confirmation',async()=>{
